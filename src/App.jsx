@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLogin from "./pages/auth/AdminLogin.jsx";
 import AdminLayout from "./components/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
+import Appointments from "./pages/admin/Appointments";
 
 export default function App() {
   return (
@@ -11,7 +12,8 @@ export default function App() {
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
-        {/* Next up: appointments, logbook, masterlist, clinic-schedule, reports */}
+        <Route path="appointments" element={<Appointments />} />
+        {/* Next up: logbook, masterlist, clinic-schedule, reports */}
       </Route>
     </Routes>
    );
