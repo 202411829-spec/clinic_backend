@@ -146,6 +146,16 @@ export default function LogbookPanel() {
               placeholder="E.g. Paracetamol"
               className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {medTags.map((tag, i) => (
+                <span
+                  key={i}
+                  className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-gray-500">Quantity</label>
@@ -160,28 +170,16 @@ export default function LogbookPanel() {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex flex-wrap gap-2">
-          {medTags.map((tag, i) => (
-            <span
-              key={i}
-              className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2 ml-auto">
-          <button
-            onClick={handleAddMedicine}
-            className="text-sm font-semibold bg-gc-accent text-white px-4 py-2 rounded-full hover:opacity-90"
-          >
-            + Add Medicine
-          </button>
-          <button className="text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-full hover:opacity-90">
-            + Add Walk-in Visit
-          </button>
-        </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          onClick={handleAddMedicine}
+          className="text-sm font-semibold bg-gc-accent text-white px-4 py-2 rounded-full hover:opacity-90"
+        >
+          + Add Medicine
+        </button>
+        <button className="text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-full hover:opacity-90">
+          + Add Walk-in Visit
+        </button>
       </div>
     </section>
   );
