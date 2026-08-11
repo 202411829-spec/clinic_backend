@@ -128,6 +128,21 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M12 5v14M5 12h14" />
         </svg>
       );
+    case "printer":
+      return (
+        <svg {...common}>
+          <path d="M7 8V4h10v4" />
+          <rect x="4" y="8" width="16" height="8" rx="1.5" />
+          <path d="M7 15h10v5H7z" />
+        </svg>
+      );
+    case "download":
+      return (
+        <svg {...common}>
+          <path d="M12 4v11m0 0l-4-4m4 4l4-4" />
+          <path d="M5 18h14" />
+        </svg>
+      );
     case "sort":
       // small up/down chevron pair used for sortable table headers
       return (

@@ -6,6 +6,7 @@ import Appointments from "./pages/admin/Appointments";
 import Logbook from "./pages/admin/Logbook";
 import Masterlist from "./pages/admin/Masterlist";
 import ClinicSchedule from "./pages/admin/ClinicSchedule";
+import Reports from "./pages/admin/Reports";
 
 export default function App() {
   return (
@@ -19,7 +20,7 @@ export default function App() {
         <Route path="logbook" element={<Logbook />} />
         <Route path="masterlist" element={<Masterlist />} />
         <Route path="clinic-schedule" element={<ClinicSchedule />} />
-        {/* Next up: reports */}
+        <Route path="reports" element={<Reports />} />
       </Route>
     </Routes>
    );

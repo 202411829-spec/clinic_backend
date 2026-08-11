@@ -19,7 +19,7 @@ export default function Topbar({ user, onBack, onMenuClick }) {
   const handleBack = onBack ?? (() => window.history.back());
 
   return (
-    <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 bg-white">
+    <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 bg-white print:hidden">
       <div className="flex items-center gap-3">
         <button
           onClick={handleBack}
