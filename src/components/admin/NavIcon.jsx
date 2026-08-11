@@ -82,6 +82,41 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M15 18l-6-6 6-6" />
         </svg>
       );
+    case "search":
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
+      );
+    case "dots":
+      // vertical three-dot "more actions" trigger, filled rather than
+      // stroked so the dots read clearly at small sizes
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <circle cx="12" cy="5" r="1.9" />
+          <circle cx="12" cy="12" r="1.9" />
+          <circle cx="12" cy="19" r="1.9" />
+        </svg>
+      );
+    case "sort":
+      // small up/down chevron pair used for sortable table headers
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <path d="M12 4l4 5H8l4-5Z" opacity="0.9" />
+          <path d="M12 20l-4-5h8l-4 5Z" opacity="0.45" />
+        </svg>
+      );
     default:
       return null;
   }

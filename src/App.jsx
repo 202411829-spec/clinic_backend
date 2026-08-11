@@ -4,6 +4,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import Appointments from "./pages/admin/Appointments";
 import Logbook from "./pages/admin/Logbook";
+import Masterlist from "./pages/admin/Masterlist";
 
 export default function App() {
   return (
@@ -15,7 +16,8 @@ export default function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="logbook" element={<Logbook />} />
-        {/* Next up: masterlist, clinic-schedule, reports */}
+        <Route path="masterlist" element={<Masterlist />} />
+        {/* Next up: clinic-schedule, reports */}
       </Route>
     </Routes>
    );
