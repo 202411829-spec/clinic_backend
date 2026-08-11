@@ -104,6 +104,30 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <circle cx="12" cy="19" r="1.9" />
         </svg>
       );
+    case "chevron-left":
+      return (
+        <svg {...common}>
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      );
+    case "chevron-right":
+      return (
+        <svg {...common}>
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      );
+    case "x":
+      return (
+        <svg {...common}>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      );
+    case "plus":
+      return (
+        <svg {...common}>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      );
     case "sort":
       // small up/down chevron pair used for sortable table headers
       return (
