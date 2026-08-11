@@ -19,7 +19,7 @@ function NavGroup({ title, items, onNavigate }) {
                 [
                   "relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors overflow-hidden",
                   isActive
-                    ? "bg-gradient-to-r from-[#6BCB6F] to-[#4CB157] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+                    ? "bg-[#1E6C1A] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
                     : "text-white/85 hover:bg-white/10",
                 ].join(" ")
               }
@@ -27,7 +27,7 @@ function NavGroup({ title, items, onNavigate }) {
               {({ isActive }) =>
                 isActive ? (
                   <>
-                    <span className="absolute inset-y-0 left-0 w-1.5 bg-[#A8F085] rounded-l-xl" />
+                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32]" />
                     <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
                     <span>{item.label}</span>
                   </>

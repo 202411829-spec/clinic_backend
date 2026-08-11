@@ -1,11 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLogin from "./pages/auth/AdminLogin.jsx";
-import AdminLayout from "./components/admin/AdminLayout";
-import Dashboard from "./pages/admin/Dashboard";
-import Appointments from "./pages/admin/Appointments";
-import Logbook from "./pages/admin/Logbook";
-import Masterlist from "./pages/admin/Masterlist";
-import ClinicSchedule from "./pages/admin/ClinicSchedule";
+import AdminLayout from "./components/admin/AdminLayout.jsx";
+import Dashboard from "./pages/admin/Dashboard.jsx";
+import Appointments from "./pages/admin/Appointments.jsx";
+import Logbook from "./pages/admin/Logbook.jsx";
+import Masterlist from "./pages/admin/Masterlist.jsx";
+import ClinicSchedule from "./pages/admin/ClinicSchedule.jsx";
 import Reports from "./pages/admin/Reports";
 
 export default function App() {

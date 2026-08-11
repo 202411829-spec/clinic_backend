@@ -1,5 +1,5 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import ScheduleCalendar from "./ScheduleCalendar";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
@@ -19,7 +19,21 @@ function InfoDot({ label }) {
   );
 }
 
-function TimeBlockRow({ block, onToggleEdit, editing, onSave }) {
+function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e) {
+      if (menuWrapRef.current && !menuWrapRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
   return (
     <div className="relative">
       <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-4 py-3">
@@ -27,16 +41,44 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave }) {
           {block.time}
         </span>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Slots are set once per generated schedule and stay fixed per block,
+              regardless of later time edits on this or other blocks. */}
           <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
             {block.capacity} Slot{block.capacity === 1 ? "" : "s"}
           </span>
-          <button
-            onClick={() => onToggleEdit(block.id)}
-            aria-label={`Edit ${block.time}`}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-          >
-            <NavIcon name="dots" className="w-4 h-4" />
-          </button>
+
+          <div className="relative" ref={menuWrapRef}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={`Actions for ${block.time}`}
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            >
+              <NavIcon name="dots" className="w-4 h-4" />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onToggleEdit(block.id);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete(block.id);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -80,6 +122,10 @@ export default function ClinicScheduleFullPanel() {
     setBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, time: data.time, capacity: data.slots } : b))
     );
+  }
+
+  function handleDeleteBlock(blockId) {
+    setBlocks((prev) => prev.filter((b) => b.id !== blockId));
   }
 
   function handleUpdateSchedule() {
@@ -210,7 +256,7 @@ export default function ClinicScheduleFullPanel() {
           <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3">
             Time Block Preview
           </h3>
-          <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+          <div className="space-y-2.5">
             {blocks.map((block) => (
               <TimeBlockRow
                 key={block.id}
@@ -218,6 +264,7 @@ export default function ClinicScheduleFullPanel() {
                 editing={openEditId === block.id}
                 onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
                 onSave={handleSaveBlock}
+                onDelete={handleDeleteBlock}
               />
             ))}
             {blocks.length === 0 && (

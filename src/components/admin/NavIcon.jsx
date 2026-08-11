@@ -16,11 +16,16 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
   switch (name) {
     case "grid":
       return (
-        <svg {...common}>
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <rect x="3" y="3" width="8" height="8" rx="2.5" />
+          <rect x="13" y="3" width="8" height="8" rx="2.5" />
+          <rect x="3" y="13" width="8" height="8" rx="2.5" />
+          <rect x="13" y="13" width="8" height="8" rx="2.5" />
         </svg>
       );
     case "calendar":

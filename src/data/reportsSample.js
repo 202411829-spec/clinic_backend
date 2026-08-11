@@ -14,7 +14,7 @@
 export function getReportData() {
   return {
     status: {
-      title: "Complaint",
+      title: "Total of the Students",
       rows: [
         { label: "Total Students", value: "26" },
         { label: "Completed", value: "15 (57.7% of total)" },
