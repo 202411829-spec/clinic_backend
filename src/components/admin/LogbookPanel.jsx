@@ -1,9 +1,11 @@
 // src/components/admin/LogbookPanel.jsx
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
 import { recentLogbookEntries, reasonOptions } from "../../data/dashboardSample";
 
 export default function LogbookPanel() {
+  const navigate = useNavigate();
   const [regId, setRegId] = useState("");
   const [reason, setReason] = useState("");
   const [complaint, setComplaint] = useState("");
@@ -35,7 +37,10 @@ export default function LogbookPanel() {
             </p>
           </div>
         </div>
-        <button className="text-xs font-semibold text-gc-green flex items-center gap-1 hover:underline">
+        <button
+          onClick={() => navigate("/admin/logbook")}
+          className="text-xs font-semibold text-gc-green flex items-center gap-1 hover:underline"
+        >
           View Full Logbook <span aria-hidden>›</span>
         </button>
       </div>

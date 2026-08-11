@@ -82,31 +82,6 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M15 18l-6-6 6-6" />
         </svg>
       );
-    case "search":
-      return (
-        <svg {...common}>
-          <circle cx="11" cy="11" r="7" />
-          <path d="M21 21l-4.3-4.3" />
-        </svg>
-      );
-    case "chevron-left":
-      return (
-        <svg {...common}>
-          <path d="M14.5 18l-6-6 6-6" />
-        </svg>
-      );
-    case "chevron-right":
-      return (
-        <svg {...common}>
-          <path d="M9.5 6l6 6-6 6" />
-        </svg>
-      );
-    case "x":
-      return (
-        <svg {...common}>
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-      );
     default:
       return null;
   }
