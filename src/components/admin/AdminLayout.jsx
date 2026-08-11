@@ -15,7 +15,7 @@ export default function AdminLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gc-green md:flex">
+    <div className="min-h-screen md:h-screen bg-gc-green md:flex md:overflow-hidden">
       <Sidebar />
 
       <MobileSidebarOverlay
@@ -26,8 +26,10 @@ export default function AdminLayout() {
       {/* persistent green handle bar, mobile only — tap to open the menu */}
       <MobileMenuHandle onClick={() => setMobileNavOpen(true)} />
 
-      {/* content panel — the rounded-left-corner cutout matches the desktop mock */}
-      <div className="flex-1 bg-gray-50 md:rounded-tl-[48px] md:rounded-bl-[48px] min-h-screen overflow-hidden pb-10 md:pb-0">
+      {/* content panel — the rounded-left-corner cutout matches the desktop mock.
+          On desktop this column owns its own scroll (md:overflow-y-auto) so the
+          page itself never scrolls — only this panel does, matching the Figma mock. */}
+      <div className="flex-1 bg-gray-50 md:rounded-tl-[48px] md:rounded-bl-[48px] min-h-screen md:h-screen md:overflow-y-auto overflow-hidden pb-10 md:pb-0">
         <Topbar user={currentUser} onMenuClick={() => setMobileNavOpen(true)} />
         <main className="px-4 md:px-8 pb-10">
           <Outlet />

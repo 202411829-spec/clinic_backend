@@ -20,8 +20,8 @@ export default function LogbookPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
             <NavIcon name="book" className="w-4 h-4" />
@@ -41,7 +41,7 @@ export default function LogbookPanel() {
       </div>
 
       {/* search + filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
           <NavIcon name="user" className="w-4 h-4 shrink-0" />
           <input
@@ -103,7 +103,7 @@ export default function LogbookPanel() {
       </div>
 
       {/* walk-in visit form */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
           <label className="text-xs font-semibold text-gray-500">
             ID / Registration Number
@@ -170,15 +170,15 @@ export default function LogbookPanel() {
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <button className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90">
+          + Add Walk-in Visit
+        </button>
         <button
           onClick={handleAddMedicine}
-          className="text-sm font-semibold bg-gc-accent text-white px-4 py-2 rounded-full hover:opacity-90"
+          className="text-sm font-semibold bg-gc-accent text-white px-4 py-2.5 rounded-lg hover:opacity-90"
         >
           + Add Medicine
-        </button>
-        <button className="text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-full hover:opacity-90">
-          + Add Walk-in Visit
         </button>
       </div>
     </section>

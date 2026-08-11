@@ -11,21 +11,33 @@ function NavGroup({ title, items, onNavigate }) {
       </p>
       <ul className="space-y-1">
         {items.map((item) => (
-          <li key={item.to}>
+          <li key={item.to} className="relative">
             <NavLink
               to={item.to}
               onClick={onNavigate}
               className={({ isActive }) =>
                 [
-                  "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors",
+                  "relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors overflow-hidden",
                   isActive
-                    ? "bg-gc-accent text-white shadow-sm"
+                    ? "bg-gradient-to-r from-[#6BCB6F] to-[#4CB157] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
                     : "text-white/85 hover:bg-white/10",
                 ].join(" ")
               }
             >
-              <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
-              <span>{item.label}</span>
+              {({ isActive }) =>
+                isActive ? (
+                  <>
+                    <span className="absolute inset-y-0 left-0 w-1.5 bg-[#A8F085] rounded-l-xl" />
+                    <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
+                    <span>{item.label}</span>
+                  </>
+                ) : (
+                  <>
+                    <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
+                    <span>{item.label}</span>
+                  </>
+                )
+              }
             </NavLink>
           </li>
         ))}
@@ -78,7 +90,7 @@ export default function SidebarNav({ onNavigate }) {
         <NavLink
           to="/admin/about"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-white/85 hover:bg-white/10"
+          className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-white/85 hover:bg-white/10"
         >
           <NavIcon name="info" className="w-[18px] h-[18px]" />
           <span>About</span>

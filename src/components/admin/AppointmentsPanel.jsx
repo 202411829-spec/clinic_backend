@@ -7,12 +7,18 @@ import { appointmentSlots, appointmentDate } from "../../data/dashboardSample";
 
 function SlotGroup({ slot, onStatusChange }) {
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="border border-gray-100 rounded-2xl overflow-hidden mb-3">
-      <button
+    <div className="border border-gray-100 rounded-2xl overflow-hidden mb-2">
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white text-left"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setExpanded((v) => !v);
+        }}
+        className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white text-left cursor-pointer"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span
@@ -46,8 +52,38 @@ function SlotGroup({ slot, onStatusChange }) {
               ? "Full"
               : `${slot.slotsLeft} Slot${slot.slotsLeft === 1 ? "" : "s"} Left`}
           </span>
+
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((v) => !v);
+              }}
+              aria-label="Slot actions"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
+            >
+              &#8942;
+            </button>
+
+            {menuOpen && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 z-10 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden"
+              >
+                <button
+                  onClick={() => {
+                    setExpanded(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  View Bookings
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </button>
+      </div>
 
       {expanded && slot.bookings.length > 0 && (
         <div className="overflow-x-auto border-t border-gray-100">
@@ -116,8 +152,8 @@ export default function AppointmentsPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
             <NavIcon name="calendar" className="w-4 h-4" />
@@ -131,7 +167,7 @@ export default function AppointmentsPanel() {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
           <NavIcon name="user" className="w-4 h-4 shrink-0" />
           <input
