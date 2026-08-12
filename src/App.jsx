@@ -7,7 +7,7 @@ import Logbook from "./pages/admin/Logbook.jsx";
 import Masterlist from "./pages/admin/Masterlist.jsx";
 import StudentRecord from "./pages/admin/StudentRecord.jsx";
 import ClinicSchedule from "./pages/admin/ClinicSchedule.jsx";
-import Reports from "./pages/admin/Reports";
+import Reports from "./pages/admin/Reports.jsx";
 
 export default function App() {
   return (
