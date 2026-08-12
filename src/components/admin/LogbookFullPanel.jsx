@@ -173,7 +173,7 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       {/* header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
         <div className="flex items-center gap-2">
@@ -181,7 +181,7 @@ export default function LogbookFullPanel() {
             <NavIcon name="book" className="w-4 h-4" />
           </span>
           <div>
-            <h1 className="font-bold text-gray-800 text-base md:text-lg leading-tight">
+            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
               Logbook
             </h1>
             <p className="text-xs text-gray-400 leading-tight">
@@ -189,20 +189,6 @@ export default function LogbookFullPanel() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowWalkInForm((v) => !v)}
-          aria-expanded={showWalkInForm}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-        >
-          {showWalkInForm ? (
-            <>
-              <span aria-hidden className="text-base leading-none">×</span>
-              Close
-            </>
-          ) : (
-            <>+ Add Walk-in Visit</>
-          )}
-        </button>
       </div>
 
       {/* search + filters */}
@@ -247,7 +233,7 @@ export default function LogbookFullPanel() {
       </div>
 
       {/* table */}
-      <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-100 md:rounded-xl">
+      <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
         <table className="w-full text-sm min-w-[820px]">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
@@ -293,103 +279,125 @@ export default function LogbookFullPanel() {
         <Pagination page={currentPage} pageCount={pageCount} onChange={setPage} />
       </div>
 
-      {/* walk-in visit form */}
-      {showWalkInForm && (
-      <div className="mt-6 pt-5 border-t border-gray-100">
-        <h2 className="text-sm font-bold text-gray-800 mb-3">Add Walk-in Visit</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-500">
-              ID / Registration Number
-            </label>
-            <input
-              value={regId}
-              onChange={(e) => setRegId(e.target.value)}
-              placeholder="Student ID"
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500">Reason</label>
-            <select
-              value={walkInReason}
-              onChange={(e) => setWalkInReason(e.target.value)}
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
-            >
-              <option value="">Select Reason</option>
-              {reasonOptions.map((r) => (
-                <option key={r}>{r}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500">Complaint</label>
-            <input
-              value={complaint}
-              onChange={(e) => setComplaint(e.target.value)}
-              placeholder="E.g. Headache"
-              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Medicine</label>
-              <input
-                value={medicine}
-                onChange={(e) => setMedicine(e.target.value)}
-                placeholder="E.g. Paracetamol"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Quantity</label>
-              <div className="mt-1 flex gap-1.5">
-                <input
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  type="number"
-                  min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                />
-                <button
-                  onClick={handleAddMedicine}
-                  className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
-                >
-                  + Add
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {medTags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {medTags.map((tag, i) => (
-              <span
-                key={i}
-                className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
+      {/* bottom trigger — the single Add Walk-in Visit entry point */}
+      {!showWalkInForm && (
+        <div className="mt-6 pt-5 border-t border-gray-100 flex justify-end">
           <button
-            onClick={() => setShowWalkInForm(false)}
-            className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAddWalkIn}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            onClick={() => setShowWalkInForm(true)}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             + Add Walk-in Visit
           </button>
         </div>
-      </div>
+      )}
+
+      {/* walk-in visit form — expands directly below the button, closes back into it */}
+      {showWalkInForm && (
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
+            <button
+              onClick={() => setShowWalkInForm(false)}
+              aria-label="Close"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <span aria-hidden className="text-base leading-none">×</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500">
+                ID / Registration Number
+              </label>
+              <input
+                value={regId}
+                onChange={(e) => setRegId(e.target.value)}
+                placeholder="Student ID"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Reason</label>
+              <select
+                value={walkInReason}
+                onChange={(e) => setWalkInReason(e.target.value)}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
+              >
+                <option value="">Select Reason</option>
+                {reasonOptions.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Complaint</label>
+              <input
+                value={complaint}
+                onChange={(e) => setComplaint(e.target.value)}
+                placeholder="E.g. Headache"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Medicine</label>
+                <input
+                  value={medicine}
+                  onChange={(e) => setMedicine(e.target.value)}
+                  placeholder="E.g. Paracetamol"
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Quantity</label>
+                <div className="mt-1 flex gap-1.5">
+                  <input
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    type="number"
+                    min="0"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                  />
+                  <button
+                    onClick={handleAddMedicine}
+                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {medTags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {medTags.map((tag, i) => (
+                <span
+                  key={i}
+                  className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
+            <button
+              onClick={() => setShowWalkInForm(false)}
+              className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddWalkIn}
+              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            >
+              + Add Walk-in Visit
+            </button>
+          </div>
+        </div>
       )}
     </section>
   );

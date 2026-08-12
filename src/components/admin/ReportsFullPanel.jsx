@@ -7,8 +7,8 @@ import { formatMDY, formatLongDate } from "../../lib/calendar";
 
 function StatCard({ title, rows }) {
   return (
-    <div className="border border-gray-100 rounded-2xl p-4">
-      <span className="inline-block text-xs font-bold tracking-wide text-gc-green uppercase bg-gc-green-50 rounded-full px-3 py-1 mb-3">
+    <div className="border border-gray-200 rounded-2xl p-4">
+      <span className="inline-block text-xs font-bold tracking-wide text-gc-green uppercase bg-gc-green-50 rounded-md px-2 py-1 mb-3">
         {title}
       </span>
       <div className="space-y-2.5">
@@ -91,7 +91,7 @@ export default function ReportsFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 print:shadow-none print:border-none">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6 print:shadow-none print:border-none">
       {/* header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div className="flex items-center gap-2">
@@ -99,34 +99,34 @@ export default function ReportsFullPanel() {
             <NavIcon name="chart" className="w-4 h-4" />
           </span>
           <div>
-            <h1 className="font-bold text-gray-800 text-base md:text-lg leading-tight">
+            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
               Reports
             </h1>
             <p className="text-xs text-gray-400 leading-tight">View statistics report.</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 print:hidden">
+        <div className="flex items-center gap-3 print:hidden">
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50"
+            className="inline-flex items-center gap-2 text-base font-semibold text-gray-700 border border-gray-200 px-5 py-3 rounded-xl hover:bg-gray-50"
           >
-            <NavIcon name="printer" className="w-4 h-4" />
+            <NavIcon name="printer" className="w-5 h-5" />
             Print
           </button>
           <button
             onClick={handleDownloadPdf}
             disabled={downloading}
-            className="inline-flex items-center gap-2 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-xl hover:bg-gc-green-600 disabled:opacity-60"
+            className="inline-flex items-center gap-2 text-base font-semibold bg-gc-green text-white px-5 py-3 rounded-xl hover:bg-gc-green-600 disabled:opacity-60"
           >
-            <NavIcon name="download" className="w-4 h-4" />
+            <NavIcon name="download" className="w-5 h-5" />
             {downloading ? "Preparing…" : "Download PDF"}
           </button>
         </div>
       </div>
 
       {/* filters */}
-      <div className="border border-gray-100 rounded-2xl p-4 md:p-5">
+      <div className="border border-gray-200 rounded-2xl p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5 print:hidden">
           <div className="flex items-center gap-2 max-w-[240px]">
             <button

@@ -116,7 +116,7 @@ function ActionMenu({ open, onToggle, onClose, student }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white py-1.5 shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
         >
           <button
             role="menuitem"
@@ -207,14 +207,14 @@ export default function MasterlistFullPanel() {
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       {/* header */}
       <div className="flex items-center gap-2 mb-4">
         <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
           <NavIcon name="user" className="w-4 h-4" />
         </span>
         <div>
-          <h1 className="font-bold text-gray-800 text-base md:text-lg leading-tight">
+          <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
             Masterlist
           </h1>
           <p className="text-xs text-gray-400 leading-tight">
@@ -267,7 +267,7 @@ export default function MasterlistFullPanel() {
       </div>
 
       {/* table */}
-      <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-100 md:rounded-xl">
+      <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
         <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">

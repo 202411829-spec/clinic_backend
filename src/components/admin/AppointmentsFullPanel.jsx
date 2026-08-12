@@ -14,8 +14,8 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
 
   return (
-    <div className="relative border border-gray-100 rounded-2xl overflow-visible mb-3">
-      <div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white">
+    <div className="border border-gray-200 rounded-2xl overflow-visible mb-3">
+      <div className="relative w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex items-center gap-2 min-w-0 text-left"
@@ -59,15 +59,15 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
             &#8942;
           </button>
         </div>
-      </div>
 
-      {editing && (
-        <TimeBlockEditPopover
-          slot={slot}
-          onClose={() => onToggleEdit(null)}
-          onSave={(data) => onSaveTimeBlock(slot.id, data)}
-        />
-      )}
+        {editing && (
+          <TimeBlockEditPopover
+            slot={slot}
+            onClose={() => onToggleEdit(null)}
+            onSave={(data) => onSaveTimeBlock(slot.id, data)}
+          />
+        )}
+      </div>
 
       {expanded && slot.bookings.length > 0 && (
         <div className="overflow-x-auto border-t border-gray-100">
@@ -189,13 +189,13 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   }, [slots, search, department, reason]);
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
             <NavIcon name="calendar" className="w-4 h-4" />
           </span>
-          <h2 className="font-bold text-gray-800 text-sm md:text-base">
+          <h2 className="font-bold text-gc-green text-sm md:text-base">
             Appointments
           </h2>
         </div>

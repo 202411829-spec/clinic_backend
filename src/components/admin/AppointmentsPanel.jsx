@@ -10,7 +10,7 @@ function SlotGroup({ slot, onStatusChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="border border-gray-100 rounded-2xl overflow-hidden mb-2">
+    <div className="border border-gray-200 rounded-2xl overflow-hidden mb-2">
       <div
         role="button"
         tabIndex={0}
@@ -68,7 +68,7 @@ function SlotGroup({ slot, onStatusChange }) {
             {menuOpen && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 z-10 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden"
+                className="absolute right-0 z-10 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
               >
                 <button
                   onClick={() => {
@@ -152,7 +152,7 @@ export default function AppointmentsPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">

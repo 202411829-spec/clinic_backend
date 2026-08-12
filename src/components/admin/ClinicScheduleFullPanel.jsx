@@ -36,7 +36,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3">
         <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
           {block.time}
         </span>
@@ -57,7 +57,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                 <button
                   onClick={() => {
                     setMenuOpen(false);
@@ -138,13 +138,13 @@ export default function ClinicScheduleFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       {/* header */}
       <div className="flex items-center gap-2 mb-5">
         <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
           <NavIcon name="calendar" className="w-4 h-4" />
         </span>
-        <h1 className="font-bold text-gray-800 text-base md:text-lg leading-tight">
+        <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
           Clinic Schedule
         </h1>
       </div>
@@ -154,7 +154,7 @@ export default function ClinicScheduleFullPanel() {
         <ScheduleCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
 
         {/* middle: working hours / break time / time block config */}
-        <div className="border border-gray-100 rounded-2xl p-4 md:p-5 space-y-5">
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 space-y-5">
           <div>
             <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-2">
               Working Hours
@@ -252,7 +252,7 @@ export default function ClinicScheduleFullPanel() {
         </div>
 
         {/* right: live preview */}
-        <div className="border border-gray-100 rounded-2xl p-4 md:p-5">
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5">
           <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3">
             Time Block Preview
           </h3>

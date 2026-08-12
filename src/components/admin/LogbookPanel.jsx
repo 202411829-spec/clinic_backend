@@ -22,7 +22,7 @@ export default function LogbookPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">

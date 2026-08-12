@@ -52,7 +52,7 @@ export default function ScheduleCalendar({ selectedDates, onChange }) {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
         Select Date
       </h2>
