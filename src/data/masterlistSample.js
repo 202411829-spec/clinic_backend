@@ -46,6 +46,24 @@ const placeholderBirthday = "02/05/2004";
 const placeholderContactNumber = "09475429750";
 const placeholderStudentNumber = "202311330";
 const placeholderCivilStatus = "Single";
+const placeholderPresentAddress = "45B, Domingo St., Gordon Heights, Olongapo City";
+
+// Used by the Medical Summary page (/admin/masterlist/:studentId/medical-summary).
+// A real emergency contact — not the student themselves — swap for a real
+// Supabase query later, same shape.
+const placeholderEmergencyContact = {
+  name: "Maria Elena B. Ramos",
+  relationship: "Mother",
+  contactNumber: "09171234567",
+  presentAddress: placeholderPresentAddress,
+};
+
+const placeholderMedicalConditions = ["Allergy: Peanuts", "Hepatitis", "Asthma"];
+
+const placeholderPreviousOperation = {
+  date: "02/05/2004",
+  procedure: "Exploratory Laparotomy",
+};
 
 export const masterlistStudents = Array.from({ length: TOTAL_STUDENTS }, (_, i) => ({
   id: `stu-${i + 1}`,
@@ -59,6 +77,10 @@ export const masterlistStudents = Array.from({ length: TOTAL_STUDENTS }, (_, i) 
   birthday: placeholderBirthday,
   contactNumber: placeholderContactNumber,
   civilStatus: placeholderCivilStatus,
+  presentAddress: placeholderPresentAddress,
+  emergencyContact: placeholderEmergencyContact,
+  medicalConditions: placeholderMedicalConditions,
+  previousOperation: placeholderPreviousOperation,
 }));
 
 export const departmentOptions = Array.from(new Set(deptCoursePairs.map((d) => d.dept)));

@@ -6,6 +6,7 @@ import Appointments from "./pages/admin/Appointments.jsx";
 import Logbook from "./pages/admin/Logbook.jsx";
 import Masterlist from "./pages/admin/Masterlist.jsx";
 import StudentRecord from "./pages/admin/StudentRecord.jsx";
+import MedicalSummary from "./pages/admin/MedicalSummary.jsx";
 import ClinicSchedule from "./pages/admin/ClinicSchedule.jsx";
 import Reports from "./pages/admin/Reports.jsx";
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="logbook" element={<Logbook />} />
         <Route path="masterlist" element={<Masterlist />} />
         <Route path="masterlist/:studentId" element={<StudentRecord />} />
+        <Route path="masterlist/:studentId/medical-summary" element={<MedicalSummary />} />
         <Route path="clinic-schedule" element={<ClinicSchedule />} />
         <Route path="reports" element={<Reports />} />
       </Route>

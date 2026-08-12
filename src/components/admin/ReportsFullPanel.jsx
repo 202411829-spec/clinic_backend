@@ -7,13 +7,13 @@ import { formatMDY, formatLongDate } from "../../lib/calendar";
 
 function StatCard({ title, rows }) {
   return (
-    <div className="border border-gray-200 rounded-2xl p-4">
-      <span className="inline-block text-xs font-bold tracking-wide text-gc-green uppercase bg-gc-green-50 rounded-md px-2 py-1 mb-3">
-        {title}
-      </span>
-      <div className="space-y-2.5">
+    <div className="border border-gray-300 rounded-2xl overflow-hidden">
+      <div className="bg-gray-50 border-b border-gray-300 px-4 py-2.5">
+        <span className="text-xs font-bold tracking-wide text-gc-green uppercase">{title}</span>
+      </div>
+      <div className="divide-y divide-gray-200 px-4">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-start justify-between gap-3 text-sm">
+          <div key={r.label} className="flex items-start justify-between gap-3 text-sm py-2.5">
             <span className="text-gray-800 font-semibold">{r.label}</span>
             <span className="text-gray-500 text-right whitespace-nowrap">{r.value}</span>
           </div>
@@ -91,7 +91,7 @@ export default function ReportsFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6 print:shadow-none print:border-none">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none">
       {/* header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export default function ReportsFullPanel() {
         <div className="flex items-center gap-3 print:hidden">
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 text-base font-semibold text-gray-700 border border-gray-200 px-5 py-3 rounded-xl hover:bg-gray-50"
+            className="inline-flex items-center gap-2 text-base font-semibold text-gray-700 border border-gray-300 px-5 py-3 rounded-xl hover:bg-gray-50"
           >
             <NavIcon name="printer" className="w-5 h-5" />
             Print
@@ -126,24 +126,24 @@ export default function ReportsFullPanel() {
       </div>
 
       {/* filters */}
-      <div className="border border-gray-200 rounded-2xl p-4 md:p-5">
+      <div className="border border-gray-300 rounded-2xl p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5 print:hidden">
           <div className="flex items-center gap-2 max-w-[240px]">
             <button
               onClick={() => shiftDay(-1)}
               aria-label="Previous day"
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
             >
               <NavIcon name="chevron-left" className="w-4 h-4" />
             </button>
-            <div className="flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap">
+            <div className="flex-1 flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap">
               <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
               {formatMDY(date)}
             </div>
             <button
               onClick={() => shiftDay(1)}
               aria-label="Next day"
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
             >
               <NavIcon name="chevron-right" className="w-4 h-4" />
             </button>
@@ -152,7 +152,7 @@ export default function ReportsFullPanel() {
           <select
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
           >
             <option>All Departments</option>
             {departmentOptions.map((d) => (

@@ -1,5 +1,6 @@
 // src/components/admin/StudentRecordPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
 import {
   academicYears,
@@ -49,7 +50,7 @@ function TextInput({ label, ...props }) {
       {label && <FieldLabel>{label}</FieldLabel>}
       <input
         {...props}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20 placeholder:text-gray-400"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20 placeholder:text-gray-400"
       />
     </div>
   );
@@ -62,7 +63,7 @@ function DateInput({ label, ...props }) {
       <input
         type="date"
         {...props}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20"
       />
     </div>
   );
@@ -74,7 +75,7 @@ function SelectInput({ label, options, placeholder, ...props }) {
       {label && <FieldLabel>{label}</FieldLabel>}
       <select
         {...props}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20 bg-white"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20 bg-white"
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((o) => (
@@ -131,7 +132,7 @@ function SectionHeader({ icon, title, subtitle }) {
 /** Thin gray label bar used to split up the Laboratory Results sub-sections. */
 function GroupBar({ children }) {
   return (
-    <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+    <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
       {children}
     </div>
   );
@@ -181,7 +182,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-300 bg-white py-1.5 shadow-lg"
         >
           <button
             role="menuitem"
@@ -202,6 +203,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
 /* ---------- main panel ---------- */
 
 export default function StudentRecordPanel({ student }) {
+  const navigate = useNavigate();
   const [records, setRecords] = useState(getStudentAnnualHistory);
   const [activeYear, setActiveYear] = useState("y1");
   const [savedSection, setSavedSection] = useState(null);
@@ -253,7 +255,7 @@ export default function StudentRecordPanel({ student }) {
   return (
     <div className="flex flex-col gap-5 pb-10">
       {/* ---------- student info card ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gc-green text-white text-xl font-bold flex items-center justify-center shrink-0">
             {initials(student.name)}
@@ -270,7 +272,7 @@ export default function StudentRecordPanel({ student }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:flex md:items-stretch gap-x-4 gap-y-3 md:divide-x md:divide-gray-100 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-2 md:flex md:items-stretch gap-x-4 gap-y-3 md:divide-x md:divide-gray-100 pt-4 border-t border-gray-200">
           {[
             ["Student ID", student.studentNumber],
             ["Dept. / Course", student.deptCourse],
@@ -288,7 +290,7 @@ export default function StudentRecordPanel({ student }) {
       </section>
 
       {/* ---------- annual examination history ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
@@ -307,10 +309,10 @@ export default function StudentRecordPanel({ student }) {
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 md:items-stretch">
-          <div className="flex-1 min-w-0 overflow-x-auto border border-gray-200 rounded-xl">
+          <div className="flex-1 min-w-0 overflow-x-auto border border-gray-300 rounded-xl">
             <table className="w-full text-sm min-w-[600px]">
               <thead>
-                <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+                <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
                   <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Year</th>
                   <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Date Examined</th>
                   <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Examined By</th>
@@ -320,7 +322,7 @@ export default function StudentRecordPanel({ student }) {
               </thead>
               <tbody>
                 {history.map((row) => (
-                  <tr key={row.key} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60">
+                  <tr key={row.key} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/60">
                     <td className="py-2.5 px-4 text-gray-800 font-medium whitespace-nowrap">{row.label}</td>
                     <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.dateExamined}</td>
                     <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.examinedBy}</td>
@@ -357,7 +359,7 @@ export default function StudentRecordPanel({ student }) {
               Medical Certificate
             </button>
             <button
-              onClick={() => window.print()}
+              onClick={() => navigate(`/admin/masterlist/${student.id}/medical-summary`)}
               className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
             >
               Medical Summary
@@ -376,7 +378,7 @@ export default function StudentRecordPanel({ student }) {
               className={`shrink-0 whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
                 activeYear === y.key
                   ? "border-gc-green text-gc-green bg-white"
-                  : "border-gray-200 text-gray-500 bg-white hover:bg-gray-50"
+                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
               }`}
             >
               {y.label}
@@ -392,7 +394,7 @@ export default function StudentRecordPanel({ student }) {
       </div>
 
       {/* ---------- physical examinations ---------- */}
-      <section ref={physicalExamRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <section ref={physicalExamRef} className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader
           icon="user"
           title="Physical Examinations"
@@ -447,7 +449,7 @@ export default function StudentRecordPanel({ student }) {
               />
               <div>
                 <FieldLabel>BMI (kg/m²)</FieldLabel>
-                <div className="w-full border border-gray-200 bg-gc-green-50 rounded-lg px-3 py-2 text-sm text-gray-700 flex items-center justify-between">
+                <div className="w-full border border-gray-300 bg-gc-green-50 rounded-lg px-3 py-2 text-sm text-gray-700 flex items-center justify-between">
                   <span>{computeBmi(rec.weight, rec.height) ?? "—"}</span>
                   <span title="Calculated automatically from weight and height">
                     <NavIcon name="info" className="w-3.5 h-3.5 text-gray-400" />
@@ -468,10 +470,10 @@ export default function StudentRecordPanel({ student }) {
           {/* physical findings */}
           <div>
             <GroupBar>Physical Findings</GroupBar>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-300 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+                  <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
                     <th className="py-2 px-3 font-semibold">Examination</th>
                     <th className="py-2 px-3 font-semibold">Result</th>
                     <th className="py-2 px-3 font-semibold">Findings / Remarks</th>
@@ -485,7 +487,7 @@ export default function StudentRecordPanel({ student }) {
                     ["abdomen", "Abdomen"],
                     ["extremities", "Extremities"],
                   ].map(([key, label]) => (
-                    <tr key={key} className="border-b border-gray-50 last:border-b-0">
+                    <tr key={key} className="border-b border-gray-200 last:border-b-0">
                       <td className="py-2 px-3 text-gray-700 whitespace-nowrap">{label}</td>
                       <td className="py-2 px-3">
                         <ResultSelect value={rec.findings[key]} onChange={(e) => updateFinding(key, e.target.value)} />
@@ -494,7 +496,7 @@ export default function StudentRecordPanel({ student }) {
                         <input
                           value={rec.findingsRemarks[key]}
                           onChange={(e) => updateFindingRemark(key, e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gc-accent"
+                          className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gc-accent"
                         />
                       </td>
                     </tr>
@@ -507,7 +509,7 @@ export default function StudentRecordPanel({ student }) {
                           value={rec.othersSpecify}
                           onChange={(e) => updateRecord({ othersSpecify: e.target.value })}
                           placeholder="Specify"
-                          className="w-full min-w-0 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-gc-accent placeholder:text-gray-400"
+                          className="w-full min-w-0 border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none focus:border-gc-accent placeholder:text-gray-400"
                         />
                       </div>
                     </td>
@@ -518,7 +520,7 @@ export default function StudentRecordPanel({ student }) {
                       <input
                         value={rec.findingsRemarks.others}
                         onChange={(e) => updateFindingRemark("others", e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gc-accent"
+                        className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gc-accent"
                       />
                     </td>
                   </tr>
@@ -553,7 +555,7 @@ export default function StudentRecordPanel({ student }) {
           />
         </div>
 
-        <div className="mt-5 pt-4 border-t border-gray-100">
+        <div className="mt-5 pt-4 border-t border-gray-200">
           <SaveButton onClick={() => handleSave("physical")} saved={savedSection === "physical"}>
             Save Physical Examination
           </SaveButton>
@@ -561,7 +563,7 @@ export default function StudentRecordPanel({ student }) {
       </section>
 
       {/* ---------- laboratory results ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader
           icon="chart"
           title="Laboratory Results"
@@ -654,7 +656,7 @@ export default function StudentRecordPanel({ student }) {
           </div>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-gray-100">
+        <div className="mt-5 pt-4 border-t border-gray-200">
           <SaveButton onClick={() => handleSave("lab")} saved={savedSection === "lab"}>
             Save Lab Results
           </SaveButton>
@@ -662,7 +664,7 @@ export default function StudentRecordPanel({ student }) {
       </section>
 
       {/* ---------- diagnosis and final remark ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader icon="info" title="Diagnosis and Final Remark" />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -676,7 +678,7 @@ export default function StudentRecordPanel({ student }) {
             value={rec.finalRemark}
             onChange={(e) => updateRecord({ finalRemark: e.target.value })}
           />
-          <div className="md:pl-4 md:border-l md:border-gray-100">
+          <div className="md:pl-4 md:border-l md:border-gray-200">
             <TextInput
               label="Examined By"
               value={rec.diagnosisExaminedBy}

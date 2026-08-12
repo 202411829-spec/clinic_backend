@@ -155,6 +155,20 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M3.5 6.5L12 13l8.5-6.5" />
         </svg>
       );
+    case "file":
+      return (
+        <svg {...common}>
+          <path d="M7 3.5h7l5 5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Z" />
+          <path d="M14 3.5V8h4.5" />
+        </svg>
+      );
+    case "medical-cross":
+      return (
+        <svg {...common}>
+          <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+          <path d="M12 8v8M8 12h8" />
+        </svg>
+      );
     case "sort":
       // small up/down chevron pair used for sortable table headers
       return (
