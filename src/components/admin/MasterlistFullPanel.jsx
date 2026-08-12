@@ -1,5 +1,6 @@
 // src/components/admin/MasterlistFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
 import {
   masterlistStudents,
@@ -89,7 +90,7 @@ function Pagination({ page, pageCount, onChange }) {
   );
 }
 
-function ActionMenu({ open, onToggle, onClose, student }) {
+function ActionMenu({ open, onToggle, onClose, student, onViewRecord }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -120,10 +121,13 @@ function ActionMenu({ open, onToggle, onClose, student }) {
         >
           <button
             role="menuitem"
-            onClick={onClose}
+            onClick={() => {
+              onViewRecord(student);
+              onClose();
+            }}
             className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
           >
-            View Profile
+            Student Record
           </button>
           <button
             role="menuitem"
@@ -146,6 +150,7 @@ function ActionMenu({ open, onToggle, onClose, student }) {
 }
 
 export default function MasterlistFullPanel() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
   const [course, setCourse] = useState("All Course");
@@ -322,6 +327,7 @@ export default function MasterlistFullPanel() {
                     open={openMenuId === row.id}
                     onToggle={() => setOpenMenuId((id) => (id === row.id ? null : row.id))}
                     onClose={() => setOpenMenuId(null)}
+                    onViewRecord={(s) => navigate(`/admin/masterlist/${s.id}`)}
                   />
                 </td>
               </tr>

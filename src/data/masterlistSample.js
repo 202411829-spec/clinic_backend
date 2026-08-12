@@ -45,6 +45,7 @@ const placeholderYearLevel = "3rd Year";
 const placeholderBirthday = "02/05/2004";
 const placeholderContactNumber = "09475429750";
 const placeholderStudentNumber = "202311330";
+const placeholderCivilStatus = "Single";
 
 export const masterlistStudents = Array.from({ length: TOTAL_STUDENTS }, (_, i) => ({
   id: `stu-${i + 1}`,
@@ -57,6 +58,7 @@ export const masterlistStudents = Array.from({ length: TOTAL_STUDENTS }, (_, i) 
   sex: placeholderPerson.sex,
   birthday: placeholderBirthday,
   contactNumber: placeholderContactNumber,
+  civilStatus: placeholderCivilStatus,
 }));
 
 export const departmentOptions = Array.from(new Set(deptCoursePairs.map((d) => d.dept)));

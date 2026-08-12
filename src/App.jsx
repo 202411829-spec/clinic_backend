@@ -5,6 +5,7 @@ import Dashboard from "./pages/admin/Dashboard.jsx";
 import Appointments from "./pages/admin/Appointments.jsx";
 import Logbook from "./pages/admin/Logbook.jsx";
 import Masterlist from "./pages/admin/Masterlist.jsx";
+import StudentRecord from "./pages/admin/StudentRecord.jsx";
 import ClinicSchedule from "./pages/admin/ClinicSchedule.jsx";
 import Reports from "./pages/admin/Reports";
 
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="appointments" element={<Appointments />} />
         <Route path="logbook" element={<Logbook />} />
         <Route path="masterlist" element={<Masterlist />} />
+        <Route path="masterlist/:studentId" element={<StudentRecord />} />
         <Route path="clinic-schedule" element={<ClinicSchedule />} />
         <Route path="reports" element={<Reports />} />
       </Route>
