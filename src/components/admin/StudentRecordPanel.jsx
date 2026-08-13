@@ -353,7 +353,7 @@ export default function StudentRecordPanel({ student }) {
 
           <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
             <button
-              onClick={() => window.print()}
+              onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
               className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
             >
               Medical Certificate

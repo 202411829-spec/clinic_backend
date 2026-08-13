@@ -11,9 +11,7 @@ const deptCoursePairs = [
   { dept: "CHTM", course: "BS Hospitality Management" },
   { dept: "CBA", course: "BS Accountancy" },
   { dept: "CBA", course: "BS Business Administration" },
-  { dept: "CTE", course: "BSED English" },
-  { dept: "CTE", course: "BEED" },
-  { dept: "CEA", course: "BS Civil Engineering" },
+  { dept: "CBA", course: "BS Entrepreneurship" }, 
 ];
 
 const people = [
