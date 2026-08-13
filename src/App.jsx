@@ -13,7 +13,7 @@ import Reports from "./pages/admin/Reports.jsx";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/admin/login" replace />} />
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/login" element={<AdminLogin />} />
 
       <Route path="/admin" element={<AdminLayout />}>
