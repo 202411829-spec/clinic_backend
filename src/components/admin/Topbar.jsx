@@ -30,10 +30,15 @@ export default function Topbar({ user, onBack, onMenuClick }) {
         </button>
       </div>
 
-      {/* desktop: plain name + role, no chip */}
-      <div className="hidden md:block text-right leading-tight">
-        <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
-        <p className="text-xs font-medium text-gc-accent">{user?.role}</p>
+      {/* desktop: avatar + name/role, matches the mockup */}
+      <div className="hidden md:flex items-center gap-3">
+        <div className="text-right leading-tight">
+          <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
+          <p className="text-xs font-medium text-gc-accent">{user?.role}</p>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-gc-green text-white text-sm font-bold flex items-center justify-center shrink-0">
+          {initials(user?.name)}
+        </div>
       </div>
 
       {/* mobile: rounded chip with avatar, matches the mockup */}

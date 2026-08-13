@@ -11,7 +11,8 @@
 // (matching what its rows — CCS, CAHS, CHTM… — actually are) so the page
 // reads clearly instead of showing two identically-labeled cards.
 
-export function getReportData() {
+// eslint-disable-next-line no-unused-vars
+export function getReportData(date, department, period) {
   return {
     status: {
       title: "Total",

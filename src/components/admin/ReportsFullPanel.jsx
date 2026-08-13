@@ -1,9 +1,10 @@
 // src/components/admin/ReportsFullPanel.jsx
 import { useMemo, useState } from "react";
 import NavIcon from "./NavIcon";
+import PeriodDropdown from "./PeriodDropdown";
 import { getReportData } from "../../data/reportsSample";
 import { departmentOptions } from "../../data/masterlistSample";
-import { formatMDY, formatLongDate } from "../../lib/calendar";
+import { formatMDY, getPeriodLabel, shiftByPeriod } from "../../lib/calendar";
 
 function StatCard({ title, rows }) {
   return (
@@ -25,15 +26,19 @@ function StatCard({ title, rows }) {
 
 export default function ReportsFullPanel() {
   const [date, setDate] = useState(new Date(2026, 5, 7));
+  const [period, setPeriod] = useState("Day");
   const [department, setDepartment] = useState("All Departments");
   const [downloading, setDownloading] = useState(false);
 
-  const data = useMemo(() => getReportData(date, department), [date, department]);
+  // NOTE: getReportData is still placeholder data (see src/data/reportsSample.js).
+  // Once real aggregation queries are wired up, pass `period` through so the
+  // backend can bucket by day/week/month/semester/academic year/year/all-time.
+  const data = useMemo(() => getReportData(date, department, period), [date, department, period]);
+
+  const periodLabel = useMemo(() => getPeriodLabel(date, period), [date, period]);
 
   function shiftDay(delta) {
-    const next = new Date(date);
-    next.setDate(next.getDate() + delta);
-    setDate(next);
+    setDate((prev) => shiftByPeriod(prev, period, delta));
   }
 
   function handlePrint() {
@@ -54,7 +59,7 @@ export default function ReportsFullPanel() {
 
       doc.setFontSize(10);
       doc.setFont(undefined, "normal");
-      doc.text(`Date: ${formatLongDate(date)}`, 14, y);
+      doc.text(`Period: ${period} (${periodLabel})`, 14, y);
       y += 5;
       doc.text(`Department: ${department}`, 14, y);
       y += 10;
@@ -128,42 +133,49 @@ export default function ReportsFullPanel() {
       {/* filters */}
       <div className="border border-gray-300 rounded-2xl p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5 print:hidden">
-          <div className="flex items-center gap-2 max-w-[240px]">
-            <button
-              onClick={() => shiftDay(-1)}
-              aria-label="Previous day"
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-            >
-              <NavIcon name="chevron-left" className="w-4 h-4" />
-            </button>
+          <div className="flex items-center gap-2 max-w-[320px]">
+            {period !== "All Time" && (
+              <button
+                onClick={() => shiftDay(-1)}
+                aria-label={`Previous ${period.toLowerCase()}`}
+                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              >
+                <NavIcon name="chevron-left" className="w-4 h-4" />
+              </button>
+            )}
             <div className="flex-1 flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap">
               <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
-              {formatMDY(date)}
+              {periodLabel}
             </div>
-            <button
-              onClick={() => shiftDay(1)}
-              aria-label="Next day"
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-            >
-              <NavIcon name="chevron-right" className="w-4 h-4" />
-            </button>
+            {period !== "All Time" && (
+              <button
+                onClick={() => shiftDay(1)}
+                aria-label={`Next ${period.toLowerCase()}`}
+                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+              >
+                <NavIcon name="chevron-right" className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <select
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
-          >
-            <option>All Departments</option>
-            {departmentOptions.map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <PeriodDropdown value={period} onChange={setPeriod} />
+            <select
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
+            >
+              <option>All Departments</option>
+              {departmentOptions.map((d) => (
+                <option key={d}>{d}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* print-only date/department line, since the controls above are hidden when printing */}
         <p className="hidden print:block text-sm text-gray-600 mb-4">
-          {formatLongDate(date)} — {department}
+          {periodLabel} — {department}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

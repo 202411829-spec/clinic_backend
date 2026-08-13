@@ -3,6 +3,7 @@
 // info + annual physical exam / lab history. Opened from the "Medical Summary"
 // button on the Student Record page.
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
 import {
   academicYears,
@@ -130,6 +131,7 @@ function GroupRow({ label, span }) {
 }
 
 export default function MedicalSummaryPanel({ student }) {
+  const navigate = useNavigate();
   const [physicalOpen, setPhysicalOpen] = useState(true);
   const [labOpen, setLabOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -316,7 +318,7 @@ export default function MedicalSummaryPanel({ student }) {
 
         <div className="grid grid-cols-3 md:flex md:items-center gap-2 print:hidden">
           <button
-            onClick={() => window.print()}
+            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
             className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             Medical Certificate
