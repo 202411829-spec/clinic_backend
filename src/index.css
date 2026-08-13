@@ -21,3 +21,24 @@
     -webkit-box-shadow: 0 0 0px 1000px white inset;
   }
 }
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    -webkit-font-smoothing: auto !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    color: #111827 !important; /* gray-900 */
+  }
+
+  .text-gray-400 {
+    color: #4b5563 !important; /* gray-600 */
+  }
+
+  .text-gray-500 {
+    color: #374151 !important; /* gray-700 */
+  }
+}
