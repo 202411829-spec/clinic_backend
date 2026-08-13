@@ -289,27 +289,27 @@ export default function StudentRecordPanel({ student }) {
         </div>
       </section>
 
-      {/* ---------- annual examination history ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-              <NavIcon name="calendar" className="w-4 h-4" />
-            </span>
-            <h2 className="font-bold text-gc-green text-sm md:text-base leading-tight uppercase tracking-wide">
-              Annual Examination History
-            </h2>
+      {/* ---------- annual examination history (+ its own actions, outside the box) ---------- */}
+      <div className="flex flex-col md:flex-row gap-4 md:items-start">
+        <section className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+                <NavIcon name="calendar" className="w-4 h-4" />
+              </span>
+              <h2 className="font-bold text-gc-green text-sm md:text-base leading-tight uppercase tracking-wide">
+                Annual Examination History
+              </h2>
+            </div>
+            <button
+              onClick={handleAddAnnualExamination}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            >
+              + Add Annual Examination
+            </button>
           </div>
-          <button
-            onClick={handleAddAnnualExamination}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            + Add Annual Examination
-          </button>
-        </div>
 
-        <div className="flex flex-col md:flex-row gap-4 md:items-stretch">
-          <div className="flex-1 min-w-0 overflow-x-auto border border-gray-300 rounded-xl">
+          <div className="overflow-x-auto border border-gray-300 rounded-xl">
             <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
@@ -350,23 +350,24 @@ export default function StudentRecordPanel({ student }) {
               </tbody>
             </table>
           </div>
+        </section>
 
-          <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
-            <button
-              onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
-              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-            >
-              Medical Certificate
-            </button>
-            <button
-              onClick={() => navigate(`/admin/masterlist/${student.id}/medical-summary`)}
-              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-            >
-              Medical Summary
-            </button>
-          </div>
+        {/* Medical Certificate / Medical Summary — live outside the Annual Examination box */}
+        <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
+          <button
+            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
+            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+          >
+            Medical Certificate
+          </button>
+          <button
+            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-summary`)}
+            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+          >
+            Medical Summary
+          </button>
         </div>
-      </section>
+      </div>
 
       {/* ---------- year tabs + view full record ---------- */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

@@ -48,3 +48,78 @@ export function formatLongDate(date) {
     year: "numeric",
   });
 }
+
+/**
+ * Academic year (PH convention: starts ~August) that `date` falls in,
+ * returned as "AY 2026-2027".
+ */
+export function getAcademicYearLabel(date) {
+  const y = date.getFullYear();
+  const startYear = date.getMonth() >= 7 ? y : y - 1; // Aug (7) onward starts the new AY
+  return `AY ${startYear}-${startYear + 1}`;
+}
+
+/** Rough PH term for `date`: "1st Semester", "2nd Semester", or "Summer Term". */
+export function getSemesterLabel(date) {
+  const m = date.getMonth(); // 0-indexed
+  if (m >= 7 && m <= 11) return "1st Semester"; // Aug–Dec
+  if (m === 0 || (m >= 1 && m <= 4)) return "2nd Semester"; // Jan–May
+  return "Summer Term"; // Jun–Jul
+}
+
+/** Human label for the currently selected reporting period. */
+export function getPeriodLabel(date, period) {
+  switch (period) {
+    case "Week": {
+      const start = new Date(date);
+      start.setDate(start.getDate() - start.getDay());
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      const sameMonth = start.getMonth() === end.getMonth();
+      const startLabel = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const endLabel = end.toLocaleDateString(
+        "en-US",
+        sameMonth ? { day: "numeric", year: "numeric" } : { month: "short", day: "numeric", year: "numeric" }
+      );
+      return `${startLabel} – ${endLabel}`;
+    }
+    case "Month":
+      return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    case "Semester":
+      return `${getSemesterLabel(date)}, ${getAcademicYearLabel(date)}`;
+    case "Academic Year":
+      return getAcademicYearLabel(date);
+    case "Year":
+      return String(date.getFullYear());
+    case "All Time":
+      return "All Time";
+    case "Day":
+    default:
+      return formatLongDate(date);
+  }
+}
+
+/** Shifts `date` by one unit of `period` in the given `delta` direction (±1). */
+export function shiftByPeriod(date, period, delta) {
+  const next = new Date(date);
+  switch (period) {
+    case "Week":
+      next.setDate(next.getDate() + 7 * delta);
+      break;
+    case "Month":
+      next.setMonth(next.getMonth() + delta);
+      break;
+    case "Semester":
+      next.setMonth(next.getMonth() + 5 * delta);
+      break;
+    case "Academic Year":
+    case "Year":
+      next.setFullYear(next.getFullYear() + delta);
+      break;
+    case "Day":
+    default:
+      next.setDate(next.getDate() + delta);
+      break;
+  }
+  return next;
+}
