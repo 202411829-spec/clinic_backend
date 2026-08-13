@@ -3,24 +3,19 @@ import { useState } from "react";
 import NavIcon from "./NavIcon";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
+import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { appointmentSlots, appointmentDate } from "../../data/dashboardSample";
 
-function SlotGroup({ slot, onStatusChange }) {
+function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock }) {
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="border border-gray-200 rounded-2xl overflow-hidden mb-2">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setExpanded((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") setExpanded((v) => !v);
-        }}
-        className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white text-left cursor-pointer"
-      >
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="border border-gray-200 rounded-2xl overflow-visible mb-2">
+      <div className="relative w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white text-left">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 min-w-0 text-left"
+        >
           <span
             className={`shrink-0 transition-transform text-gray-400 ${
               expanded ? "rotate-90" : ""
@@ -31,7 +26,7 @@ function SlotGroup({ slot, onStatusChange }) {
           <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
             {slot.time}
           </span>
-        </div>
+        </button>
 
         <div className="flex items-center gap-2 pl-6 md:pl-0 shrink-0">
           <span
@@ -53,68 +48,57 @@ function SlotGroup({ slot, onStatusChange }) {
               : `${slot.slotsLeft} Slot${slot.slotsLeft === 1 ? "" : "s"} Left`}
           </span>
 
-          <div className="relative">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((v) => !v);
-              }}
-              aria-label="Slot actions"
-              className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
-            >
-              &#8942;
-            </button>
-
-            {menuOpen && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 z-10 mt-1 w-40 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
-              >
-                <button
-                  onClick={() => {
-                    setExpanded(true);
-                    setMenuOpen(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  View Bookings
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleEdit(slot.id);
+            }}
+            aria-label="Slot actions"
+            className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
+          >
+            &#8942;
+          </button>
         </div>
+
+        {editing && (
+          <TimeBlockEditPopover
+            slot={slot}
+            onClose={() => onToggleEdit(null)}
+            onSave={(data) => onSaveTimeBlock(slot.id, data)}
+          />
+        )}
       </div>
 
       {expanded && slot.bookings.length > 0 && (
         <div className="overflow-x-auto border-t border-gray-100">
-          <table className="w-full text-sm min-w-[560px]">
+          <table className="w-full text-sm min-w-[560px] border-collapse">
             <thead>
               <tr className="text-left text-xs text-gray-400 bg-gray-50">
-                <th className="py-2 px-4 font-semibold">Name</th>
-                <th className="py-2 px-2 font-semibold">Age</th>
-                <th className="py-2 px-2 font-semibold">Dept</th>
-                <th className="py-2 px-2 font-semibold hidden md:table-cell">
+                <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
                   Sex
                 </th>
-                <th className="py-2 px-2 font-semibold">Reason</th>
-                <th className="py-2 px-2 font-semibold">Status</th>
-                <th className="py-2 px-4 font-semibold text-right">Action</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
+                <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
               </tr>
             </thead>
             <tbody>
               {slot.bookings.map((b) => (
-                <tr key={b.id} className="border-t border-gray-50">
-                  <td className="py-2.5 px-4 text-gray-700">{b.name}</td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.age}</td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.dept}</td>
-                  <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <tr key={b.id}>
+                  <td className="py-2.5 px-4 text-gray-700 border border-gray-300">{b.name}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                     {b.sex}
                   </td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.reason}</td>
-                  <td className="py-2.5 px-2">
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
+                  <td className="py-2.5 px-2 border border-gray-300">
                     <StatusBadge status={b.status} />
                   </td>
-                  <td className="py-2.5 px-4 text-right">
+                  <td className="py-2.5 px-4 text-right border border-gray-300">
                     <StatusMenu
                       current={b.status}
                       onChange={(newStatus) =>
@@ -135,6 +119,7 @@ function SlotGroup({ slot, onStatusChange }) {
 
 export default function AppointmentsPanel() {
   const [slots, setSlots] = useState(appointmentSlots);
+  const [openEditId, setOpenEditId] = useState(null);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     setSlots((prev) =>
@@ -148,6 +133,23 @@ export default function AppointmentsPanel() {
               ),
             }
       )
+    );
+  }
+
+  function handleSaveTimeBlock(slotId, data) {
+    setSlots((prev) =>
+      prev.map((slot) => {
+        if (slot.id !== slotId) return slot;
+        const capacity = data.slots;
+        const slotsLeft = Math.max(capacity - slot.booked, 0);
+        return {
+          ...slot,
+          time: data.time,
+          capacity,
+          slotsLeft,
+          full: slot.booked >= capacity,
+        };
+      })
     );
   }
 
@@ -187,7 +189,16 @@ export default function AppointmentsPanel() {
       </div>
 
       {slots.map((slot) => (
-        <SlotGroup key={slot.id} slot={slot} onStatusChange={handleStatusChange} />
+        <SlotGroup
+          key={slot.id}
+          slot={slot}
+          onStatusChange={handleStatusChange}
+          editing={openEditId === slot.id}
+          onToggleEdit={(id) =>
+            setOpenEditId((cur) => (cur === id ? null : id))
+          }
+          onSaveTimeBlock={handleSaveTimeBlock}
+        />
       ))}
     </section>
   );

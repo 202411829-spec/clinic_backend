@@ -71,34 +71,34 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
 
       {expanded && slot.bookings.length > 0 && (
         <div className="overflow-x-auto border-t border-gray-100">
-          <table className="w-full text-sm min-w-[560px]">
+          <table className="w-full text-sm min-w-[560px] border-collapse">
             <thead>
               <tr className="text-left text-xs text-gray-500 bg-gray-50">
-                <th className="py-2 px-4 font-semibold">Name</th>
-                <th className="py-2 px-2 font-semibold">Age</th>
-                <th className="py-2 px-2 font-semibold">Dept</th>
-                <th className="py-2 px-2 font-semibold hidden md:table-cell">
+                <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
                   Sex
                 </th>
-                <th className="py-2 px-2 font-semibold">Reason</th>
-                <th className="py-2 px-2 font-semibold">Status</th>
-                <th className="py-2 px-4 font-semibold text-right">Action</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
+                <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
+                <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
               </tr>
             </thead>
             <tbody>
               {slot.bookings.map((b) => (
-                <tr key={b.id} className="border-t border-gray-50">
-                  <td className="py-2.5 px-4 text-gray-800">{b.name}</td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.age}</td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.dept}</td>
-                  <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <tr key={b.id}>
+                  <td className="py-2.5 px-4 text-gray-800 border border-gray-300">{b.name}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                     {b.sex}
                   </td>
-                  <td className="py-2.5 px-2 text-gray-700">{b.reason}</td>
-                  <td className="py-2.5 px-2">
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
+                  <td className="py-2.5 px-2 border border-gray-300">
                     <StatusBadge status={b.status} />
                   </td>
-                  <td className="py-2.5 px-4 text-right">
+                  <td className="py-2.5 px-4 text-right border border-gray-300">
                     <StatusMenu
                       current={b.status}
                       onChange={(newStatus) =>
