@@ -104,7 +104,11 @@ function ChevronToggle({ open, onClick }) {
 function Th({ children, wide }) {
   return (
     <th
-      className={`py-2.5 px-4 font-semibold border border-gray-300 text-left ${
+      // Fixed pixel widths keep columns steady on screen, but with
+      // table-fixed they'd add up to more than a printed page's width.
+      // print:w-auto lets the table-fixed layout fall back to splitting the
+      // page width evenly across columns instead.
+      className={`py-2.5 px-4 font-semibold border border-gray-300 text-left print:w-auto ${
         wide ? "w-[200px]" : "w-[130px]"
       }`}
     >
@@ -499,7 +503,10 @@ export default function MedicalSummaryPanel({ student }) {
       </section>
 
       {/* ---------- laboratory results ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
+      {/* print:break-before-page forces this section to start at the top of a
+          fresh printed page instead of splitting mid-table across the
+          Physical Examinations page. */}
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4 print:break-before-page">
         <SectionHeader
           icon="chart"
           title="Laboratory Results"
@@ -507,8 +514,13 @@ export default function MedicalSummaryPanel({ student }) {
         />
 
         {labOpen && (
-          <div className="overflow-x-auto rounded-xl">
-            <table className="w-full text-sm min-w-[640px] border-collapse table-fixed">
+          // On screen this scrolls horizontally (overflow-x-auto + min-w) so
+          // narrow viewports can still see every column. In print that
+          // scroll affordance is meaningless — it just clips columns off the
+          // page — so print:overflow-visible + print:min-w-0/print:w-full
+          // let the table shrink to the printable width instead.
+          <div className="overflow-x-auto rounded-xl print:overflow-visible">
+            <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
               <thead>
                 <tr className="text-left text-xs text-gray-500 bg-gray-50">
                   <Th wide>Chest X-Ray</Th>
