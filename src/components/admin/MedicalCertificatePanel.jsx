@@ -3,10 +3,10 @@
 // button on the Student Record and Medical Summary pages. Only this document
 // uses the three seal images below; the Sidebar/Login logos are untouched.
 //
-// Print output: formal format, A4 landscape, three copies per sheet (per the
-// clinic's paper trail — one for the student, one for the department, one for
-// the clinic's own file).
-import { useState } from "react";
+// Print output: formal format, A4 portrait, three copies stacked on one
+// sheet (per the clinic's paper trail — one for the student, one for the
+// department, one for the clinic's own file).
+import { useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import { formatMDY } from "../../lib/calendar";
@@ -30,7 +30,7 @@ function pronounFor(sex) {
 }
 
 // Compact, read-only rendering of one certificate copy — used only in the
-// print output, where three of these sit side by side on a landscape A4 page.
+// print output, where three of these stack on a single portrait A4 page.
 function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark, purpose, issuedOn, copyLabel, copyNumber }) {
   return (
     <div className="border border-gray-400 rounded-lg p-3 relative flex flex-col text-[9px] leading-snug h-full">
@@ -40,7 +40,10 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
       </p>
 
       <div className="flex items-start gap-1 mt-3">
-        <img src={gordonCollegeSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
+        <div className="flex items-start gap-1 shrink-0">
+          <img src={gordonCollegeSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
+          <img src={oswsSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
+        </div>
         <div className="flex-1 text-center px-1">
           <h1 className="font-bold text-gc-green text-[11px] tracking-wide leading-tight">GORDON COLLEGE</h1>
           <p className="text-[7px] text-gray-600 leading-tight">
@@ -124,6 +127,8 @@ export default function MedicalCertificatePanel({ student }) {
   const [purpose, setPurpose] = useState(() => new Set());
   const [issuedOn, setIssuedOn] = useState(() => formatMDY(new Date()));
   const [sending, setSending] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const printRef = useRef(null);
 
   const age = computeAge(student.birthday);
 
@@ -147,10 +152,50 @@ export default function MedicalCertificatePanel({ student }) {
     setTimeout(() => setSending(false), 600);
   }
 
+  // Renders the same three-copy certificate layout used for printing into a
+  // real, downloadable PDF file — instead of just opening the browser's
+  // print dialog like the "Print" button does. We snapshot the off-screen
+  // print-only grid (see printRef below) with html2canvas, then place that
+  // image into an A4-portrait jsPDF document at the same 10mm margin used
+  // by the print stylesheet, so the download matches what printing produces.
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const node = printRef.current;
+      if (!node) return;
+
+      const canvas = await html2canvas(node, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const margin = 10; // matches the certificate-portrait @page margin
+      const imgWidth = 210 - margin * 2; // 190mm
+      const imgHeight = (canvas.height / canvas.width) * imgWidth;
+
+      doc.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      doc.save(`medical-certificate-${student.studentNumber || student.name}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Couldn't generate the PDF. Please try again.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   const copyProps = { student, age, normalFindings, diagnosis, finalRemark, purpose, issuedOn };
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
+    <div className="flex flex-col gap-5 pb-10 print:pb-0 print:gap-0">
       {/* ---------- action row ---------- */}
       <div className="grid grid-cols-3 md:flex md:items-center md:justify-end gap-2 print:hidden">
         <button
@@ -165,14 +210,15 @@ export default function MedicalCertificatePanel({ student }) {
           className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
         >
           <NavIcon name="printer" className="w-4 h-4" />
-          Print (3 copies, A4 landscape)
+          Print (3 copies, A4 portrait)
         </button>
         <button
-          onClick={() => window.print()}
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+          onClick={handleDownloadPdf}
+          disabled={downloadingPdf}
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
         >
           <NavIcon name="download" className="w-4 h-4" />
-          Download PDF
+          {downloadingPdf ? "Preparing…" : "Download PDF"}
         </button>
       </div>
 
@@ -185,7 +231,7 @@ export default function MedicalCertificatePanel({ student }) {
           <h2 className="font-bold text-gray-700 text-sm">Medical Certificate</h2>
         </div>
         <p className="text-xs text-gray-400 -mt-2 mb-4">
-          Fill this in once — printing produces three formal copies (student, department, clinic) on a single A4 landscape sheet.
+          Fill this in once — printing produces three formal copies (student, department, clinic) stacked on a single A4 portrait sheet.
         </p>
 
         {/* the actual editable form */}
@@ -289,8 +335,13 @@ export default function MedicalCertificatePanel({ student }) {
         </div>
       </section>
 
-      {/* ---------- print-only: three formal copies, A4 landscape ---------- */}
-      <div className="hidden print:grid print-a4-landscape grid-cols-3 gap-3 items-stretch">
+      {/* ---------- print/PDF-only: three formal copies, stacked on A4 portrait ----------
+          Kept off-screen (not display:none) so html2canvas can still capture it for the
+          "Download PDF" button — display:none elements have no layout box to snapshot. */}
+      <div
+        ref={printRef}
+        className="grid grid-cols-1 grid-rows-3 gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait-cert print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
+      >
         {COPY_LABELS.map((label, i) => (
           <CertificateCopy key={label} {...copyProps} copyLabel={label} copyNumber={i + 1} />
         ))}

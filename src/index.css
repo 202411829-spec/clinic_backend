@@ -43,17 +43,18 @@
   }
 }
 
-/* Formal A4 print sizing. Most documents (Reports) print portrait; the
-   Medical Certificate prints landscape so its three copies fit side by
-   side on one sheet. Chromium-based browsers support the CSS `page`
-   property to pick a named @page rule per element. */
+/* Formal A4 print sizing. Most documents (Reports) print portrait, using the
+   default @page margin. The Medical Certificate also prints portrait, but
+   with a tighter margin (like the old landscape layout) so its three
+   stacked copies have more room to breathe. Chromium-based browsers
+   support the CSS `page` property to pick a named @page rule per element. */
 @page {
   size: A4 portrait;
   margin: 14mm;
 }
 
-@page certificate-landscape {
-  size: A4 landscape;
+@page certificate-portrait {
+  size: A4 portrait;
   margin: 10mm;
 }
 
@@ -62,15 +63,17 @@
     page: auto;
   }
 
-  .print-a4-landscape {
-    page: certificate-landscape;
+  .print-a4-portrait-cert {
+    page: certificate-portrait;
   }
 
-  /* Landscape A4 (297mm x 210mm) minus the 10mm @page margin on each side
-     leaves ~277mm x 190mm printable. Stretch the 3-copy grid to fill that
-     height so each certificate copy is large and legible, not shrunk into
-     the top of an otherwise-blank page. */
+  /* Portrait A4 (210mm x 297mm) minus the 10mm @page margin on each side
+     leaves ~190mm x 277mm printable. Fill most of that height with the
+     3-copy stack (a couple mm shy of the full 277mm as a safety margin
+     against browser print-engine rounding) so each certificate copy is
+     large and legible without spilling onto a second page. */
   .print-cert-grid {
-    height: 190mm;
+    height: 272mm;
   }
 }
+

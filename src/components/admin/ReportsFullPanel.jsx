@@ -13,13 +13,13 @@ import healthServicesSeal from "../../assets/certificate/health-services-seal.pn
 
 function StatCard({ title, rows }) {
   return (
-    <div className="border border-gray-300 rounded-2xl overflow-hidden">
-      <div className="bg-gray-50 border-b border-gray-300 px-4 py-2.5">
+    <div className="border border-gray-300 rounded-2xl overflow-hidden print:rounded-lg print:break-inside-avoid">
+      <div className="bg-gray-50 border-b border-gray-300 px-4 py-2.5 print:px-3 print:py-1.5">
         <span className="text-xs font-bold tracking-wide text-gc-green uppercase">{title}</span>
       </div>
-      <div className="divide-y divide-gray-200 px-4">
+      <div className="divide-y divide-gray-200 px-4 print:px-3">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-start justify-between gap-3 text-sm py-2.5">
+          <div key={r.label} className="flex items-start justify-between gap-3 text-sm py-2.5 print:py-1.5">
             <span className="text-gray-800 font-semibold">{r.label}</span>
             <span className="text-gray-500 text-right whitespace-nowrap">{r.value}</span>
           </div>
@@ -247,13 +247,13 @@ export default function ReportsFullPanel() {
           {periodLabel} — {department}
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4 print:gap-2">
+          <div className="space-y-4 print:space-y-2">
             <StatCard title={data.status.title} rows={data.status.rows} />
             <StatCard title={data.reason.title} rows={data.reason.rows} />
             <StatCard title={data.department.title} rows={data.department.rows} />
           </div>
-          <div className="space-y-4">
+          <div className="space-y-4 print:space-y-2">
             <StatCard title={data.complaint.title} rows={data.complaint.rows} />
             <StatCard title={data.sex.title} rows={data.sex.rows} />
             <StatCard title={data.age.title} rows={data.age.rows} />
