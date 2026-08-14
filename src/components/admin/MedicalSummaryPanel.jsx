@@ -12,6 +12,10 @@ import {
   formatLongDate,
 } from "../../data/studentRecordSample";
 
+import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
+import oswsSeal from "../../assets/certificate/osws-seal.png";
+import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+
 const RESULT_STYLES = {
   Normal: "bg-green-100 text-green-700",
   "With Findings": "bg-amber-100 text-amber-700",
@@ -100,8 +104,8 @@ function ChevronToggle({ open, onClick }) {
 function Th({ children, wide }) {
   return (
     <th
-      className={`py-2.5 px-4 font-semibold whitespace-nowrap border border-gray-300 text-left ${
-        wide ? "w-[200px]" : "w-[110px]"
+      className={`py-2.5 px-4 font-semibold border border-gray-300 text-left ${
+        wide ? "w-[200px]" : "w-[130px]"
       }`}
     >
       {children}
@@ -111,7 +115,7 @@ function Th({ children, wide }) {
 
 function Td({ children, className = "" }) {
   return (
-    <td className={`py-2.5 px-4 border border-gray-300 text-gray-700 whitespace-nowrap ${className}`}>
+    <td className={`py-2.5 px-4 border border-gray-300 text-gray-700 break-words ${className}`}>
       {children}
     </td>
   );
@@ -299,9 +303,32 @@ export default function MedicalSummaryPanel({ student }) {
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
+    <div className="flex flex-col gap-5 pb-10 print:pb-0 print-a4-portrait">
+      {/* ---------- print-only formal letterhead, matching the Medical
+          Certificate / Reports header ---------- */}
+      <div className="hidden print:flex items-center gap-3 pb-4 border-b border-gray-300">
+        <div className="flex-1 flex items-center gap-2">
+          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
+          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
+        </div>
+        <div className="flex-1 text-center px-2">
+          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
+          <p className="text-xs text-gray-600 leading-snug">
+            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
+          </p>
+          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
+          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
+        </div>
+        <div className="flex-1 flex items-center justify-end">
+          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
+        </div>
+      </div>
+      <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4">
+        MEDICAL SUMMARY
+      </h2>
+
       {/* ---------- title row + actions ---------- */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
             <NavIcon name="file" className="w-5 h-5" />
@@ -316,7 +343,7 @@ export default function MedicalSummaryPanel({ student }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 md:flex md:items-center gap-2 print:hidden">
+        <div className="grid grid-cols-3 md:flex md:items-center gap-2">
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
             className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
@@ -342,7 +369,7 @@ export default function MedicalSummaryPanel({ student }) {
       </div>
 
       {/* ---------- student information ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
         <SectionHeader icon="user" title="Student Information" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
@@ -369,7 +396,7 @@ export default function MedicalSummaryPanel({ student }) {
       </section>
 
       {/* ---------- medical history ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
         <SectionHeader icon="medical-cross" title="Medical History" />
 
         <SubLabel>Medical Conditions</SubLabel>
@@ -397,7 +424,7 @@ export default function MedicalSummaryPanel({ student }) {
       </section>
 
       {/* ---------- physical examinations ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
         <SectionHeader
           icon="user"
           title="Physical Examinations"
@@ -472,7 +499,7 @@ export default function MedicalSummaryPanel({ student }) {
       </section>
 
       {/* ---------- laboratory results ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
         <SectionHeader
           icon="chart"
           title="Laboratory Results"

@@ -49,6 +49,7 @@ function emptyYearRecord() {
       others: "",
     },
     othersSpecify: "",
+    extraOthersFindings: [],
     generalRemarks: "",
     finalAssessment: "",
     physicalExaminedBy: "",
@@ -57,10 +58,12 @@ function emptyYearRecord() {
     cbc: { date: "", hemoglobin: "", hematocrit: "", wbc: "", plateletCount: "", bloodType: "" },
     urinalysis: { date: "", glucose: "", protein: "" },
     otherLabType: "",
+    extraLabOthers: [],
     diagnosis: "",
     finalRemark: "",
     diagnosisExaminedBy: "",
     diagnosisLicenseNo: "",
+    diagnosisNormalFindingsChecked: false,
     normalFindingsChecked: false,
   };
 }

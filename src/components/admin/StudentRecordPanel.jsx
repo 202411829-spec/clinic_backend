@@ -229,6 +229,50 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ findingsRemarks: { ...rec.findingsRemarks, [key]: value } });
   }
 
+  // extra "Others" rows added via the "+ Add" button on the Physical
+  // Examinations findings table — kept separate from the single built-in
+  // "Others" row (othersSpecify / findings.others / findingsRemarks.others)
+  // so existing data/logic for that row is untouched.
+  function addExtraOthersFinding() {
+    updateRecord({
+      extraOthersFindings: [
+        ...rec.extraOthersFindings,
+        { id: `${Date.now()}-${Math.random()}`, specify: "", result: "Normal", remarks: "" },
+      ],
+    });
+  }
+
+  function updateExtraOthersFinding(id, patch) {
+    updateRecord({
+      extraOthersFindings: rec.extraOthersFindings.map((row) =>
+        row.id === id ? { ...row, ...patch } : row
+      ),
+    });
+  }
+
+  function removeExtraOthersFinding(id) {
+    updateRecord({ extraOthersFindings: rec.extraOthersFindings.filter((row) => row.id !== id) });
+  }
+
+  // extra "Others" rows added via the "+ Add" button on Laboratory Results —
+  // kept separate from the single built-in Examination Type field
+  // (otherLabType) for the same reason as above.
+  function addExtraLabOther() {
+    updateRecord({
+      extraLabOthers: [...rec.extraLabOthers, { id: `${Date.now()}-${Math.random()}`, examType: "" }],
+    });
+  }
+
+  function updateExtraLabOther(id, examType) {
+    updateRecord({
+      extraLabOthers: rec.extraLabOthers.map((row) => (row.id === id ? { ...row, examType } : row)),
+    });
+  }
+
+  function removeExtraLabOther(id) {
+    updateRecord({ extraLabOthers: rec.extraLabOthers.filter((row) => row.id !== id) });
+  }
+
   function updateChestXray(patch) {
     updateRecord({ chestXray: { ...rec.chestXray, ...patch } });
   }
@@ -525,35 +569,59 @@ export default function StudentRecordPanel({ student }) {
                       />
                     </td>
                   </tr>
+                  {rec.extraOthersFindings.map((row) => (
+                    <tr key={row.id} className="border-t border-gray-200">
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="text-gray-700">Others</span>
+                          <input
+                            value={row.specify}
+                            onChange={(e) => updateExtraOthersFinding(row.id, { specify: e.target.value })}
+                            placeholder="Specify"
+                            className="w-full min-w-0 border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none focus:border-gc-accent placeholder:text-gray-400"
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 px-3">
+                        <ResultSelect
+                          value={row.result}
+                          onChange={(e) => updateExtraOthersFinding(row.id, { result: e.target.value })}
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={row.remarks}
+                            onChange={(e) => updateExtraOthersFinding(row.id, { remarks: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm outline-none focus:border-gc-accent"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeExtraOthersFinding(row.id)}
+                            aria-label="Remove this finding"
+                            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                          >
+                            <NavIcon name="x" className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={3} className="py-2 px-3">
+                      <button
+                        type="button"
+                        onClick={addExtraOthersFinding}
+                        className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
+                      >
+                        + Add
+                      </button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
-          <TextInput
-            label="General Physical Examination Remarks"
-            value={rec.generalRemarks}
-            onChange={(e) => updateRecord({ generalRemarks: e.target.value })}
-          />
-          <TextInput
-            label="Final Assessment"
-            value={rec.finalAssessment}
-            onChange={(e) => updateRecord({ finalAssessment: e.target.value })}
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-          <TextInput
-            label="Examined By"
-            value={rec.physicalExaminedBy}
-            onChange={(e) => updateRecord({ physicalExaminedBy: e.target.value })}
-          />
-          <TextInput
-            label="License No."
-            value={rec.physicalLicenseNo}
-            onChange={(e) => updateRecord({ physicalLicenseNo: e.target.value })}
-          />
         </div>
 
         <div className="mt-5 pt-4 border-t border-gray-200">
@@ -654,6 +722,34 @@ export default function StudentRecordPanel({ student }) {
                 onChange={(e) => updateRecord({ otherLabType: e.target.value })}
               />
             </div>
+            {rec.extraLabOthers.map((row) => (
+              <div key={row.id} className="max-w-xs flex items-end gap-2 mt-3">
+                <div className="flex-1">
+                  <SelectInput
+                    label="Examination Type"
+                    placeholder="Select"
+                    options={labExamTypeOptions}
+                    value={row.examType}
+                    onChange={(e) => updateExtraLabOther(row.id, e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeExtraLabOther(row.id)}
+                  aria-label="Remove this examination"
+                  className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                >
+                  <NavIcon name="x" className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addExtraLabOther}
+              className="mt-3 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
+            >
+              + Add
+            </button>
           </div>
         </div>
 
@@ -691,6 +787,50 @@ export default function StudentRecordPanel({ student }) {
             value={rec.diagnosisLicenseNo}
             onChange={(e) => updateRecord({ diagnosisLicenseNo: e.target.value })}
           />
+        </div>
+
+        <div className="mt-4">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={rec.diagnosisNormalFindingsChecked}
+              onChange={(e) => updateRecord({ diagnosisNormalFindingsChecked: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-300 text-gc-green focus:ring-gc-accent"
+            />
+            Essentially normal physical findings at the time of evaluation
+          </label>
+        </div>
+
+        {/* moved here from Physical Examinations, per request — sits at the end of
+            Diagnosis and Final Remark, right above the "essentially normal findings"
+            checkbox it's tied to (checking it is what auto-fills that same checkbox
+            on the Medical Certificate). */}
+        <div className="mt-5 pt-4 border-t border-gray-200">
+          <GroupBar>General Physical Examination Summary</GroupBar>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <TextInput
+              label="General Physical Examination Remarks"
+              value={rec.generalRemarks}
+              onChange={(e) => updateRecord({ generalRemarks: e.target.value })}
+            />
+            <TextInput
+              label="Final Assessment"
+              value={rec.finalAssessment}
+              onChange={(e) => updateRecord({ finalAssessment: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <TextInput
+              label="Examined By"
+              value={rec.physicalExaminedBy}
+              onChange={(e) => updateRecord({ physicalExaminedBy: e.target.value })}
+            />
+            <TextInput
+              label="License No."
+              value={rec.physicalLicenseNo}
+              onChange={(e) => updateRecord({ physicalLicenseNo: e.target.value })}
+            />
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
