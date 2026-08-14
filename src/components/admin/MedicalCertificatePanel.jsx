@@ -10,13 +10,14 @@ import { useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import { formatMDY } from "../../lib/calendar";
+import { getCertificateDefaults } from "../../lib/certificateSync";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
 import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
 
-const PURPOSE_OPTIONS = ["Allergy", "Asthma", "Chicken Pox"];
-const COPY_LABELS = ["Student's Copy", "Department's Copy", "Clinic's Copy"];
+const PURPOSE_OPTIONS = ["Enrollment", "OJT Internship", "R.L.E"];
+const COPY_LABELS = ["Student's Copy", "Coordinator's Copy", "Registrar's Copy"];
 
 // "Ramos, Joseph Daniel B." -> "Joseph Daniel B. Ramos"
 function formatDisplayName(name = "") {
@@ -121,9 +122,13 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
 }
 
 export default function MedicalCertificatePanel({ student }) {
-  const [normalFindings, setNormalFindings] = useState(false);
-  const [diagnosis, setDiagnosis] = useState("");
-  const [finalRemark, setFinalRemark] = useState("");
+  // Pre-fill from whatever was last saved on the Diagnosis and Final Remark
+  // section of this student's Student Record — the nurse can still edit any
+  // of these here, this just saves re-typing them.
+  const certDefaults = getCertificateDefaults(student.id);
+  const [normalFindings, setNormalFindings] = useState(certDefaults.normalFindingsChecked);
+  const [diagnosis, setDiagnosis] = useState(certDefaults.diagnosis);
+  const [finalRemark, setFinalRemark] = useState(certDefaults.finalRemark);
   const [purpose, setPurpose] = useState(() => new Set());
   const [issuedOn, setIssuedOn] = useState(() => formatMDY(new Date()));
   const [sending, setSending] = useState(false);

@@ -90,7 +90,7 @@ function Pagination({ page, pageCount, onChange }) {
   );
 }
 
-function ActionMenu({ open, onToggle, onClose, student, onViewRecord, onEdit, onDelete }) {
+function ActionMenu({ open, onToggle, onClose, student, onViewRecord }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -125,32 +125,9 @@ function ActionMenu({ open, onToggle, onClose, student, onViewRecord, onEdit, on
               onViewRecord(student);
               onClose();
             }}
-            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="block w-full px-4 py-2 text-left text-sm font-semibold text-gc-green hover:bg-gray-50"
           >
             View Record
-          </button>
-          <button
-            role="menuitem"
-            onClick={() => {
-              onEdit?.(student);
-              onClose();
-            }}
-            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Edit
-          </button>
-          <div className="border-t border-gray-100" />
-          <button
-            role="menuitem"
-            onClick={() => {
-              if (window.confirm(`Remove ${student.name} from the masterlist?`)) {
-                onDelete?.(student);
-              }
-              onClose();
-            }}
-            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-          >
-            Delete
           </button>
         </div>
       )}
@@ -175,10 +152,6 @@ export default function MasterlistFullPanel() {
       setter(e.target.value);
       setPage(1);
     };
-  }
-
-  function handleDeleteStudent(studentId) {
-    setStudents((prev) => prev.filter((s) => s.id !== studentId));
   }
 
   function handleSort(key) {
@@ -342,8 +315,6 @@ export default function MasterlistFullPanel() {
                     onToggle={() => setOpenMenuId((id) => (id === row.id ? null : row.id))}
                     onClose={() => setOpenMenuId(null)}
                     onViewRecord={(s) => navigate(`/admin/masterlist/${s.id}`)}
-                    onEdit={(s) => navigate(`/admin/masterlist/${s.id}?edit=1`)}
-                    onDelete={(s) => handleDeleteStudent(s.id)}
                   />
                 </td>
               </tr>

@@ -13,6 +13,7 @@ import {
   getHistorySummary,
   computeAge,
 } from "../../data/studentRecordSample";
+import { saveCertificateDefaults } from "../../lib/certificateSync";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
 // once auth is wired up — matches the placeholder used in AdminLayout.
@@ -843,7 +844,21 @@ export default function StudentRecordPanel({ student }) {
             />
             Essentially normal physical findings at the time of evaluation
           </label>
-          <SaveButton onClick={() => handleSave("diagnosis")} saved={savedSection === "diagnosis"}>
+          <SaveButton
+            onClick={() => {
+              // Push Diagnosis, Final Remark, and the "Essentially normal
+              // findings" checkbox above (rec.diagnosisNormalFindingsChecked)
+              // so the Medical Certificate auto-fills with these instead of
+              // the nurse re-typing them there.
+              saveCertificateDefaults(student.id, {
+                diagnosis: rec.diagnosis,
+                finalRemark: rec.finalRemark,
+                normalFindingsChecked: rec.diagnosisNormalFindingsChecked,
+              });
+              handleSave("diagnosis");
+            }}
+            saved={savedSection === "diagnosis"}
+          >
             Save Record
           </SaveButton>
         </div>
