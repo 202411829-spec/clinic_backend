@@ -72,9 +72,12 @@ export function getPeriodLabel(date, period) {
   switch (period) {
     case "Week": {
       const start = new Date(date);
-      start.setDate(start.getDate() - start.getDay());
+      // Monday-start week (ISO): Sun=0 -> shift back 6, Mon=1 -> 0, ... Sat=6 -> 5
+      const dow = start.getDay();
+      const diffToMonday = dow === 0 ? 6 : dow - 1;
+      start.setDate(start.getDate() - diffToMonday);
       const end = new Date(start);
-      end.setDate(end.getDate() + 6);
+      end.setDate(end.getDate() + 6); // Sunday
       const sameMonth = start.getMonth() === end.getMonth();
       const startLabel = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const endLabel = end.toLocaleDateString(
@@ -97,6 +100,15 @@ export function getPeriodLabel(date, period) {
     default:
       return formatLongDate(date);
   }
+}
+
+/** Monday of the week containing `date` (ISO week start). */
+export function getWeekStart(date) {
+  const start = new Date(date);
+  const dow = start.getDay();
+  const diffToMonday = dow === 0 ? 6 : dow - 1;
+  start.setDate(start.getDate() - diffToMonday);
+  return start;
 }
 
 /** Shifts `date` by one unit of `period` in the given `delta` direction (±1). */

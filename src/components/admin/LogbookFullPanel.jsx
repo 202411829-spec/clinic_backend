@@ -234,35 +234,35 @@ export default function LogbookFullPanel() {
 
       {/* table */}
       <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
-        <table className="w-full text-sm min-w-[820px]">
+        <table className="w-full text-sm min-w-[820px] border-collapse">
           <thead>
-            <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
-              <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Date / Time</th>
-              <th className="py-2.5 px-3 font-semibold">Name</th>
-              <th className="py-2.5 px-3 font-semibold">Age</th>
-              <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Dept &amp; Course</th>
-              <th className="py-2.5 px-3 font-semibold">Sex</th>
-              <th className="py-2.5 px-3 font-semibold">Reason</th>
-              <th className="py-2.5 px-3 font-semibold">Complaint</th>
-              <th className="py-2.5 px-4 font-semibold">Medicine</th>
+            <tr className="text-left text-xs text-gray-500 bg-gray-50">
+              <th className="py-2.5 px-4 font-semibold border border-gray-300 whitespace-nowrap">Date / Time</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300">Name</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300">Age</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap">Dept &amp; Course</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300">Sex</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300">Reason</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300">Complaint</th>
+              <th className="py-2.5 px-4 font-semibold border border-gray-300">Medicine</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60">
-                <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{row.dateTime}</td>
-                <td className="py-3 px-3 text-gray-800 font-medium">{row.name}</td>
-                <td className="py-3 px-3 text-gray-700">{row.age}</td>
-                <td className="py-3 px-3 text-gray-700 whitespace-nowrap">{row.deptCourse}</td>
-                <td className="py-3 px-3 text-gray-700">{row.sex}</td>
-                <td className="py-3 px-3 text-gray-700">{row.reason}</td>
-                <td className="py-3 px-3 text-gray-700">{row.complaint}</td>
-                <td className="py-3 px-4 text-gray-700">{row.medicine}</td>
+              <tr key={row.id} className="hover:bg-gray-50/60">
+                <td className="py-3 px-4 text-gray-700 border border-gray-300 whitespace-nowrap">{row.dateTime}</td>
+                <td className="py-3 px-3 text-gray-800 font-medium border border-gray-300">{row.name}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.age}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.deptCourse}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.sex}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.reason}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.complaint}</td>
+                <td className="py-3 px-4 text-gray-700 border border-gray-300">{row.medicine}</td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-sm text-gray-400">
+                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
                   No visits match your search or filters.
                 </td>
               </tr>

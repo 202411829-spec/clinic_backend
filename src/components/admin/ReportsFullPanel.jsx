@@ -1,10 +1,15 @@
 // src/components/admin/ReportsFullPanel.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import PeriodDropdown from "./PeriodDropdown";
+import SelectDateCalendar from "./SelectDateCalendar";
 import { getReportData } from "../../data/reportsSample";
 import { departmentOptions } from "../../data/masterlistSample";
 import { formatMDY, getPeriodLabel, shiftByPeriod } from "../../lib/calendar";
+
+import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
+import oswsSeal from "../../assets/certificate/osws-seal.png";
+import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
 
 function StatCard({ title, rows }) {
   return (
@@ -29,6 +34,19 @@ export default function ReportsFullPanel() {
   const [period, setPeriod] = useState("Day");
   const [department, setDepartment] = useState("All Departments");
   const [downloading, setDownloading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function handleClickOutside(e) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pickerOpen]);
 
   // NOTE: getReportData is still placeholder data (see src/data/reportsSample.js).
   // Once real aggregation queries are wired up, pass `period` through so the
@@ -49,8 +67,17 @@ export default function ReportsFullPanel() {
     setDownloading(true);
     try {
       const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF();
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       let y = 18;
+
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("GORDON COLLEGE", 105, y, { align: "center" });
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+      doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
+      y += 10;
 
       doc.setFontSize(16);
       doc.setFont(undefined, "bold");
@@ -96,7 +123,29 @@ export default function ReportsFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print-a4-portrait">
+      {/* print-only formal letterhead, matching the Medical Certificate header */}
+      <div className="hidden print:flex items-center gap-3 mb-4 pb-4 border-b border-gray-300">
+        <div className="flex-1 flex items-center gap-2">
+          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
+          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
+        </div>
+        <div className="flex-1 text-center px-2">
+          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
+          <p className="text-xs text-gray-600 leading-snug">
+            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
+          </p>
+          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
+          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
+        </div>
+        <div className="flex-1 flex items-center justify-end">
+          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
+        </div>
+      </div>
+      <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+        CLINIC REPORT
+      </h2>
+
       {/* header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div className="flex items-center gap-2">
@@ -133,7 +182,7 @@ export default function ReportsFullPanel() {
       {/* filters */}
       <div className="border border-gray-300 rounded-2xl p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5 print:hidden">
-          <div className="flex items-center gap-2 max-w-[320px]">
+          <div className="flex items-center gap-2 max-w-[320px] relative" ref={pickerRef}>
             {period !== "All Time" && (
               <button
                 onClick={() => shiftDay(-1)}
@@ -143,10 +192,18 @@ export default function ReportsFullPanel() {
                 <NavIcon name="chevron-left" className="w-4 h-4" />
               </button>
             )}
-            <div className="flex-1 flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => period !== "All Time" && setPickerOpen((v) => !v)}
+              aria-haspopup={period !== "All Time" ? "dialog" : undefined}
+              aria-expanded={pickerOpen}
+              className={`flex-1 flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap ${
+                period !== "All Time" ? "hover:bg-gray-50 cursor-pointer" : "cursor-default"
+              }`}
+            >
               <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
               {periodLabel}
-            </div>
+            </button>
             {period !== "All Time" && (
               <button
                 onClick={() => shiftDay(1)}
@@ -155,6 +212,18 @@ export default function ReportsFullPanel() {
               >
                 <NavIcon name="chevron-right" className="w-4 h-4" />
               </button>
+            )}
+
+            {pickerOpen && (
+              <div className="absolute left-0 top-full mt-2 z-30 w-[320px]">
+                <SelectDateCalendar
+                  selectedDate={date}
+                  onSelectDate={(d) => {
+                    setDate(d);
+                    setPickerOpen(false);
+                  }}
+                />
+              </div>
             )}
           </div>
 

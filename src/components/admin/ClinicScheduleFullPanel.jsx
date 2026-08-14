@@ -1,10 +1,10 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
-import ScheduleCalendar from "./ScheduleCalendar";
+import ScheduleCalendar, { DEFAULT_OPEN_WEEKDAYS } from "./ScheduleCalendar";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { generateTimeBlocks } from "../../lib/schedule";
-import { formatMDY } from "../../lib/calendar";
+import { formatMDY, WEEKDAY_LABELS } from "../../lib/calendar";
 
 function InfoDot({ label }) {
   return (
@@ -95,6 +95,8 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
 export default function ClinicScheduleFullPanel() {
   const [selectedDates, setSelectedDates] = useState([new Date(2026, 5, 6)]);
+  const [scheduleMode, setScheduleMode] = useState("date"); // "date" | "days"
+  const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
 
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("17:00");
@@ -105,6 +107,7 @@ export default function ClinicScheduleFullPanel() {
   const [blocks, setBlocks] = useState([]);
   const [openEditId, setOpenEditId] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
+  const [bookingOpenMessage, setBookingOpenMessage] = useState("");
 
   const computed = useMemo(
     () => generateTimeBlocks({ workStart, workEnd, breakStart, breakEnd, numStudents }),
@@ -130,11 +133,24 @@ export default function ClinicScheduleFullPanel() {
 
   function handleUpdateSchedule() {
     const dateLabel =
-      selectedDates.length > 1
+      scheduleMode === "days"
+        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
+        : selectedDates.length > 1
         ? `${selectedDates.length} dates`
         : formatMDY(selectedDates[0]);
     setSavedMessage(`Schedule updated for ${dateLabel}.`);
     window.setTimeout(() => setSavedMessage(""), 3000);
+  }
+
+  function handleOpenBooking() {
+    const dateLabel =
+      scheduleMode === "days"
+        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
+        : selectedDates.length > 1
+        ? `${selectedDates.length} dates`
+        : formatMDY(selectedDates[0]);
+    setBookingOpenMessage(`Booking is now open for ${dateLabel}.`);
+    window.setTimeout(() => setBookingOpenMessage(""), 3000);
   }
 
   return (
@@ -151,7 +167,14 @@ export default function ClinicScheduleFullPanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">
         {/* left: calendar */}
-        <ScheduleCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+        <ScheduleCalendar
+          selectedDates={selectedDates}
+          onChange={setSelectedDates}
+          scheduleMode={scheduleMode}
+          onScheduleModeChange={setScheduleMode}
+          selectedWeekdays={selectedWeekdays}
+          onWeekdaysChange={setSelectedWeekdays}
+        />
 
         {/* middle: working hours / break time / time block config */}
         <div className="border border-gray-200 rounded-2xl p-4 md:p-5 space-y-5">
@@ -276,11 +299,19 @@ export default function ClinicScheduleFullPanel() {
         </div>
       </div>
 
-      {/* footer: save action */}
+      {/* footer: save + open booking actions */}
       <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
-        {savedMessage && (
-          <p className="text-sm font-semibold text-gc-green">{savedMessage}</p>
+        {(savedMessage || bookingOpenMessage) && (
+          <p className="text-sm font-semibold text-gc-green">
+            {savedMessage || bookingOpenMessage}
+          </p>
         )}
+        <button
+          onClick={handleOpenBooking}
+          className="w-full md:w-auto rounded-xl bg-gc-accent px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors"
+        >
+          Open Booking
+        </button>
         <button
           onClick={handleUpdateSchedule}
           className="w-full md:w-auto rounded-xl bg-gc-green px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"

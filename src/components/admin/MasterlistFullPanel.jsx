@@ -90,7 +90,7 @@ function Pagination({ page, pageCount, onChange }) {
   );
 }
 
-function ActionMenu({ open, onToggle, onClose, student, onViewRecord }) {
+function ActionMenu({ open, onToggle, onClose, student, onViewRecord, onEdit, onDelete }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -129,6 +129,29 @@ function ActionMenu({ open, onToggle, onClose, student, onViewRecord }) {
           >
             View Record
           </button>
+          <button
+            role="menuitem"
+            onClick={() => {
+              onEdit?.(student);
+              onClose();
+            }}
+            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Edit
+          </button>
+          <div className="border-t border-gray-100" />
+          <button
+            role="menuitem"
+            onClick={() => {
+              if (window.confirm(`Remove ${student.name} from the masterlist?`)) {
+                onDelete?.(student);
+              }
+              onClose();
+            }}
+            className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
         </div>
       )}
     </div>
@@ -137,6 +160,7 @@ function ActionMenu({ open, onToggle, onClose, student, onViewRecord }) {
 
 export default function MasterlistFullPanel() {
   const navigate = useNavigate();
+  const [students, setStudents] = useState(masterlistStudents);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
   const [course, setCourse] = useState("All Course");
@@ -153,6 +177,10 @@ export default function MasterlistFullPanel() {
     };
   }
 
+  function handleDeleteStudent(studentId) {
+    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+  }
+
   function handleSort(key) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -165,7 +193,7 @@ export default function MasterlistFullPanel() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let rows = masterlistStudents.filter((s) => {
+    let rows = students.filter((s) => {
       const matchesSearch =
         !q ||
         s.name.toLowerCase().includes(q) ||
@@ -188,7 +216,7 @@ export default function MasterlistFullPanel() {
     }
 
     return rows;
-  }, [search, department, course, yearLevel, sortKey, sortDir]);
+  }, [students, search, department, course, yearLevel, sortKey, sortDir]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -259,13 +287,13 @@ export default function MasterlistFullPanel() {
 
       {/* table */}
       <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
-        <table className="w-full text-sm min-w-[900px]">
+        <table className="w-full text-sm min-w-[900px] border-collapse">
           <thead>
-            <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+            <tr className="text-left text-xs text-gray-500 bg-gray-50">
               {COLUMNS.map((col, i) => (
                 <th
                   key={col.key}
-                  className={`py-2.5 font-semibold whitespace-nowrap ${
+                  className={`py-2.5 font-semibold border border-gray-300 whitespace-nowrap ${
                     i === 0 ? "px-4" : "px-3"
                   }`}
                 >
@@ -287,13 +315,13 @@ export default function MasterlistFullPanel() {
                   )}
                 </th>
               ))}
-              <th className="py-2.5 px-4 font-semibold text-right whitespace-nowrap">Action</th>
+              <th className="py-2.5 px-4 font-semibold border border-gray-300 text-right whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60">
-                <td className="py-2.5 px-4">
+              <tr key={row.id} className="hover:bg-gray-50/60">
+                <td className="py-2.5 px-4 border border-gray-300">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-gc-green text-white text-xs font-bold flex items-center justify-center shrink-0">
                       {initials(row.name)}
@@ -301,26 +329,28 @@ export default function MasterlistFullPanel() {
                     <span className="text-gray-800 font-medium whitespace-nowrap">{row.name}</span>
                   </div>
                 </td>
-                <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.studentNumber}</td>
-                <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.deptCourse}</td>
-                <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.yearLevel}</td>
-                <td className="py-2.5 px-3 text-gray-700">{row.sex}</td>
-                <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.birthday}</td>
-                <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.contactNumber}</td>
-                <td className="py-2.5 px-4 text-right">
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.studentNumber}</td>
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.deptCourse}</td>
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.yearLevel}</td>
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300">{row.sex}</td>
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.birthday}</td>
+                <td className="py-2.5 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.contactNumber}</td>
+                <td className="py-2.5 px-4 text-right border border-gray-300">
                   <ActionMenu
                     student={row}
                     open={openMenuId === row.id}
                     onToggle={() => setOpenMenuId((id) => (id === row.id ? null : row.id))}
                     onClose={() => setOpenMenuId(null)}
                     onViewRecord={(s) => navigate(`/admin/masterlist/${s.id}`)}
+                    onEdit={(s) => navigate(`/admin/masterlist/${s.id}?edit=1`)}
+                    onDelete={(s) => handleDeleteStudent(s.id)}
                   />
                 </td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={COLUMNS.length + 1} className="py-8 text-center text-sm text-gray-400">
+                <td colSpan={COLUMNS.length + 1} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
                   No students match your search or filters.
                 </td>
               </tr>
