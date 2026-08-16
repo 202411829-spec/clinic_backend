@@ -169,6 +169,18 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M12 8v8M8 12h8" />
         </svg>
       );
+    case "bell":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <path d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.62C7.36 5.27 5.25 8 5.25 11.25v3.1c0 .5-.18.98-.51 1.36l-1.06 1.22c-.72.83-.13 2.12.96 2.12h14.72c1.09 0 1.68-1.29.96-2.12l-1.06-1.22a2.08 2.08 0 0 1-.51-1.36v-3.1c0-3.25-2.11-5.98-5.25-6.63V4A1.5 1.5 0 0 0 12 2.5Z" />
+          <path d="M9.5 20a2.5 2.5 0 0 0 5 0h-5Z" />
+        </svg>
+      );
     case "sort":
       // small up/down chevron pair used for sortable table headers
       return (

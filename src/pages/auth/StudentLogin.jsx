@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import StudentLoginForm from '../../components/student/StudentLoginForm.jsx'
 import { studentSignIn } from '../../lib/supabaseClient.js'
 
@@ -9,6 +10,7 @@ const BRAND = {
 }
 
 export default function StudentLogin() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -17,7 +19,7 @@ export default function StudentLogin() {
     setLoading(true)
     try {
       await studentSignIn(username, password)
-      // TODO: navigate to /student/dashboard once the dashboard route exists
+      navigate('/student/dashboard')
     } catch (err) {
       setError(err?.message || 'Unable to log in. Please check your credentials.')
     } finally {
