@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLogin from "./pages/auth/AdminLogin.jsx";
+import StudentLogin from "./pages/auth/StudentLogin.jsx";
 import AdminLayout from "./components/admin/AdminLayout.jsx";
 import Dashboard from "./pages/admin/Dashboard.jsx";
 import Appointments from "./pages/admin/Appointments.jsx";
@@ -16,6 +17,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/student/login" element={<StudentLogin />} />
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
