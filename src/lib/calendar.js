@@ -40,6 +40,18 @@ export function formatMDY(date) {
   return `${mm}/${dd}/${date.getFullYear()}`;
 }
 
+/**
+ * e.g. { month: "AUG", day: "8", weekday: "MON" } — matches the date box
+ * on the Student Dashboard's Upcoming Appointment card.
+ */
+export function getCalendarBoxParts(date) {
+  return {
+    month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    day: String(date.getDate()),
+    weekday: date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+  };
+}
+
 /** e.g. "August 6, 2026" — matches the header on the Appointments card */
 export function formatLongDate(date) {
   return date.toLocaleDateString("en-US", {

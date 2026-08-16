@@ -1,8 +1,15 @@
 // src/components/student/NotificationsPanel.jsx
 import NavIcon from "../admin/NavIcon";
-import { notifications } from "../../data/studentDashboardSample";
+import { notifications as sampleNotifications } from "../../data/studentDashboardSample";
+import { useAppointment } from "../../context/AppointmentContext";
 
 export default function NotificationsPanel() {
+  const { notifications: liveNotifications } = useAppointment();
+  // Live events (booked/rescheduled/cancelled just now) show first, above
+  // the placeholder history. TODO: drop sampleNotifications once the
+  // backend returns real notification history.
+  const notifications = [...liveNotifications, ...sampleNotifications];
+
   return (
     <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
       <div className="flex items-start gap-3 mb-4">
