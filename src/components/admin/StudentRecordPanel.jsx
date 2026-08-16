@@ -9,6 +9,7 @@ import {
   proteinOptions,
   bloodTypeOptions,
   labExamTypeOptions,
+  labOtherFieldsConfig,
   getStudentAnnualHistory,
   getHistorySummary,
   computeAge,
@@ -85,6 +86,41 @@ function SelectInput({ label, options, placeholder, ...props }) {
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/**
+ * Extra fields that appear under an "Others" Examination Type once one is
+ * picked (e.g. Fecalysis -> Color / Consistency / Pus Cells / Rbc / Parasites
+ * Ova, Drug Testing -> Methamphetamine / Tetrahydrocannabinol, etc). Driven
+ * entirely by labOtherFieldsConfig so adding a new exam type there is enough.
+ */
+function LabOtherDynamicFields({ examType, details, onChange }) {
+  const fields = labOtherFieldsConfig[examType];
+  if (!fields || fields.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-3">
+      {fields.map((f) =>
+        f.type === "select" ? (
+          <SelectInput
+            key={f.key}
+            label={f.label}
+            placeholder="Select"
+            options={f.options}
+            value={details?.[f.key] ?? ""}
+            onChange={(e) => onChange({ [f.key]: e.target.value })}
+          />
+        ) : (
+          <TextInput
+            key={f.key}
+            label={f.label}
+            value={details?.[f.key] ?? ""}
+            onChange={(e) => onChange({ [f.key]: e.target.value })}
+          />
+        )
+      )}
     </div>
   );
 }
@@ -260,18 +296,41 @@ export default function StudentRecordPanel({ student }) {
   // (otherLabType) for the same reason as above.
   function addExtraLabOther() {
     updateRecord({
-      extraLabOthers: [...rec.extraLabOthers, { id: `${Date.now()}-${Math.random()}`, examType: "" }],
+      extraLabOthers: [
+        ...rec.extraLabOthers,
+        { id: `${Date.now()}-${Math.random()}`, examType: "", details: {} },
+      ],
     });
   }
 
+  // Changing the Examination Type resets that row's details, since the
+  // fields shown (and what they mean) are specific to the exam picked.
   function updateExtraLabOther(id, examType) {
     updateRecord({
-      extraLabOthers: rec.extraLabOthers.map((row) => (row.id === id ? { ...row, examType } : row)),
+      extraLabOthers: rec.extraLabOthers.map((row) =>
+        row.id === id ? { ...row, examType, details: {} } : row
+      ),
+    });
+  }
+
+  function updateExtraLabOtherDetails(id, patch) {
+    updateRecord({
+      extraLabOthers: rec.extraLabOthers.map((row) =>
+        row.id === id ? { ...row, details: { ...row.details, ...patch } } : row
+      ),
     });
   }
 
   function removeExtraLabOther(id) {
     updateRecord({ extraLabOthers: rec.extraLabOthers.filter((row) => row.id !== id) });
+  }
+
+  function updateOtherLabType(examType) {
+    updateRecord({ otherLabType: examType, otherLabDetails: {} });
+  }
+
+  function updateOtherLabDetails(patch) {
+    updateRecord({ otherLabDetails: { ...rec.otherLabDetails, ...patch } });
   }
 
   function updateChestXray(patch) {
@@ -714,36 +773,51 @@ export default function StudentRecordPanel({ student }) {
 
           <div>
             <GroupBar>Others</GroupBar>
+
             <div className="max-w-xs">
               <SelectInput
                 label="Examination Type"
                 placeholder="Select"
                 options={labExamTypeOptions}
                 value={rec.otherLabType}
-                onChange={(e) => updateRecord({ otherLabType: e.target.value })}
+                onChange={(e) => updateOtherLabType(e.target.value)}
               />
             </div>
+            <LabOtherDynamicFields
+              examType={rec.otherLabType}
+              details={rec.otherLabDetails}
+              onChange={updateOtherLabDetails}
+            />
+
             {rec.extraLabOthers.map((row) => (
-              <div key={row.id} className="max-w-xs flex items-end gap-2 mt-3">
-                <div className="flex-1">
-                  <SelectInput
-                    label="Examination Type"
-                    placeholder="Select"
-                    options={labExamTypeOptions}
-                    value={row.examType}
-                    onChange={(e) => updateExtraLabOther(row.id, e.target.value)}
-                  />
+              <div key={row.id} className="mt-4 pt-4 border-t border-gray-100">
+                <div className="max-w-xs flex items-end gap-2">
+                  <div className="flex-1">
+                    <SelectInput
+                      label="Examination Type"
+                      placeholder="Select"
+                      options={labExamTypeOptions}
+                      value={row.examType}
+                      onChange={(e) => updateExtraLabOther(row.id, e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeExtraLabOther(row.id)}
+                    aria-label="Remove this examination"
+                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                  >
+                    <NavIcon name="x" className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeExtraLabOther(row.id)}
-                  aria-label="Remove this examination"
-                  className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-500"
-                >
-                  <NavIcon name="x" className="w-4 h-4" />
-                </button>
+                <LabOtherDynamicFields
+                  examType={row.examType}
+                  details={row.details}
+                  onChange={(patch) => updateExtraLabOtherDetails(row.id, patch)}
+                />
               </div>
             ))}
+
             <button
               type="button"
               onClick={addExtraLabOther}
