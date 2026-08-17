@@ -76,6 +76,14 @@ export default function StudentRecordPanel({ student: initialStudent }) {
     window.setTimeout(() => setSavedNotice(false), 4000);
   }
 
+  // Full-page edit view — takes over the whole page instead of popping up
+  // in a small box, so the two-column layout has real room to breathe.
+  if (editing) {
+    return (
+      <EditStudentInfoModal student={student} onClose={() => setEditing(false)} onSave={handleSave} />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-10">
       {/* ---------- title row + edit action ---------- */}
@@ -103,14 +111,6 @@ export default function StudentRecordPanel({ student: initialStudent }) {
             <NavIcon name="x" className="w-4 h-4" />
           </button>
         </div>
-      )}
-
-      {editing && (
-        <EditStudentInfoModal
-          student={student}
-          onClose={() => setEditing(false)}
-          onSave={handleSave}
-        />
       )}
 
       {/* ---------- student information + emergency contact ---------- */}

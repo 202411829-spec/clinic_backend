@@ -4,7 +4,7 @@ import { currentStudentRecord } from "../../data/masterlistSample";
 
 export default function StudentRecord() {
   return (
-    <div className="pt-2 md:pt-4 max-w-4xl mx-auto">
+    <div className="pt-2 md:pt-4 max-w-6xl mx-auto">
       <StudentRecordPanel student={currentStudentRecord} />
     </div>
   );

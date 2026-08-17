@@ -289,218 +289,231 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
   const errEmergency = (k) => touched && String(form.emergency[k] || "").trim() === "";
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* photo */}
-      <div className="flex flex-col items-center gap-2 pb-1">
-        <div className="relative w-28 h-28">
-          <button
-            type="button"
-            onClick={onPickPhoto}
-            aria-label="Upload student photo"
-            className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden"
-          >
-            {photoPreview ? (
-              <img src={photoPreview} alt="Student" className="w-full h-full object-cover" />
-            ) : (
-              <NavIcon name="user" className="w-11 h-11 text-gray-300" />
-            )}
-          </button>
-          {/* separate element (not inside the overflow-hidden photo circle)
-              so the badge renders as a full clean circle instead of being
-              clipped at the photo circle's edge */}
-          <button
-            type="button"
-            onClick={onPickPhoto}
-            aria-label="Change photo"
-            className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full bg-gc-green text-white flex items-center justify-center border-[3px] border-white shadow-md"
-          >
-            <NavIcon name="camera" className="w-5 h-5" />
-          </button>
+    <div className="flex flex-col gap-6">
+      {/* wide two-column layout on desktop so nothing feels squeezed:
+          photo + academic info + emergency contact on the left,
+          personal details on the right — matches the desktop mockup */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          {/* photo */}
+          <div className="flex flex-col items-center gap-2 border border-gray-200 rounded-xl p-5">
+            <div className="relative w-28 h-28">
+              <button
+                type="button"
+                onClick={onPickPhoto}
+                aria-label="Upload student photo"
+                className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Student" className="w-full h-full object-cover" />
+                ) : (
+                  <NavIcon name="user" className="w-11 h-11 text-gray-300" />
+                )}
+              </button>
+              {/* separate element (not inside the overflow-hidden photo circle)
+                  so the badge renders as a full clean circle instead of being
+                  clipped at the photo circle's edge */}
+              <button
+                type="button"
+                onClick={onPickPhoto}
+                aria-label="Change photo"
+                className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full bg-gc-green text-white flex items-center justify-center border-[3px] border-white shadow-md"
+              >
+                <NavIcon name="camera" className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-gray-700">Student 1x1 Photo</p>
+              <p className="text-xs text-gray-400">Tap the circle to upload</p>
+            </div>
+          </div>
+
+          {/* academic information */}
+          <SectionBlock icon="file" title="Academic Information">
+            <Field label="Student Number" required error={err("studentNumber")}>
+              <input
+                className={inputClass}
+                placeholder="e.g. 20230000"
+                value={form.studentNumber}
+                onChange={(e) => update({ studentNumber: e.target.value })}
+              />
+            </Field>
+            <Field label="Department" required error={err("department")}>
+              <select
+                className={`${inputClass} bg-white`}
+                value={form.department}
+                onChange={(e) => update({ department: e.target.value, course: "" })}
+              >
+                <option value="">Select Department</option>
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Course" required error={err("course")}>
+              <select
+                className={`${inputClass} bg-white`}
+                value={form.course}
+                onChange={(e) => update({ course: e.target.value })}
+                disabled={!form.department}
+              >
+                <option value="">
+                  {form.department ? "Select Course" : "Select a Department first"}
+                </option>
+                {courses.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </SectionBlock>
+
+          {/* emergency contact */}
+          <SectionBlock icon="phone" title="Emergency Contact">
+            <Field label="Full Name" required error={errEmergency("name")}>
+              <input
+                className={inputClass}
+                placeholder="Contact Person Name"
+                value={form.emergency.name}
+                onChange={(e) => updateEmergency({ name: e.target.value })}
+              />
+            </Field>
+            <Field label="Relationship" required error={errEmergency("relationship")}>
+              <input
+                className={inputClass}
+                placeholder="e.g. Mother / Father"
+                value={form.emergency.relationship}
+                onChange={(e) => updateEmergency({ relationship: e.target.value })}
+              />
+            </Field>
+            <Field label="Contact Number" required error={errEmergency("contactNumber")}>
+              <input
+                className={inputClass}
+                placeholder="09XX XXX XXXX"
+                value={form.emergency.contactNumber}
+                onChange={(e) => updateEmergency({ contactNumber: e.target.value })}
+              />
+            </Field>
+            <Field label="Address" required error={errEmergency("presentAddress")}>
+              <input
+                className={inputClass}
+                placeholder="City / Municipality, Province"
+                value={form.emergency.presentAddress}
+                onChange={(e) => updateEmergency({ presentAddress: e.target.value })}
+              />
+            </Field>
+          </SectionBlock>
         </div>
-        <div className="text-center">
-          <p className="text-sm font-bold text-gray-700">Student 1x1 Photo</p>
-          <p className="text-xs text-gray-400">Tap the circle to upload</p>
+
+        {/* personal details */}
+        <div className="lg:col-span-3">
+          <SectionBlock icon="user" title="Personal Details">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Last Name" required error={err("lastName")}>
+                <input
+                  className={inputClass}
+                  placeholder="Last Name"
+                  value={form.lastName}
+                  onChange={(e) => update({ lastName: e.target.value })}
+                />
+              </Field>
+              <Field label="First Name" required error={err("firstName")}>
+                <input
+                  className={inputClass}
+                  placeholder="First Name"
+                  value={form.firstName}
+                  onChange={(e) => update({ firstName: e.target.value })}
+                />
+              </Field>
+              <Field label="Middle Initial / M.I.">
+                <input
+                  className={inputClass}
+                  placeholder="M.I."
+                  value={form.middleName}
+                  onChange={(e) => update({ middleName: e.target.value })}
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Birthday" required error={err("birthday")}>
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={form.birthday}
+                  onChange={(e) => update({ birthday: e.target.value })}
+                />
+              </Field>
+              <div>
+                <Label>
+                  Age{" "}
+                  <span className="text-[10px] font-normal text-gray-400 normal-case">
+                    (Auto-Computed)
+                  </span>
+                </Label>
+                <input
+                  className={inputClass}
+                  value={age != null ? age : ""}
+                  readOnly
+                  disabled
+                  placeholder="—"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Sex" required>
+                <ToggleGroup
+                  options={["Male", "Female"]}
+                  value={form.sex}
+                  onChange={(v) => update({ sex: v })}
+                  error={err("sex")}
+                />
+              </Field>
+              <Field label="Civil Status" required>
+                <ToggleGroup
+                  options={["Single", "Married"]}
+                  value={form.civilStatus}
+                  onChange={(v) => update({ civilStatus: v })}
+                  error={err("civilStatus")}
+                />
+              </Field>
+            </div>
+
+            <Field label="Contact Number" required error={err("contactNumber")}>
+              <input
+                className={inputClass}
+                placeholder="09XX XXX XXXX"
+                value={form.contactNumber}
+                onChange={(e) => update({ contactNumber: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Present Address" required error={err("presentAddress")}>
+              <input
+                className={inputClass}
+                placeholder="House No., Street, Barangay, City / Municipality"
+                value={form.presentAddress}
+                onChange={(e) => update({ presentAddress: e.target.value })}
+              />
+            </Field>
+          </SectionBlock>
         </div>
       </div>
-
-      {/* academic information */}
-      <SectionBlock icon="file" title="Academic Information">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Student Number" required error={err("studentNumber")}>
-            <input
-              className={inputClass}
-              placeholder="e.g. 20230000"
-              value={form.studentNumber}
-              onChange={(e) => update({ studentNumber: e.target.value })}
-            />
-          </Field>
-          <Field label="Department" required error={err("department")}>
-            <select
-              className={`${inputClass} bg-white`}
-              value={form.department}
-              onChange={(e) => update({ department: e.target.value, course: "" })}
-            >
-              <option value="">Select Department</option>
-              {departmentOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Course" required error={err("course")}>
-            <select
-              className={`${inputClass} bg-white`}
-              value={form.course}
-              onChange={(e) => update({ course: e.target.value })}
-              disabled={!form.department}
-            >
-              <option value="">
-                {form.department ? "Select Course" : "Select a Department first"}
-              </option>
-              {courses.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </SectionBlock>
-
-      {/* personal details */}
-      <SectionBlock icon="user" title="Personal Details">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Last Name" required error={err("lastName")}>
-            <input
-              className={inputClass}
-              placeholder="Last Name"
-              value={form.lastName}
-              onChange={(e) => update({ lastName: e.target.value })}
-            />
-          </Field>
-          <Field label="First Name" required error={err("firstName")}>
-            <input
-              className={inputClass}
-              placeholder="First Name"
-              value={form.firstName}
-              onChange={(e) => update({ firstName: e.target.value })}
-            />
-          </Field>
-          <Field label="Middle Initial / M.I.">
-            <input
-              className={inputClass}
-              placeholder="M.I."
-              value={form.middleName}
-              onChange={(e) => update({ middleName: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Birthday" required error={err("birthday")}>
-            <input
-              type="date"
-              className={inputClass}
-              value={form.birthday}
-              onChange={(e) => update({ birthday: e.target.value })}
-            />
-          </Field>
-          <div>
-            <Label>
-              Age <span className="text-[10px] font-normal text-gray-400 normal-case">(Auto-Computed)</span>
-            </Label>
-            <input className={inputClass} value={age != null ? age : ""} readOnly disabled placeholder="—" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Sex" required>
-            <ToggleGroup
-              options={["Male", "Female"]}
-              value={form.sex}
-              onChange={(v) => update({ sex: v })}
-              error={err("sex")}
-            />
-          </Field>
-          <Field label="Civil Status" required>
-            <ToggleGroup
-              options={["Single", "Married"]}
-              value={form.civilStatus}
-              onChange={(v) => update({ civilStatus: v })}
-              error={err("civilStatus")}
-            />
-          </Field>
-        </div>
-
-        <Field label="Contact Number" required error={err("contactNumber")}>
-          <input
-            className={inputClass}
-            placeholder="09XX XXX XXXX"
-            value={form.contactNumber}
-            onChange={(e) => update({ contactNumber: e.target.value })}
-          />
-        </Field>
-
-        <Field label="Present Address" required error={err("presentAddress")}>
-          <input
-            className={inputClass}
-            placeholder="House No., Street, Barangay, City / Municipality"
-            value={form.presentAddress}
-            onChange={(e) => update({ presentAddress: e.target.value })}
-          />
-        </Field>
-      </SectionBlock>
-
-      {/* emergency contact */}
-      <SectionBlock icon="phone" title="Emergency Contact">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Full Name" required error={errEmergency("name")}>
-            <input
-              className={inputClass}
-              placeholder="Contact Person Name"
-              value={form.emergency.name}
-              onChange={(e) => updateEmergency({ name: e.target.value })}
-            />
-          </Field>
-          <Field label="Relationship" required error={errEmergency("relationship")}>
-            <input
-              className={inputClass}
-              placeholder="e.g. Mother / Father"
-              value={form.emergency.relationship}
-              onChange={(e) => updateEmergency({ relationship: e.target.value })}
-            />
-          </Field>
-          <Field label="Contact Number" required error={errEmergency("contactNumber")}>
-            <input
-              className={inputClass}
-              placeholder="09XX XXX XXXX"
-              value={form.emergency.contactNumber}
-              onChange={(e) => updateEmergency({ contactNumber: e.target.value })}
-            />
-          </Field>
-          <Field label="Address" required error={errEmergency("presentAddress")}>
-            <input
-              className={inputClass}
-              placeholder="City / Municipality, Province"
-              value={form.emergency.presentAddress}
-              onChange={(e) => updateEmergency({ presentAddress: e.target.value })}
-            />
-          </Field>
-        </div>
-      </SectionBlock>
 
       <button
         type="button"
         onClick={onNext}
-        className="w-full text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg hover:opacity-90"
+        className="w-full sm:w-auto sm:self-end sm:px-10 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg hover:opacity-90"
       >
         Next: Medical History
       </button>
     </div>
   );
 }
-
 /* ---------------------------- step 2: medical history ---------------------------- */
 
 function StepMedical({ form, update, onBack, onNext, touched }) {
@@ -735,34 +748,27 @@ export default function EditStudentInfoModal({ student, onClose, onSave }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-gray-900/50 backdrop-blur-sm p-0 sm:p-6 overflow-y-auto"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-    >
-      <div className="w-full sm:max-w-3xl bg-white sm:rounded-2xl shadow-xl border border-gray-200 min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col">
-        {/* header */}
-        <div className="flex items-center justify-between px-4 sm:px-8 pt-5 sm:pt-6 pb-1 shrink-0">
-          <div>
-            <h2 className="font-bold text-gray-800 text-base md:text-lg">
-              Edit Student Information
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Step {step} of 3</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 shrink-0"
-          >
-            <NavIcon name="x" className="w-5 h-5" />
-          </button>
+    <div className="flex flex-col gap-5 pb-10">
+      {/* back link + header — this now lives inline on the page instead of
+          a popup box, so it gets the full page width like the desktop mockup */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gc-green w-fit"
+      >
+        <NavIcon name="back" className="w-4 h-4" />
+        Back
+      </button>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-300">
+        <div className="px-5 md:px-8 pt-5 md:pt-6">
+          <h2 className="font-bold text-gray-800 text-lg md:text-xl">Edit Student Information</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Step {step} of 3</p>
         </div>
 
         <StepIndicator step={step} />
 
-        <div className="px-4 sm:px-8 py-5 overflow-y-auto flex-1">
+        <div className="px-5 md:px-8 py-6">
           {step === 1 && (
             <StepPersonal
               form={form}
