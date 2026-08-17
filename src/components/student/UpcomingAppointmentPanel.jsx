@@ -34,17 +34,17 @@ export default function UpcomingAppointmentPanel() {
   return (
     <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
             <NavIcon name="calendar" className="w-5 h-5" />
           </span>
-          <h2 className="font-bold text-gray-800 text-base md:text-lg tracking-wide">
+          <h2 className="font-bold text-gray-800 text-sm md:text-lg tracking-wide whitespace-nowrap">
             UPCOMING APPOINTMENT
           </h2>
         </div>
 
         {appt && (
-          <div className="relative" ref={menuRef}>
+          <div className="relative shrink-0" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Appointment actions"
@@ -81,7 +81,7 @@ export default function UpcomingAppointmentPanel() {
       </div>
 
       {appt ? (
-        <div className="relative border border-gray-200 rounded-2xl p-5 md:p-6 flex items-center gap-5 md:gap-6">
+        <div className="border border-gray-200 rounded-2xl p-5 md:p-6 flex flex-wrap md:flex-nowrap items-center gap-5 md:gap-6">
           <div className="w-24 h-24 md:w-28 md:h-28 rounded-xl bg-gc-green-50 flex flex-col items-center justify-center shrink-0">
             <span className="text-xs md:text-sm font-bold text-gc-green tracking-wide">
               {appt.month}
@@ -94,20 +94,26 @@ export default function UpcomingAppointmentPanel() {
             </span>
           </div>
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-gray-800">
-              <NavIcon name="clock" className="w-5 h-5 shrink-0 text-gray-500" />
-              <span className="text-base md:text-lg font-semibold whitespace-nowrap">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2 text-gray-800">
+              <NavIcon name="clock" className="w-5 h-5 shrink-0 text-gray-500 mt-0.5" />
+              <span className="text-base md:text-lg font-semibold break-words">
                 {appt.time}
               </span>
             </div>
-            <p className="text-sm md:text-base text-gray-500 mt-1">{appt.reason}</p>
+            <p className="text-sm md:text-base text-gray-500 mt-1 break-words">{appt.reason}</p>
+
+            {/* mobile badge sits in normal flow right under the reason, so it
+                never overlaps text above it no matter how many lines the
+                time/reason wrap onto (was `absolute bottom-3 right-3` before,
+                which pinned it to the card's bottom edge regardless of
+                content height). */}
+            <span className="md:hidden mt-3 inline-flex shrink-0 items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 bg-white">
+              {appt.badge}
+            </span>
           </div>
 
-          <span className="hidden md:inline-flex ml-auto shrink-0 items-center rounded-full border border-gray-200 px-5 py-2 text-sm font-medium text-gray-600">
-            {appt.badge}
-          </span>
-          <span className="md:hidden absolute bottom-3 right-3 inline-flex shrink-0 items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 bg-white">
+          <span className="hidden md:inline-flex shrink-0 items-center rounded-full border border-gray-200 px-5 py-2 text-sm font-medium text-gray-600">
             {appt.badge}
           </span>
         </div>

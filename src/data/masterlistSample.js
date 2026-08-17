@@ -81,6 +81,13 @@ export const masterlistStudents = Array.from({ length: TOTAL_STUDENTS }, (_, i) 
   previousOperation: placeholderPreviousOperation,
 }));
 
+// Used by the Student portal's own "Students Record" page (/student/record) —
+// the student viewing their own info, not an admin looking someone up.
+// TODO: replace with the logged-in student's own row from Supabase once
+// student auth/session is wired up; matches the placeholder used for
+// `currentUser` in StudentLayout so the name/course line up.
+export const currentStudentRecord = masterlistStudents[0];
+
 export const departmentOptions = Array.from(new Set(deptCoursePairs.map((d) => d.dept)));
 export const courseOptions = Array.from(new Set(deptCoursePairs.map((d) => d.course)));
 export const yearLevelOptions = yearLevels;
