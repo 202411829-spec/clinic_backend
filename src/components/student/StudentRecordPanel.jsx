@@ -6,6 +6,7 @@
 import { useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
+import EditStudentInfoModal from "./EditStudentInfoModal";
 
 function SectionHeader({ icon, title }) {
   return (
@@ -51,18 +52,28 @@ function formatDisplayName(name = "") {
   return `${rest} ${last}`;
 }
 
-export default function StudentRecordPanel({ student }) {
-  const [editNotice, setEditNotice] = useState(false);
+export default function StudentRecordPanel({ student: initialStudent }) {
+  // Kept in local state (seeded from the prop) so the Edit modal can update
+  // it in place. Swap this for a real Supabase write + refetch once the
+  // student-profile write path is wired up — the shape stays the same.
+  const [student, setStudent] = useState(initialStudent);
+  const [editing, setEditing] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
 
   const age = computeAge(student.birthday);
   const emergency = student.emergencyContact ?? {};
   const conditions = student.medicalConditions ?? [];
   const prevOp = student.previousOperation;
 
-  // TODO: swap for a real edit form / request-a-change flow once the
-  // Supabase student-profile write path is wired up.
   function handleEditClick() {
-    setEditNotice(true);
+    setEditing(true);
+  }
+
+  function handleSave(updatedStudent) {
+    setStudent(updatedStudent);
+    setEditing(false);
+    setSavedNotice(true);
+    window.setTimeout(() => setSavedNotice(false), 4000);
   }
 
   return (
@@ -78,20 +89,28 @@ export default function StudentRecordPanel({ student }) {
         </button>
       </div>
 
-      {editNotice && (
+      {savedNotice && (
         <div className="flex items-start justify-between gap-3 bg-gc-green/5 border border-gc-green/20 text-gc-green text-sm rounded-xl px-4 py-3">
-          <span>
-            Editing isn't available yet — please visit or contact the clinic to update your
-            information.
+          <span className="flex items-center gap-2">
+            <NavIcon name="check" className="w-4 h-4 shrink-0" />
+            Your student information has been updated.
           </span>
           <button
-            onClick={() => setEditNotice(false)}
+            onClick={() => setSavedNotice(false)}
             aria-label="Dismiss"
             className="shrink-0 text-gc-green/70 hover:text-gc-green"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>
         </div>
+      )}
+
+      {editing && (
+        <EditStudentInfoModal
+          student={student}
+          onClose={() => setEditing(false)}
+          onSave={handleSave}
+        />
       )}
 
       {/* ---------- student information + emergency contact ---------- */}

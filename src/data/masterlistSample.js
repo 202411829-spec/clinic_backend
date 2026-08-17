@@ -91,3 +91,11 @@ export const currentStudentRecord = masterlistStudents[0];
 export const departmentOptions = Array.from(new Set(deptCoursePairs.map((d) => d.dept)));
 export const courseOptions = Array.from(new Set(deptCoursePairs.map((d) => d.course)));
 export const yearLevelOptions = yearLevels;
+
+// Department -> list of courses under it, used by the Student Information
+// edit form so the Course dropdown narrows down once a Department is picked.
+export const courseOptionsByDept = deptCoursePairs.reduce((acc, { dept, course }) => {
+  if (!acc[dept]) acc[dept] = [];
+  acc[dept].push(course);
+  return acc;
+}, {});
