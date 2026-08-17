@@ -228,9 +228,9 @@ function ToggleGroup({ options, value, onChange, error }) {
 
 function SectionBlock({ icon, title, children }) {
   return (
-    <div className="border border-gray-200 rounded-xl p-4 md:p-5 flex flex-col gap-4">
+    <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3.5">
       <div className="flex items-center gap-2">
-        <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+        <span className="w-6 h-6 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
           <NavIcon name={icon} className="w-3.5 h-3.5" />
         </span>
         <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">{title}</h3>
@@ -293,21 +293,21 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
       {/* wide two-column layout on desktop so nothing feels squeezed:
           photo + academic info + emergency contact on the left,
           personal details on the right — matches the desktop mockup */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        <div className="lg:col-span-2 flex flex-col gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5 items-start">
+        <div className="md:col-span-2 flex flex-col gap-5">
           {/* photo */}
-          <div className="flex flex-col items-center gap-2 border border-gray-200 rounded-xl p-5">
-            <div className="relative w-28 h-28">
+          <div className="flex flex-col items-center gap-1.5 border border-gray-200 rounded-xl p-4">
+            <div className="relative w-24 h-24">
               <button
                 type="button"
                 onClick={onPickPhoto}
                 aria-label="Upload student photo"
-                className="w-28 h-28 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden"
+                className="w-24 h-24 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden"
               >
                 {photoPreview ? (
                   <img src={photoPreview} alt="Student" className="w-full h-full object-cover" />
                 ) : (
-                  <NavIcon name="user" className="w-11 h-11 text-gray-300" />
+                  <NavIcon name="user" className="w-9 h-9 text-gray-300" />
                 )}
               </button>
               {/* separate element (not inside the overflow-hidden photo circle)
@@ -373,45 +373,49 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
 
           {/* emergency contact */}
           <SectionBlock icon="phone" title="Emergency Contact">
-            <Field label="Full Name" required error={errEmergency("name")}>
-              <input
-                className={inputClass}
-                placeholder="Contact Person Name"
-                value={form.emergency.name}
-                onChange={(e) => updateEmergency({ name: e.target.value })}
-              />
-            </Field>
-            <Field label="Relationship" required error={errEmergency("relationship")}>
-              <input
-                className={inputClass}
-                placeholder="e.g. Mother / Father"
-                value={form.emergency.relationship}
-                onChange={(e) => updateEmergency({ relationship: e.target.value })}
-              />
-            </Field>
-            <Field label="Contact Number" required error={errEmergency("contactNumber")}>
-              <input
-                className={inputClass}
-                placeholder="09XX XXX XXXX"
-                value={form.emergency.contactNumber}
-                onChange={(e) => updateEmergency({ contactNumber: e.target.value })}
-              />
-            </Field>
-            <Field label="Address" required error={errEmergency("presentAddress")}>
-              <input
-                className={inputClass}
-                placeholder="City / Municipality, Province"
-                value={form.emergency.presentAddress}
-                onChange={(e) => updateEmergency({ presentAddress: e.target.value })}
-              />
-            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <Field label="Full Name" required error={errEmergency("name")}>
+                <input
+                  className={inputClass}
+                  placeholder="Contact Person Name"
+                  value={form.emergency.name}
+                  onChange={(e) => updateEmergency({ name: e.target.value })}
+                />
+              </Field>
+              <Field label="Relationship" required error={errEmergency("relationship")}>
+                <input
+                  className={inputClass}
+                  placeholder="e.g. Mother / Father"
+                  value={form.emergency.relationship}
+                  onChange={(e) => updateEmergency({ relationship: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <Field label="Contact Number" required error={errEmergency("contactNumber")}>
+                <input
+                  className={inputClass}
+                  placeholder="09XX XXX XXXX"
+                  value={form.emergency.contactNumber}
+                  onChange={(e) => updateEmergency({ contactNumber: e.target.value })}
+                />
+              </Field>
+              <Field label="Address" required error={errEmergency("presentAddress")}>
+                <input
+                  className={inputClass}
+                  placeholder="City / Municipality, Province"
+                  value={form.emergency.presentAddress}
+                  onChange={(e) => updateEmergency({ presentAddress: e.target.value })}
+                />
+              </Field>
+            </div>
           </SectionBlock>
         </div>
 
         {/* personal details */}
-        <div className="lg:col-span-3">
+        <div className="md:col-span-3">
           <SectionBlock icon="user" title="Personal Details">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <Field label="Last Name" required error={err("lastName")}>
                 <input
                   className={inputClass}
@@ -438,7 +442,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
               </Field>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <Field label="Birthday" required error={err("birthday")}>
                 <input
                   type="date"
@@ -464,7 +468,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <Field label="Sex" required>
                 <ToggleGroup
                   options={["Male", "Female"]}
