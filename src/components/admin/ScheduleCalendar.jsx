@@ -8,15 +8,40 @@ import {
   WEEKDAY_LABELS,
 } from "../../lib/calendar";
 
+// Default set of open days — Mon–Fri. Admin can change this any time by
+// clicking the day buttons in "By Day(s)" mode.
+export const DEFAULT_OPEN_WEEKDAYS = [1, 2, 3, 4, 5];
+
 /**
  * selectedDates: Date[] — always at least the "primary" date at index 0
  * onChange: (dates: Date[]) => void
+ * selectedWeekdays: number[] — 0=Sun..6=Sat, used when scheduleMode is "days"
+ * onWeekdaysChange: (weekdays: number[]) => void
+ * scheduleMode: "date" | "days"
+ * onScheduleModeChange: (mode: "date" | "days") => void
  */
-export default function ScheduleCalendar({ selectedDates, onChange }) {
+export default function ScheduleCalendar({
+  selectedDates,
+  onChange,
+  selectedWeekdays = DEFAULT_OPEN_WEEKDAYS,
+  onWeekdaysChange,
+  scheduleMode = "date",
+  onScheduleModeChange,
+}) {
   const primary = selectedDates[0] ?? new Date();
   const [viewYear, setViewYear] = useState(primary.getFullYear());
   const [viewMonth, setViewMonth] = useState(primary.getMonth());
   const [multiMode, setMultiMode] = useState(false); // mobile toggle
+
+  function toggleWeekday(dayIndex) {
+    if (!onWeekdaysChange) return;
+    if (selectedWeekdays.includes(dayIndex)) {
+      const next = selectedWeekdays.filter((d) => d !== dayIndex);
+      onWeekdaysChange(next.length ? next : selectedWeekdays);
+    } else {
+      onWeekdaysChange([...selectedWeekdays, dayIndex].sort());
+    }
+  }
 
   const weeks = getMonthMatrix(viewYear, viewMonth);
 
@@ -53,10 +78,68 @@ export default function ScheduleCalendar({ selectedDates, onChange }) {
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+      <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-3">
         Select Date
       </h2>
 
+      {/* mode tabs: pick specific date(s), or set default open day(s) of the week */}
+      <div className="grid grid-cols-2 gap-1.5 mb-4 bg-gray-100 rounded-lg p-1">
+        <button
+          type="button"
+          onClick={() => onScheduleModeChange?.("date")}
+          className={`text-xs font-semibold rounded-md py-1.5 transition-colors ${
+            scheduleMode === "date"
+              ? "bg-white text-gc-green shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          By Date
+        </button>
+        <button
+          type="button"
+          onClick={() => onScheduleModeChange?.("days")}
+          className={`text-xs font-semibold rounded-md py-1.5 transition-colors ${
+            scheduleMode === "days"
+              ? "bg-white text-gc-green shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          By Day(s)
+        </button>
+      </div>
+
+      {scheduleMode === "days" ? (
+        <div>
+          <p className="text-xs text-gray-500 mb-3">
+            Choose which days of the week the clinic is open for booking by
+            default. Click a day to turn it on or off.
+          </p>
+          <div className="grid grid-cols-7 gap-1.5">
+            {WEEKDAY_LABELS.map((label, i) => {
+              const on = selectedWeekdays.includes(i);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => toggleWeekday(i)}
+                  aria-pressed={on}
+                  className={`flex flex-col items-center justify-center rounded-xl py-3 text-xs font-bold transition-colors ${
+                    on
+                      ? "bg-gc-accent text-white shadow-sm"
+                      : "bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs font-semibold text-gc-green">
+            {selectedWeekdays.length} day{selectedWeekdays.length === 1 ? "" : "s"} open by default
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => shiftDay(-1)}
@@ -138,6 +221,8 @@ export default function ScheduleCalendar({ selectedDates, onChange }) {
         <p className="mt-2 text-xs font-semibold text-gc-green">
           {selectedDates.length} days selected
         </p>
+      )}
+        </>
       )}
     </section>
   );

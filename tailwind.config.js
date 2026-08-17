@@ -15,7 +15,8 @@ export default {
             800: '#033A0B',
             900: '#022607'
           },
-          accent: '#43AF52' // "ADMIN PORTAL" eyebrow label green
+          accent: '#43AF52', // portal eyebrow label green; also the Student login button color
+          student: '#4FAD32' // bright green background used on the Student login screen
         }
       },
       fontFamily: {

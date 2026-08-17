@@ -1,12 +1,71 @@
 // src/components/admin/AppointmentsPanel.jsx
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { appointmentSlots, appointmentDate } from "../../data/dashboardSample";
 
-function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock }) {
+function SlotActionMenu({ onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-label="Slot actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
+      >
+        &#8942;
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+        >
+          <button
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Edit
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
 
   return (
@@ -48,16 +107,14 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
               : `${slot.slotsLeft} Slot${slot.slotsLeft === 1 ? "" : "s"} Left`}
           </span>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleEdit(slot.id);
+          <SlotActionMenu
+            onEdit={() => onToggleEdit(slot.id)}
+            onDelete={() => {
+              if (window.confirm(`Delete the ${slot.time} time block?`)) {
+                onDeleteTimeBlock(slot.id);
+              }
             }}
-            aria-label="Slot actions"
-            className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
-          >
-            &#8942;
-          </button>
+          />
         </div>
 
         {editing && (
@@ -153,6 +210,11 @@ export default function AppointmentsPanel() {
     );
   }
 
+  function handleDeleteTimeBlock(slotId) {
+    setSlots((prev) => prev.filter((slot) => slot.id !== slotId));
+    setOpenEditId((cur) => (cur === slotId ? null : cur));
+  }
+
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
@@ -198,6 +260,7 @@ export default function AppointmentsPanel() {
             setOpenEditId((cur) => (cur === id ? null : id))
           }
           onSaveTimeBlock={handleSaveTimeBlock}
+          onDeleteTimeBlock={handleDeleteTimeBlock}
         />
       ))}
     </section>

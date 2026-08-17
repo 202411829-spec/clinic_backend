@@ -1,6 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLogin from "./pages/auth/AdminLogin.jsx";
+import StudentLogin from "./pages/auth/StudentLogin.jsx";
 import AdminLayout from "./components/admin/AdminLayout.jsx";
+import StudentLayout from "./components/student/StudentLayout.jsx";
+import StudentDashboard from "./pages/student/Dashboard.jsx";
+import StudentBook from "./pages/student/Book.jsx";
+import StudentRecordPage from "./pages/student/StudentRecord.jsx";
 import Dashboard from "./pages/admin/Dashboard.jsx";
 import Appointments from "./pages/admin/Appointments.jsx";
 import Logbook from "./pages/admin/Logbook.jsx";
@@ -16,6 +21,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/student/login" element={<StudentLogin />} />
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
@@ -27,6 +33,12 @@ export default function App() {
         <Route path="masterlist/:studentId/medical-certificate" element={<MedicalCertificate />} />
         <Route path="clinic-schedule" element={<ClinicSchedule />} />
         <Route path="reports" element={<Reports />} />
+      </Route>
+
+      <Route path="/student" element={<StudentLayout />}>
+        <Route path="dashboard" element={<StudentDashboard />} />
+        <Route path="book" element={<StudentBook />} />
+        <Route path="record" element={<StudentRecordPage />} />
       </Route>
     </Routes>
    );

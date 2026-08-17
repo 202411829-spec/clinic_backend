@@ -40,6 +40,18 @@ export function formatMDY(date) {
   return `${mm}/${dd}/${date.getFullYear()}`;
 }
 
+/**
+ * e.g. { month: "AUG", day: "8", weekday: "MON" } — matches the date box
+ * on the Student Dashboard's Upcoming Appointment card.
+ */
+export function getCalendarBoxParts(date) {
+  return {
+    month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    day: String(date.getDate()),
+    weekday: date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+  };
+}
+
 /** e.g. "August 6, 2026" — matches the header on the Appointments card */
 export function formatLongDate(date) {
   return date.toLocaleDateString("en-US", {
@@ -72,9 +84,12 @@ export function getPeriodLabel(date, period) {
   switch (period) {
     case "Week": {
       const start = new Date(date);
-      start.setDate(start.getDate() - start.getDay());
+      // Monday-start week (ISO): Sun=0 -> shift back 6, Mon=1 -> 0, ... Sat=6 -> 5
+      const dow = start.getDay();
+      const diffToMonday = dow === 0 ? 6 : dow - 1;
+      start.setDate(start.getDate() - diffToMonday);
       const end = new Date(start);
-      end.setDate(end.getDate() + 6);
+      end.setDate(end.getDate() + 6); // Sunday
       const sameMonth = start.getMonth() === end.getMonth();
       const startLabel = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const endLabel = end.toLocaleDateString(
@@ -97,6 +112,15 @@ export function getPeriodLabel(date, period) {
     default:
       return formatLongDate(date);
   }
+}
+
+/** Monday of the week containing `date` (ISO week start). */
+export function getWeekStart(date) {
+  const start = new Date(date);
+  const dow = start.getDay();
+  const diffToMonday = dow === 0 ? 6 : dow - 1;
+  start.setDate(start.getDate() - diffToMonday);
+  return start;
 }
 
 /** Shifts `date` by one unit of `period` in the given `delta` direction (±1). */

@@ -107,38 +107,38 @@ export default function LogbookPanel() {
 
       {/* table */}
       <div className="overflow-x-auto -mx-4 md:mx-0">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className="w-full text-sm min-w-[640px] border-collapse">
           <thead>
-            <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-              <th className="py-2 px-4 md:px-2 font-semibold">Date / Time</th>
-              <th className="py-2 px-2 font-semibold">Name</th>
-              <th className="py-2 px-2 font-semibold">Age</th>
-              <th className="py-2 px-2 font-semibold">Dept. &amp; Course</th>
-              <th className="py-2 px-2 font-semibold hidden md:table-cell">Sex</th>
-              <th className="py-2 px-2 font-semibold hidden md:table-cell">Reason</th>
-              <th className="py-2 px-2 font-semibold hidden md:table-cell">Complaint</th>
-              <th className="py-2 px-2 font-semibold hidden md:table-cell">Medicine</th>
+            <tr className="text-left text-xs text-gray-500 bg-gray-50">
+              <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300">Date / Time</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300">Name</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300">Dept. &amp; Course</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Sex</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Reason</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Complaint</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Medicine</th>
             </tr>
           </thead>
           <tbody>
             {entries.map((row) => (
-              <tr key={row.id} className="border-b border-gray-50">
-                <td className="py-2.5 px-4 md:px-2 text-gray-700 whitespace-nowrap">
+              <tr key={row.id}>
+                <td className="py-2.5 px-4 md:px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
                   {row.dateTime}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700">{row.name}</td>
-                <td className="py-2.5 px-2 text-gray-700">{row.age}</td>
-                <td className="py-2.5 px-2 text-gray-700">{row.deptCourse}</td>
-                <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.name}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.age}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.deptCourse}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                   {row.sex}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                   {row.reason}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                   {row.complaint}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
                   {row.medicine}
                 </td>
               </tr>

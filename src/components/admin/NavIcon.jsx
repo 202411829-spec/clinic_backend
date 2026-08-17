@@ -169,6 +169,54 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M12 8v8M8 12h8" />
         </svg>
       );
+    case "bell":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          stroke="none"
+        >
+          <path d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.62C7.36 5.27 5.25 8 5.25 11.25v3.1c0 .5-.18.98-.51 1.36l-1.06 1.22c-.72.83-.13 2.12.96 2.12h14.72c1.09 0 1.68-1.29.96-2.12l-1.06-1.22a2.08 2.08 0 0 1-.51-1.36v-3.1c0-3.25-2.11-5.98-5.25-6.63V4A1.5 1.5 0 0 0 12 2.5Z" />
+          <path d="M9.5 20a2.5 2.5 0 0 0 5 0h-5Z" />
+        </svg>
+      );
+    case "edit":
+      return (
+        <svg {...common}>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...common}>
+          <path d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    case "camera":
+      // filled glyph (not stroked) so it stays crisp/legible even at the
+      // small badge size it's used at on the photo-upload circle. The lens
+      // is punched out in the badge's green so it reads clearly against
+      // the white camera body instead of disappearing at small sizes.
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M9 4.5h6l1.1 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2.9l1.1-2Z" />
+          <circle cx="12" cy="13.5" r="3.1" fill="#044B0E" />
+        </svg>
+      );
+    case "shield":
+      return (
+        <svg {...common}>
+          <path d="M12 3.5 5 6v5.2c0 4.3 3 7.6 7 9.3 4-1.7 7-5 7-9.3V6l-7-2.5Z" />
+          <path d="M9.2 12l1.9 1.9L15 10" />
+        </svg>
+      );
+    case "phone":
+      return (
+        <svg {...common}>
+          <path d="M6 3.5h2.6l1.4 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.4V16a2 2 0 0 1-2.2 2C10.7 17.5 6.5 13.3 6 7.7A2 2 0 0 1 6 3.5Z" />
+        </svg>
+      );
     case "sort":
       // small up/down chevron pair used for sortable table headers
       return (
