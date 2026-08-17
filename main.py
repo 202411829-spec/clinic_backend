@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from supabase_client import supabase
-from routers import masterlist
+from routers import masterlist, student_record, reports
 
 app = FastAPI()
 
@@ -15,6 +15,8 @@ app.add_middleware(
 )
 
 app.include_router(masterlist.router)
+app.include_router(student_record.router)
+app.include_router(reports.router)
 
 
 @app.get("/")
