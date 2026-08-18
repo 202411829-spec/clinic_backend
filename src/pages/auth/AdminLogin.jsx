@@ -19,10 +19,11 @@ export default function AdminLogin() {
     setLoading(true)
     try {
       await adminSignIn(username, password)
-      navigate('/admin/dashboard')
+      // Sends to Masterlist for now since Dashboard isn't built yet —
+      // swap to '/admin/dashboard' once that page exists.
+      navigate('/admin/masterlist')
     } catch (err) {
-      // Fallback redirect for development mock
-      navigate('/admin/dashboard')
+      setError(err?.message || 'Unable to log in. Please check your credentials.')
     } finally {
       setLoading(false)
     }
