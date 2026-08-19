@@ -1,34 +1,51 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from supabase import create_client
-import os
+from flask import Flask, render_template
+from flask_cors import CORS
 
-load_dotenv()
+from routers.student import student_bp
+from routers.appointment import appointment_bp
+from routers.dashboard import dashboard_bp
+from routers.clinic_schedule import clinic_schedule_bp
+from routers.logbook import logbook_bp
 
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
+app = Flask(__name__)
 
-print("URL:", url)
-print("KEY:", key)
+# Allow frontend applications to access the API
+CORS(app)
 
-supabase = create_client(url, key)
+# =========================
+# REGISTER ROUTERS
+# =========================
 
-app = FastAPI()
+app.register_blueprint(student_bp)
+app.register_blueprint(appointment_bp)
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(clinic_schedule_bp)
+app.register_blueprint(logbook_bp)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
+# =========================
+# FRONTEND
+# =========================
+@app.route("/")
 def home():
-    return {"message": "Clinic Appointment Backend is Running!"}
+    return render_template("index.html")
 
-@app.get("/students")
-def get_students():
-    response = supabase.table("student").select("*").execute()
-    return response.data
+# =========================
+# HEALTH CHECK
+# =========================
+@app.route("/health")
+def health():
+    return {
+        "success": True,
+        "message": "Clinic Appointment Backend is running"
+    }
+
+# =========================
+# START SERVER
+# =========================
+if __name__ == "__main__":
+    print("Clinic Appointment Backend starting...")
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
