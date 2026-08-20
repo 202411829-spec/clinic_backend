@@ -22,12 +22,12 @@ export default function StudentSidebarContent({ onNavigate }) {
           <img
             src="/gordon-college-badge.png"
             alt="Gordon College seal"
-            className="w-11 h-11 shrink-0 object-contain"
+            className="w-[70px] h-[70px] shrink-0 object-contain"
           />
           <img
-            src="/health-services-badge.png"
-            alt="Health Services Unit seal"
-            className="w-11 h-11 shrink-0 object-contain"
+            src="/health-service-badge.png"
+            alt="Health Service Unit seal"
+            className="w-[70px] h-[70px] shrink-0 object-contain"
           />
         </div>
         <div className="text-center leading-tight">
@@ -70,14 +70,31 @@ export default function StudentSidebarContent({ onNavigate }) {
         </ul>
       </nav>
 
-      <NavLink
-        to="/student/about"
-        onClick={onNavigate}
-        className="flex items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white hover:bg-gc-green-900"
-      >
-        <NavIcon name="info" className="w-[18px] h-[18px]" />
-        <span>About</span>
-      </NavLink>
+      <div className="border-t border-white/20">
+        <NavLink
+          to="/student/feedback"
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-colors",
+              isActive
+                ? "bg-gc-green text-white"
+                : "text-white/95 bg-gc-green-800 hover:bg-gc-green-900",
+            ].join(" ")
+          }
+        >
+          <NavIcon name="feedback" className="w-[18px] h-[18px]" />
+          <span>Feedback</span>
+        </NavLink>
+        <NavLink
+          to="/student/about"
+          onClick={onNavigate}
+          className="flex items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white hover:bg-gc-green-900 border-t border-white/10"
+        >
+          <NavIcon name="info" className="w-[18px] h-[18px]" />
+          <span>About</span>
+        </NavLink>
+      </div>
     </div>
   );
 }

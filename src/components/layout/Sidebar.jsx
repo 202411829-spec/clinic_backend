@@ -41,7 +41,10 @@ function NavContent() {
   return (
     <>
       <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
-        <img src="/gordon-college-logo.png" alt="" className="h-12 w-12 object-contain" />
+        <div className="flex items-center justify-center gap-2">
+          <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 object-contain" />
+          <img src="/health-services-logo.png" alt="Health Services Unit seal" className="h-16 w-16 object-contain" />
+        </div>
         <p className="mt-2 text-sm font-extrabold leading-tight text-white">GORDON COLLEGE</p>
         <p className="text-[11px] leading-tight text-white/80">Clinic Appointment System</p>
         <p className="mt-2 text-xs font-bold tracking-widest text-white">ADMIN PORTAL</p>

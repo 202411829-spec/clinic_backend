@@ -69,6 +69,24 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M12 8h.01M11 11h1v6h1" />
         </svg>
       );
+    case "feedback":
+      // speech bubble with a star — used for the Feedback nav link
+      return (
+        <svg {...common}>
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9A1.5 1.5 0 0 1 18.5 16H10l-4.2 3.4a.5.5 0 0 1-.8-.4V16h-.5A1.5 1.5 0 0 1 3 14.5v-9Z" />
+          <path
+            d="M12 7.2l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3 1-2Z"
+            fill="currentColor"
+            stroke="none"
+          />
+        </svg>
+      );
+    case "star":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M12 3.3l2.5 5.3 5.7.8-4.1 4.1 1 5.8L12 16.5l-5.1 2.8 1-5.8L3.8 9.4l5.7-.8L12 3.3Z" />
+        </svg>
+      );
     case "menu":
       return (
         <svg {...common}>

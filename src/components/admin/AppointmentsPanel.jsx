@@ -6,7 +6,7 @@ import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { appointmentSlots, appointmentDate } from "../../data/dashboardSample";
 
-function SlotActionMenu({ onEdit, onDelete }) {
+function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -61,6 +61,14 @@ function SlotActionMenu({ onEdit, onDelete }) {
           </button>
         </div>
       )}
+
+      {editing && (
+        <TimeBlockEditPopover
+          slot={slot}
+          onClose={onCloseEdit}
+          onSave={onSaveTimeBlock}
+        />
+      )}
     </div>
   );
 }
@@ -114,16 +122,12 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                 onDeleteTimeBlock(slot.id);
               }
             }}
+            editing={editing}
+            slot={slot}
+            onCloseEdit={() => onToggleEdit(null)}
+            onSaveTimeBlock={(data) => onSaveTimeBlock(slot.id, data)}
           />
         </div>
-
-        {editing && (
-          <TimeBlockEditPopover
-            slot={slot}
-            onClose={() => onToggleEdit(null)}
-            onSave={(data) => onSaveTimeBlock(slot.id, data)}
-          />
-        )}
       </div>
 
       {expanded && slot.bookings.length > 0 && (

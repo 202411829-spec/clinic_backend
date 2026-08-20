@@ -10,7 +10,7 @@ import {
 } from "../../data/dashboardSample";
 import { formatLongDate } from "../../lib/calendar";
 
-function SlotActionMenu({ onEdit, onDelete }) {
+function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -65,6 +65,17 @@ function SlotActionMenu({ onEdit, onDelete }) {
           </button>
         </div>
       )}
+
+      {/* Anchored to this same small wrapper (not the whole row) so it always
+          opens right under the "..." button instead of drifting to the row's
+          far edge on rows near the bottom of the list. */}
+      {editing && (
+        <TimeBlockEditPopover
+          slot={slot}
+          onClose={onCloseEdit}
+          onSave={onSaveTimeBlock}
+        />
+      )}
     </div>
   );
 }
@@ -117,16 +128,12 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                 onDeleteTimeBlock(slot.id);
               }
             }}
+            editing={editing}
+            slot={slot}
+            onCloseEdit={() => onToggleEdit(null)}
+            onSaveTimeBlock={(data) => onSaveTimeBlock(slot.id, data)}
           />
         </div>
-
-        {editing && (
-          <TimeBlockEditPopover
-            slot={slot}
-            onClose={() => onToggleEdit(null)}
-            onSave={(data) => onSaveTimeBlock(slot.id, data)}
-          />
-        )}
       </div>
 
       {expanded && slot.bookings.length > 0 && (

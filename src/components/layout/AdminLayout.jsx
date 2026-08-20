@@ -4,9 +4,9 @@ import TopBar from './TopBar.jsx'
 
 export default function AdminLayout() {
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-screen overflow-hidden bg-white">
       <Sidebar />
-      <div className="flex-1">
+      <div className="flex flex-1 flex-col overflow-y-auto">
         <TopBar />
         <main className="px-4 pb-10 lg:px-10">
           <Outlet />

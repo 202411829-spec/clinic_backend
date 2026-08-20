@@ -18,6 +18,7 @@ import StudentDashboard from './pages/student/Dashboard.jsx'
 import StudentBook from './pages/student/Book.jsx'
 import StudentRecord from './pages/student/StudentRecord.jsx'
 import { AppointmentProvider } from './context/AppointmentContext.jsx'
+import StudentFeedback from './pages/student/Feedback.jsx'
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="book" element={<StudentBook />} />
         <Route path="record" element={<StudentRecord />} />
+        <Route path="feedback" element={<StudentFeedback />} />
       </Route>
 
       {/* Fallback so unmatched routes don't render a blank page */}

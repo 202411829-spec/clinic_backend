@@ -33,7 +33,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
   return (
     <div
       ref={ref}
-      className="absolute right-4 top-full mt-2 z-20 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4"
+      className="absolute right-0 top-full mt-2 z-20 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4"
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold tracking-wide text-gray-800">
