@@ -1,18 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from supabase import create_client
-import os
 
-load_dotenv()
-
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
-
-print("URL:", url)
-print("KEY:", key)
-
-supabase = create_client(url, key)
+from supabase_client import supabase
+from routers import masterlist, student_record, reports
 
 app = FastAPI()
 
@@ -24,11 +14,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(masterlist.router)
+app.include_router(student_record.router)
+app.include_router(reports.router)
+
+
 @app.get("/")
 def home():
     return {"message": "Clinic Appointment Backend is Running!"}
 
+
 @app.get("/students")
 def get_students():
+    """Legacy stub — superseded by /api/masterlist/students, kept so nothing breaks
+    if another module still calls this."""
     response = supabase.table("student").select("*").execute()
     return response.data
