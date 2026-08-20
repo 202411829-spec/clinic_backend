@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['gordon-college-logo.png'],
+      devOptions: {
+        enabled: true
+      },
       manifest: {
         name: 'Gordon College Clinic Appointment System',
         short_name: 'GC Clinic',
