@@ -4,29 +4,34 @@
 // panel only cares about this shape, so wiring real data is a drop-in swap.
 
 const deptCoursePairs = [
-  { dept: "CCS", course: "BS Computer Science" },
-  { dept: "CCS", course: "BS Information Technology" },
-  { dept: "CAHS", course: "BS Nursing" },
-  { dept: "CHTM", course: "BS Tourism Management" },
-  { dept: "CHTM", course: "BS Hospitality Management" },
-  { dept: "CBA", course: "BS Accountancy" },
-  { dept: "CBA", course: "BS Business Administration" },
-  { dept: "CBA", course: "BS Entrepreneurship" }, 
+  { dept: "CCS", course: "BS in Computer Science" },
+  { dept: "CCS", course: "BS in Information Technology" },
+  { dept: "CCS", course: "BS in Entertainment and Multimedia Computing GAT" },
+  { dept: "CCS", course: "BS in Entertainment and Multimedia Computing DAT" },
+  { dept: "CAHS", course: "BS in Nursing" },
+  { dept: "CAHS", course: "BS in Midwifery" },
+  { dept: "CHTM", course: "BS in Tourism Management" },
+  { dept: "CHTM", course: "BS in Hospitality Management" },
+  { dept: "CBA", course: "BS in Accountancy" },
+  { dept: "CBA", course: "BS in Business Administration Major in Financial Management" },
+  { dept: "CBA", course: "BS in Business Administration Major in Human Resource Management" },
+  { dept: "CBA", course: "BS in Business Administration Major in Marketing Management" },
+  { dept: "CBA", course: "BS in Customs Administration" },
+  { dept: "CEAS", course: "Bachelor of Arts in Communication" },
+  { dept: "CEAS", course: "Bachelor of Early Childhood Education" },
+  { dept: "CEAS", course: "Bachelor of Physical Education" },  
+  { dept: "CEAS", course: "Bachelor of Elementary Education" },
+  { dept: "CEAS", course: "Bachelor of Secondary Education Major in English" },
+  { dept: "CEAS", course: "Bachelor of Secondary Education Major in Filipino" },
+  { dept: "CEAS", course: "Bachelor of Secondary Education Major in Mathematics" },
+  { dept: "CEAS", course: "Bachelor of Secondary Education Major in Science" },
+  { dept: "CEAS", course: "Bachelor of Secondary Education Major in Social Studies" },   
 ];
 
 const people = [
   { first: "Joseph Daniel", middle: "B.", last: "Ramos", sex: "Male" },
   { first: "Mark Joshua", middle: "P.", last: "Alfonso", sex: "Male" },
   { first: "Christopher", middle: "T.", last: "Ladiero", sex: "Male" },
-  { first: "Maria Clara", middle: "D.", last: "Santos", sex: "Female" },
-  { first: "Anna Rosario", middle: "M.", last: "Dela Cruz", sex: "Female" },
-  { first: "John Michael", middle: "R.", last: "Reyes", sex: "Male" },
-  { first: "Kristine Joy", middle: "A.", last: "Bautista", sex: "Female" },
-  { first: "Angelo", middle: "S.", last: "Manalo", sex: "Male" },
-  { first: "Bea Andrea", middle: "L.", last: "Villanueva", sex: "Female" },
-  { first: "Paolo", middle: "G.", last: "Fernandez", sex: "Male" },
-  { first: "Samantha", middle: "C.", last: "Ocampo", sex: "Female" },
-  { first: "Rafael", middle: "N.", last: "Torres", sex: "Male" },
 ];
 
 const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];

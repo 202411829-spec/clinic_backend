@@ -36,6 +36,41 @@ export default function LogbookPanel() {
     setMedTags([]);
   }
 
+  // --- Add Medicine (clinic stock) — separate form, separate state,
+  // separate list, from the walk-in visit form above. Opened only by
+  // the "+ Add Medicine" button.
+  const [showAddMedicineForm, setShowAddMedicineForm] = useState(false);
+  const [medStock, setMedStock] = useState([]);
+
+  const [stockName, setStockName] = useState("");
+  const [stockCategory, setStockCategory] = useState("");
+  const [stockQty, setStockQty] = useState("");
+  const [stockUnit, setStockUnit] = useState("");
+  const [stockExpiry, setStockExpiry] = useState("");
+
+  function resetAddMedicineForm() {
+    setStockName("");
+    setStockCategory("");
+    setStockQty("");
+    setStockUnit("");
+    setStockExpiry("");
+  }
+
+  function handleSaveMedicineStock() {
+    if (!stockName.trim() || !stockQty) return;
+    const newStockItem = {
+      id: `med-${Date.now()}`,
+      name: stockName.trim(),
+      category: stockCategory.trim() || "-",
+      quantity: stockQty,
+      unit: stockUnit.trim() || "pcs",
+      expiry: stockExpiry || "-",
+    };
+    setMedStock((prev) => [newStockItem, ...prev]);
+    resetAddMedicineForm();
+    setShowAddMedicineForm(false);
+  }
+
   function handleAddWalkIn() {
     if (!regId.trim()) return;
     const now = new Date();
@@ -147,11 +182,11 @@ export default function LogbookPanel() {
         </table>
       </div>
 
-      {/* bottom trigger — hidden once the form is open, same as the full Logbook page */}
-      {!showWalkInForm && (
+      {/* bottom trigger — hidden once either form is open */}
+      {!showWalkInForm && !showAddMedicineForm && (
         <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-between gap-2">
           <button
-            onClick={() => setShowWalkInForm(true)}
+            onClick={() => setShowAddMedicineForm(true)}
             className="text-sm font-semibold bg-gc-accent text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             + Add Medicine
@@ -162,6 +197,109 @@ export default function LogbookPanel() {
           >
             + Add Walk-in Visit
           </button>
+        </div>
+      )}
+
+      {/* add medicine (clinic stock) form — its own section, separate from
+          the walk-in visit form below */}
+      {showAddMedicineForm && (
+        <div className="mt-4 pt-4 border-t-2 border-gray-300">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-800">Add Medicine</h2>
+            <button
+              onClick={() => {
+                setShowAddMedicineForm(false);
+                resetAddMedicineForm();
+              }}
+              aria-label="Close"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <span aria-hidden className="text-base leading-none">×</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Medicine Name</label>
+              <input
+                value={stockName}
+                onChange={(e) => setStockName(e.target.value)}
+                placeholder="E.g. Paracetamol"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Category</label>
+              <input
+                value={stockCategory}
+                onChange={(e) => setStockCategory(e.target.value)}
+                placeholder="E.g. Pain Reliever"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Quantity</label>
+                <input
+                  value={stockQty}
+                  onChange={(e) => setStockQty(e.target.value)}
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Unit</label>
+                <input
+                  value={stockUnit}
+                  onChange={(e) => setStockUnit(e.target.value)}
+                  placeholder="E.g. tablets"
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Expiry Date</label>
+              <input
+                value={stockExpiry}
+                onChange={(e) => setStockExpiry(e.target.value)}
+                type="date"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+          </div>
+
+          {medStock.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {medStock.map((item) => (
+                <span
+                  key={item.id}
+                  className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                >
+                  {item.name} · {item.quantity} {item.unit}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowAddMedicineForm(false);
+                resetAddMedicineForm();
+              }}
+              className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveMedicineStock}
+              className="text-sm font-semibold bg-gc-accent text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            >
+              + Add Medicine
+            </button>
+          </div>
         </div>
       )}
 
