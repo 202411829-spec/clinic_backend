@@ -1,7 +1,9 @@
 // src/pages/student/Feedback.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NavIcon from "../../components/admin/NavIcon";
 import StarRating from "../../components/student/StarRating";
+import { feedbackApi } from "../../lib/api.js";
+
 
 const ratingLabels = {
   0: "Tap a star to rate your visit",
@@ -12,20 +14,34 @@ const ratingLabels = {
   5: "Excellent",
 };
 
-// TODO: seed with the signed-in student's own submissions from Supabase
-// (`feedback` table filtered by student_id) once that's wired up.
-const initialHistory = [];
+// TODO: swap for the logged-in student's id once auth/session is wired.
+const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
 
 export default function Feedback() {
   const [rating, setRating] = useState(0);
   const [message, setMessage] = useState("");
-  const [history, setHistory] = useState(initialHistory);
+  const [history, setHistory] = useState([]);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const maxLength = 400;
 
-  function handleSubmit(e) {
+  // Load this student's past submissions.
+  useEffect(() => {
+    let cancelled = false;
+    feedbackApi
+      .list(CURRENT_STUDENT_ID)
+      .then((res) => {
+        if (!cancelled) setHistory(res?.feedback || []);
+      })
+      .catch((err) => console.error("Failed to load feedback:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSubmit(e) {
     e.preventDefault();
 
     if (rating === 0) {
@@ -33,20 +49,29 @@ export default function Feedback() {
       return;
     }
 
-    const entry = {
-      id: `local-${Date.now()}`,
-      rating,
-      message: message.trim(),
-      date: new Date().toISOString(),
-    };
-
-    // TODO: replace with a Supabase insert into `feedback` once wired up.
-    setHistory((prev) => [entry, ...prev]);
-    setRating(0);
-    setMessage("");
+    setSubmitting(true);
     setError("");
-    setJustSubmitted(true);
-    window.setTimeout(() => setJustSubmitted(false), 4000);
+
+    try {
+      // Persist via POST /feedback, then refresh from the backend so the
+      // history shows the saved row (with its server-generated id/date).
+      await feedbackApi.submit({
+        student_id: CURRENT_STUDENT_ID,
+        rating,
+        message: message.trim(),
+      });
+      const res = await feedbackApi.list(CURRENT_STUDENT_ID).catch(() => null);
+      if (res?.feedback) setHistory(res.feedback);
+
+      setRating(0);
+      setMessage("");
+      setJustSubmitted(true);
+      window.setTimeout(() => setJustSubmitted(false), 4000);
+    } catch (err) {
+      setError(err.message || "Couldn't submit your feedback. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (

@@ -75,6 +75,17 @@ export const referenceApi = {
   medicines: () => api.get('/medicines'),
 }
 
+// ---- Notifications (status-change history per student) ----
+export const notificationsApi = {
+  list: (studentId) => api.get(`/notifications/${studentId}`),
+}
+
+// ---- Feedback (student clinic-visit ratings) ----
+export const feedbackApi = {
+  list: (studentId) => api.get(`/feedback/${studentId}`),
+  submit: (body) => api.post('/feedback', body),
+}
+
 // ---- Reports ----
 export const reportsApi = {
   get: (params) => api.get('/api/reports/', params),
