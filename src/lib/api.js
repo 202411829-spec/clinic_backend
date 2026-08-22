@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
 async function request(path, { params, ...options } = {}) {
   const url = new URL(path, API_BASE_URL)

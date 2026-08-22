@@ -1,39 +1,84 @@
-"""
-Student Record endpoints.
+"""Student Record endpoints.
 
 Backs the Student Record page: profile header, Year I-IV annual exam
 history, per-year Physical Examination / Laboratory Results / Diagnosis
 forms, plus the Medical Certificate and Medical Summary views.
 
-Design notes:
-- Year I-IV rows are NOT pre-seeded for every student. A row in
-  `annual_examination` only exists once someone clicks "+ Add Annual
-  Examination" for that year. Years with no row are reported as a virtual
-  {"status": "no_record"} entry so the table still always shows 4 rows.
-- physical_examination / laboratory_result / chest_xray / medical_certificate
-  all hang off annual_exam_id (added in the fix_annual_exam_and_certificate_structure
-  and fix_physical_exam_and_lab_result_fields migrations).
+Converted from FastAPI to a Flask blueprint.
 """
 
+from flask import Blueprint, jsonify, request
 from datetime import date
-from typing import Literal, Optional
-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from supabase_client import supabase
 
-router = APIRouter(prefix="/api/records", tags=["student-record"])
+student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
 YEAR_LABELS = ["Year I", "Year II", "Year III", "Year IV"]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _error(message, status):
+    return jsonify({"detail": message}), status
+
+
+def _get_annual_exam_or_404(annual_exam_id):
+    """Returns (exam_row, None) or (None, error_response)."""
+    exam = (
+        supabase.table("annual_examination")
+        .select("*")
+        .eq("annual_exam_id", annual_exam_id)
+        .maybe_single()
+        .execute()
+    )
+    if not exam.data:
+        return None, _error("Annual examination not found", 404)
+    return exam.data, None
+
+
+def _get_physical_exam_or_409(annual_exam_id):
+    """Returns (exam_row, None) or (None, error_response)."""
+    exam = (
+        supabase.table("physical_examination")
+        .select("examination_id, student_id")
+        .eq("annual_exam_id", annual_exam_id)
+        .maybe_single()
+        .execute()
+    )
+    if not exam.data:
+        return None, _error(
+            "Save the Physical Examination for this year before adding lab results.",
+            409,
+        )
+    return exam.data, None
+
+
+def _compute_bmi(weight_kg, height_cm):
+    if not weight_kg or not height_cm:
+        return None
+    height_m = height_cm / 100
+    return round(weight_kg / (height_m ** 2), 1)
+
+
+def _iso_or_none(value):
+    """Accepts 'YYYY-MM-DD' strings from JSON; returns ISO string or None."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10]).isoformat()
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
 # Profile header + annual exam history
 # ---------------------------------------------------------------------------
 
-@router.get("/{student_id}")
-def get_student_record_header(student_id: str):
+@student_record_bp.route("/<path:student_id>", methods=["GET"])
+def get_student_record_header(student_id):
     profile = (
         supabase.table("student_masterlist")
         .select("*")
@@ -42,7 +87,7 @@ def get_student_record_header(student_id: str):
         .execute()
     )
     if not profile.data:
-        raise HTTPException(status_code=404, detail="Student not found")
+        return _error("Student not found", 404)
 
     exams_resp = (
         supabase.table("annual_examination")
@@ -67,95 +112,55 @@ def get_student_record_header(student_id: str):
                 "examined_by": None,
             })
 
-    return {"profile": profile.data, "annual_exam_history": history}
+    return jsonify({"profile": profile.data, "annual_exam_history": history})
 
 
-class CreateAnnualExam(BaseModel):
-    school_year: str        # "2025-2026"
-    year_label: Literal["Year I", "Year II", "Year III", "Year IV"]
-    date_examined: Optional[date] = None
-    examined_by: Optional[int] = None  # admin_id
+@student_record_bp.route("/<path:student_id>/annual-exams", methods=["POST"])
+def add_annual_exam(student_id):
+    body = request.get_json(silent=True) or {}
 
+    year_label = body.get("year_label")
+    if year_label not in YEAR_LABELS:
+        return _error(f"year_label must be one of {YEAR_LABELS}", 400)
 
-@router.post("/{student_id}/annual-exams")
-def add_annual_exam(student_id: str, body: CreateAnnualExam):
     existing = (
         supabase.table("annual_examination")
         .select("annual_exam_id")
         .eq("student_id", student_id)
-        .eq("year_label", body.year_label)
+        .eq("year_label", year_label)
         .maybe_single()
         .execute()
     )
     if existing.data:
-        raise HTTPException(status_code=409, detail=f"{body.year_label} already exists for this student")
+        return _error(f"{year_label} already exists for this student", 409)
 
     response = (
         supabase.table("annual_examination")
         .insert({
             "student_id": student_id,
-            "school_year": body.school_year,
-            "year_label": body.year_label,
+            "school_year": body.get("school_year"),
+            "year_label": year_label,
             "status": "pending",
-            "date_examined": body.date_examined.isoformat() if body.date_examined else None,
-            "examined_by": body.examined_by,
+            "date_examined": _iso_or_none(body.get("date_examined")),
+            "examined_by": body.get("examined_by"),
         })
         .execute()
     )
-    return response.data[0]
+    return jsonify(response.data[0])
 
 
 # ---------------------------------------------------------------------------
 # Physical Examination
 # ---------------------------------------------------------------------------
 
-class PhysicalFinding(BaseModel):
-    result: Literal["normal", "with_findings"] = "normal"
-    remarks: Optional[str] = None
+FINDING_FIELDS = ["skin", "heent", "heart", "abdomen", "extremities", "other_findings"]
 
 
-class PhysicalExaminationIn(BaseModel):
-    date_examined: Optional[date] = None
-    blood_pressure: Optional[str] = None
-    cardiac_rate: Optional[float] = None
-    respiratory_rate: Optional[float] = None
-    temperature: Optional[float] = None
-    weight: Optional[float] = None
-    height: Optional[float] = None
-    visual_acuity: Optional[str] = None
-    skin: PhysicalFinding = PhysicalFinding()
-    heent: PhysicalFinding = PhysicalFinding()
-    heart: PhysicalFinding = PhysicalFinding()
-    abdomen: PhysicalFinding = PhysicalFinding()
-    extremities: PhysicalFinding = PhysicalFinding()
-    other_findings_label: Optional[str] = None
-    other_findings: PhysicalFinding = PhysicalFinding()
-    examined_by: Optional[int] = None
-
-
-def _compute_bmi(weight_kg: Optional[float], height_cm: Optional[float]) -> Optional[float]:
-    if not weight_kg or not height_cm:
-        return None
-    height_m = height_cm / 100
-    return round(weight_kg / (height_m ** 2), 1)
-
-
-def _get_annual_exam_or_404(annual_exam_id: int):
-    exam = (
-        supabase.table("annual_examination")
-        .select("*")
-        .eq("annual_exam_id", annual_exam_id)
-        .maybe_single()
-        .execute()
-    )
-    if not exam.data:
-        raise HTTPException(status_code=404, detail="Annual examination not found")
-    return exam.data
-
-
-@router.get("/annual-exams/{annual_exam_id}/physical-examination")
-def get_physical_examination(annual_exam_id: int):
-    _get_annual_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/physical-examination", methods=["GET"])
+def get_physical_examination(annual_exam_id):
+    _, error = _get_annual_exam_or_404(annual_exam_id)
+    if error:
+        return error
     response = (
         supabase.table("physical_examination")
         .select("*")
@@ -163,35 +168,53 @@ def get_physical_examination(annual_exam_id: int):
         .maybe_single()
         .execute()
     )
-    return response.data  # null if not yet saved
+    # null (None) if not yet saved — matches original FastAPI behaviour.
+    if response.data is None:
+        return "null", 200, {"Content-Type": "application/json"}
+    return jsonify(response.data)
 
 
-@router.put("/annual-exams/{annual_exam_id}/physical-examination")
-def save_physical_examination(annual_exam_id: int, body: PhysicalExaminationIn):
-    exam = _get_annual_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/physical-examination", methods=["PUT"])
+def save_physical_examination(annual_exam_id):
+    exam, error = _get_annual_exam_or_404(annual_exam_id)
+    if error:
+        return error
+
+    body = request.get_json(silent=True) or {}
+
+    def finding_result(key, default="normal"):
+        value = body.get(key)
+        if isinstance(value, dict):
+            return value.get("result") or default
+        return default
+
+    def finding_remarks(key):
+        value = body.get(key)
+        if isinstance(value, dict):
+            return value.get("remarks")
+        return None
 
     row = {
         "student_id": exam["student_id"],
         "annual_exam_id": annual_exam_id,
         "school_year": exam["school_year"],
-        "blood_pressure": body.blood_pressure,
-        "cardiac_rate": body.cardiac_rate,
-        "respiratory_rate": body.respiratory_rate,
-        "temperature": body.temperature,
-        "weight": body.weight,
-        "height": body.height,
-        "bmi": _compute_bmi(body.weight, body.height),
-        "visual_acuity": body.visual_acuity,
-        "skin_result": body.skin.result, "skin": body.skin.remarks,
-        "heent_result": body.heent.result, "heent": body.heent.remarks,
-        "heart_result": body.heart.result, "heart": body.heart.remarks,
-        "abdomen_result": body.abdomen.result, "abdomen": body.abdomen.remarks,
-        "extremities_result": body.extremities.result, "extremities": body.extremities.remarks,
-        "other_findings_label": body.other_findings_label,
-        "other_findings_result": body.other_findings.result, "other_findings": body.other_findings.remarks,
-        "examined_by": body.examined_by,
-        "examined_at": body.date_examined.isoformat() if body.date_examined else None,
+        "blood_pressure": body.get("blood_pressure"),
+        "cardiac_rate": body.get("cardiac_rate"),
+        "respiratory_rate": body.get("respiratory_rate"),
+        "temperature": body.get("temperature"),
+        "weight": body.get("weight"),
+        "height": body.get("height"),
+        "bmi": _compute_bmi(body.get("weight"), body.get("height")),
+        "visual_acuity": body.get("visual_acuity"),
+        "examined_by": body.get("examined_by"),
+        "examined_at": _iso_or_none(body.get("date_examined")),
+        "other_findings_label": body.get("other_findings_label"),
     }
+
+    for key in FINDING_FIELDS:
+        column = key if key != "other_findings" else "other_findings"
+        row[f"{column}_result"] = finding_result(key)
+        row[column] = finding_remarks(key)
 
     existing = (
         supabase.table("physical_examination")
@@ -216,54 +239,18 @@ def save_physical_examination(annual_exam_id: int, body: PhysicalExaminationIn):
             "annual_exam_id", annual_exam_id
         ).execute()
 
-    return response.data[0]
+    return jsonify(response.data[0])
 
 
 # ---------------------------------------------------------------------------
 # Laboratory Results
 # ---------------------------------------------------------------------------
 
-class LabResultsIn(BaseModel):
-    # CBC
-    cbc_date: Optional[date] = None
-    hemoglobin: Optional[float] = None
-    hematocrit: Optional[float] = None
-    wbc: Optional[float] = None
-    platelet_count: Optional[float] = None
-    blood_type: Optional[str] = None
-    # Urinalysis
-    urinalysis_date: Optional[date] = None
-    glucose: Optional[str] = None
-    protein: Optional[str] = None
-    # Chest X-Ray
-    chest_xray_date: Optional[date] = None
-    chest_xray_result: Optional[Literal["normal", "with_findings"]] = None
-    chest_xray_notes: Optional[str] = None
-    # Others
-    other_examination_type: Optional[str] = None
-    other_date: Optional[date] = None
-    other_results: Optional[str] = None
-
-
-def _get_physical_exam_or_404(annual_exam_id: int):
-    exam = (
-        supabase.table("physical_examination")
-        .select("examination_id, student_id")
-        .eq("annual_exam_id", annual_exam_id)
-        .maybe_single()
-        .execute()
-    )
-    if not exam.data:
-        raise HTTPException(
-            status_code=409,
-            detail="Save the Physical Examination for this year before adding lab results.",
-        )
-    return exam.data
-
-
-@router.get("/annual-exams/{annual_exam_id}/lab-results")
-def get_lab_results(annual_exam_id: int):
-    physical_exam = _get_physical_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/lab-results", methods=["GET"])
+def get_lab_results(annual_exam_id):
+    physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
+    if error:
+        return error
     lab = (
         supabase.table("laboratory_result")
         .select("*, chest_xray(*)")
@@ -271,28 +258,34 @@ def get_lab_results(annual_exam_id: int):
         .maybe_single()
         .execute()
     )
-    return lab.data
+    if lab.data is None:
+        return "null", 200, {"Content-Type": "application/json"}
+    return jsonify(lab.data)
 
 
-@router.put("/annual-exams/{annual_exam_id}/lab-results")
-def save_lab_results(annual_exam_id: int, body: LabResultsIn):
-    physical_exam = _get_physical_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/lab-results", methods=["PUT"])
+def save_lab_results(annual_exam_id):
+    physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
+    if error:
+        return error
+
+    body = request.get_json(silent=True) or {}
 
     lab_row = {
         "student_id": physical_exam["student_id"],
         "examination_id": physical_exam["examination_id"],
-        "cbc_date": body.cbc_date.isoformat() if body.cbc_date else None,
-        "hemoglobin": body.hemoglobin,
-        "hematocrit": body.hematocrit,
-        "wbc": body.wbc,
-        "platelet_count": body.platelet_count,
-        "blood_type": body.blood_type,
-        "urinalysis_date": body.urinalysis_date.isoformat() if body.urinalysis_date else None,
-        "glucose": body.glucose,
-        "protein": body.protein,
-        "other_examination_type": body.other_examination_type,
-        "other_date": body.other_date.isoformat() if body.other_date else None,
-        "other_results": body.other_results,
+        "cbc_date": _iso_or_none(body.get("cbc_date")),
+        "hemoglobin": body.get("hemoglobin"),
+        "hematocrit": body.get("hematocrit"),
+        "wbc": body.get("wbc"),
+        "platelet_count": body.get("platelet_count"),
+        "blood_type": body.get("blood_type"),
+        "urinalysis_date": _iso_or_none(body.get("urinalysis_date")),
+        "glucose": body.get("glucose"),
+        "protein": body.get("protein"),
+        "other_examination_type": body.get("other_examination_type"),
+        "other_date": _iso_or_none(body.get("other_date")),
+        "other_results": body.get("other_results"),
     }
 
     existing = (
@@ -312,12 +305,12 @@ def save_lab_results(annual_exam_id: int, body: LabResultsIn):
         lab_result_id = inserted.data[0]["lab_result_id"]
 
     # Chest X-ray is its own table.
-    if body.chest_xray_date or body.chest_xray_result or body.chest_xray_notes:
+    if body.get("chest_xray_date") or body.get("chest_xray_result") or body.get("chest_xray_notes"):
         xray_row = {
             "lab_result_id": lab_result_id,
-            "chest_xray_date": body.chest_xray_date.isoformat() if body.chest_xray_date else None,
-            "chest_xray_result": body.chest_xray_result,
-            "chest_xray_notes": body.chest_xray_notes,
+            "chest_xray_date": _iso_or_none(body.get("chest_xray_date")),
+            "chest_xray_result": body.get("chest_xray_result"),
+            "chest_xray_notes": body.get("chest_xray_notes"),
         }
         existing_xray = (
             supabase.table("chest_xray")
@@ -340,17 +333,8 @@ def save_lab_results(annual_exam_id: int, body: LabResultsIn):
 # Diagnosis & Final Remark  (-> populates the Medical Certificate)
 # ---------------------------------------------------------------------------
 
-class DiagnosisIn(BaseModel):
-    diagnosis: Optional[str] = None
-    final_remark: Optional[str] = None
-    essentially_normal: bool = False
-    purposes: list[str] = []
-    examined_by: Optional[int] = None   # admin_id -> also gives license_no
-    issued_on: Optional[date] = None
-
-
-@router.get("/annual-exams/{annual_exam_id}/diagnosis")
-def get_diagnosis(annual_exam_id: int):
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["GET"])
+def get_diagnosis(annual_exam_id):
     response = (
         supabase.table("medical_certificate")
         .select("*")
@@ -358,21 +342,27 @@ def get_diagnosis(annual_exam_id: int):
         .maybe_single()
         .execute()
     )
-    return response.data
+    if response.data is None:
+        return "null", 200, {"Content-Type": "application/json"}
+    return jsonify(response.data)
 
 
-@router.put("/annual-exams/{annual_exam_id}/diagnosis")
-def save_diagnosis(annual_exam_id: int, body: DiagnosisIn):
-    exam = _get_annual_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["PUT"])
+def save_diagnosis(annual_exam_id):
+    _, error = _get_annual_exam_or_404(annual_exam_id)
+    if error:
+        return error
+
+    body = request.get_json(silent=True) or {}
 
     row = {
         "annual_exam_id": annual_exam_id,
-        "diagnosis": body.diagnosis,
-        "final_remark": body.final_remark,
-        "essentially_normal": body.essentially_normal,
-        "purposes": body.purposes,
-        "prepared_by": body.examined_by,
-        "date_issued": (body.issued_on or date.today()).isoformat(),
+        "diagnosis": body.get("diagnosis"),
+        "final_remark": body.get("final_remark"),
+        "essentially_normal": bool(body.get("essentially_normal", False)),
+        "purposes": body.get("purposes") or [],
+        "prepared_by": body.get("examined_by"),
+        "date_issued": _iso_or_none(body.get("issued_on")) or date.today().isoformat(),
     }
 
     existing = (
@@ -396,16 +386,18 @@ def save_diagnosis(annual_exam_id: int, body: DiagnosisIn):
         "annual_exam_id", annual_exam_id
     ).execute()
 
-    return response.data[0]
+    return jsonify(response.data[0])
 
 
 # ---------------------------------------------------------------------------
 # Medical Certificate (printable view)
 # ---------------------------------------------------------------------------
 
-@router.get("/annual-exams/{annual_exam_id}/medical-certificate")
-def get_medical_certificate(annual_exam_id: int):
-    exam = _get_annual_exam_or_404(annual_exam_id)
+@student_record_bp.route("/annual-exams/<int:annual_exam_id>/medical-certificate", methods=["GET"])
+def get_medical_certificate(annual_exam_id):
+    exam, error = _get_annual_exam_or_404(annual_exam_id)
+    if error:
+        return error
 
     profile = (
         supabase.table("student_masterlist")
@@ -422,17 +414,17 @@ def get_medical_certificate(annual_exam_id: int):
         .execute()
     )
     if not certificate.data:
-        raise HTTPException(status_code=404, detail="No diagnosis saved for this year yet")
+        return _error("No diagnosis saved for this year yet", 404)
 
-    return {"student": profile.data, "certificate": certificate.data}
+    return jsonify({"student": profile.data, "certificate": certificate.data})
 
 
 # ---------------------------------------------------------------------------
 # Medical Summary (all-years rollup)
 # ---------------------------------------------------------------------------
 
-@router.get("/{student_id}/medical-summary")
-def get_medical_summary(student_id: str):
+@student_record_bp.route("/<path:student_id>/medical-summary", methods=["GET"])
+def get_medical_summary(student_id):
     profile = (
         supabase.table("student_masterlist")
         .select("*")
@@ -441,7 +433,7 @@ def get_medical_summary(student_id: str):
         .execute()
     )
     if not profile.data:
-        raise HTTPException(status_code=404, detail="Student not found")
+        return _error("Student not found", 404)
 
     emergency_contact = (
         supabase.table("emergency_contact")
@@ -467,9 +459,9 @@ def get_medical_summary(student_id: str):
     by_year = {row["year_label"]: row for row in exams.data}
     years = {label: by_year.get(label) for label in YEAR_LABELS}
 
-    return {
+    return jsonify({
         "profile": profile.data,
         "emergency_contact": emergency_contact.data,
         "medical_history": medical_history.data,
         "years": years,
-    }
+    })

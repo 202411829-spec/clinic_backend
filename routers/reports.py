@@ -1,5 +1,4 @@
-"""
-Reports endpoint.
+"""Reports endpoint.
 
 Backs the Reports page: totals + breakdowns by status, reason, department,
 complaint, sex, and age for a given date.
@@ -15,15 +14,14 @@ that's a signal to sync with whoever owns Appointments/Logbook on their
 naming convention — not something to patch around here.
 """
 
+from flask import Blueprint, jsonify, request
 from collections import Counter
 from datetime import date as date_type
 from typing import Optional
 
-from fastapi import APIRouter, Query
-
 from supabase_client import supabase
 
-router = APIRouter(prefix="/api/reports", tags=["reports"])
+blueprint = Blueprint("reports", __name__, url_prefix="/api/reports")
 
 
 def _breakdown(rows: list[dict], field: str, missing_label: str = "Not set") -> list[dict]:
@@ -39,11 +37,20 @@ def _breakdown(rows: list[dict], field: str, missing_label: str = "Not set") -> 
     ]
 
 
-@router.get("")
-def get_report(
-    report_date: date_type = Query(..., alias="date"),
-    department_id: Optional[int] = Query(None),
-):
+@blueprint.route("/", methods=["GET"])
+def get_report():
+    date_str = request.args.get("date")
+    if date_str:
+        try:
+            report_date = date_type.fromisoformat(date_str)
+        except Exception:
+            return jsonify({"error": "Invalid date format, expected YYYY-MM-DD"}), 400
+    else:
+        from datetime import datetime
+        report_date = datetime.now().date()
+
+    department_id: Optional[int] = request.args.get("department_id", type=int)
+
     query = (
         supabase.table("report_appointment_rows")
         .select("*")
@@ -70,7 +77,7 @@ def get_report(
     }
 
 
-@router.get("/departments")
+@blueprint.route("/departments", methods=["GET"])
 def list_departments_for_filter():
     """Reuses the same department list as the Masterlist filter dropdown."""
     response = (
