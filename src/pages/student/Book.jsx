@@ -1,17 +1,23 @@
 // src/pages/student/Book.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SelectDateCalendar from "../../components/admin/SelectDateCalendar";
 import SelectTimeSlots from "../../components/student/SelectTimeSlots";
 import SelectReasonPanel from "../../components/student/SelectReasonPanel";
 import AppointmentSummaryCard from "../../components/student/AppointmentSummaryCard";
 import BookingStepIndicator from "../../components/student/BookingStepIndicator";
-import { generateDaySlots } from "../../lib/timeSlots";
+import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext";
 
-// TODO: swap for the student's actual next-available booking date /
-// a real Supabase-backed availability query once the backend is ready.
-const DEFAULT_DATE = new Date(2026, 7, 6); // Aug 6, 2026 — matches the mockup
+function toYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// TODO: swap for the logged-in student's id once auth/session is wired.
+const DEFAULT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
 
 function SuccessPanel({ rescheduling, onDone }) {
   return (
@@ -57,7 +63,7 @@ export default function Book() {
 
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(
-    isReschedule ? appointment.date : DEFAULT_DATE
+    isReschedule ? appointment.date : new Date()
   );
   const [selectedTime, setSelectedTime] = useState(
     isReschedule ? appointment.time : null
@@ -66,27 +72,76 @@ export default function Book() {
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(false);
 
-  const slots = useMemo(() => generateDaySlots(selectedDate), [selectedDate]);
+  // Real slot availability for the selected date + real reason list.
+  const [slots, setSlots] = useState([]);
+  const [reasonList, setReasonList] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    appointmentsApi
+      .slots(toYMD(selectedDate))
+      .then((res) => {
+        if (cancelled) return;
+        setSlots(
+          (res?.slots || []).map((s) => ({
+            id: s.id,
+            time: s.time,
+            capacity: s.capacity,
+            booked: s.booked,
+            slot_start: s.slot_start,
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error("Failed to load slots:", err);
+          setSlots([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    referenceApi
+      .reasons()
+      .then((res) => setReasonList(res?.reasons || []))
+      .catch(() => {});
+  }, []);
 
   function handleSelectDate(date) {
     setSelectedDate(date);
     setSelectedTime(null); // availability differs per day — clear a stale pick
   }
 
-  function handleBook() {
-    // TODO: replace with a real Supabase insert/update
-    // (student id, date, time, reason).
+  async function handleBook() {
+    // Persist via POST /appointments.
     setBooking(true);
-    setTimeout(() => {
-      setBooking(false);
-      setBooked(true);
+    try {
+      const matchedSlot = slots.find((s) => s.time === selectedTime);
+      const matchedReason = reasonList.find((r) => r.description === reason);
+      await appointmentsApi.create({
+        student_id: DEFAULT_STUDENT_ID,
+        slot_id: matchedSlot?.id ?? null,
+        appointment_date: toYMD(selectedDate),
+        appointment_time: matchedSlot?.slot_start || "08:00",
+        reason_id: matchedReason?.reason_id,
+        purpose: reason,
+      });
       const payload = { date: selectedDate, time: selectedTime, reason };
       if (isReschedule) {
         rescheduleAppointment(payload);
       } else {
         bookAppointment(payload);
       }
-    }, 600);
+      setBooked(true);
+    } catch (err) {
+      console.error("Booking failed:", err);
+      alert(`Couldn't book the appointment: ${err.message}`);
+    } finally {
+      setBooking(false);
+    }
   }
 
   function goToDashboard() {

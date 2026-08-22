@@ -1,9 +1,33 @@
 // src/components/admin/LogbookFullPanel.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import NavIcon from "./NavIcon";
-import { logbookEntries as initialEntries, reasonOptions } from "../../data/dashboardSample";
+import {
+  logbookEntries as sampleEntries,
+  reasonOptions as sampleReasons,
+} from "../../data/dashboardSample";
+import { logbookApi, referenceApi } from "../../lib/api.js";
 
 const PAGE_SIZE = 20;
+
+// Map a backend /logbook row onto the shape this panel renders.
+function mapEntry(r) {
+  // Backend deptCourse is built as "Course - Department".
+  const [course = "-", dept = "-"] = String(r.deptCourse || "-").split(" - ");
+  return {
+    id: r.id ?? r.log_id,
+    dateTime: r.dateTime || "-",
+    studentId: r.student_id ?? "-",
+    name: r.name || "-",
+    age: r.age ?? "-",
+    dept,
+    course,
+    deptCourse: r.deptCourse || "-",
+    sex: r.sex || "-",
+    reason: r.reason || "-",
+    complaint: r.complaint || "-",
+    medicine: r.medicine || "-",
+  };
+}
 
 function Pagination({ page, pageCount, onChange }) {
   // Show up to 10 page numbers to match the design, even if there isn't
@@ -73,7 +97,25 @@ function Pagination({ page, pageCount, onChange }) {
 }
 
 export default function LogbookFullPanel() {
-  const [entries, setEntries] = useState(initialEntries);
+  const [entries, setEntries] = useState([]);
+  const [reasons, setReasons] = useState(sampleReasons);
+
+  // Load real visit history + reference dropdowns.
+  useEffect(() => {
+    logbookApi
+      .list()
+      .then((res) => setEntries((res?.logbook || []).map(mapEntry)))
+      .catch((err) => console.error("Failed to load logbook:", err));
+    referenceApi
+      .reasons()
+      .then((res) => {
+        const list = (res?.reasons || [])
+          .map((r) => r.description)
+          .filter((d) => d && d !== "-");
+        if (list.length) setReasons(list);
+      })
+      .catch(() => {});
+  }, []);
 
   // search + filters
   const [search, setSearch] = useState("");
@@ -140,30 +182,34 @@ export default function LogbookFullPanel() {
     setQuantity("");
   }
 
-  function handleAddWalkIn() {
+  async function handleAddWalkIn() {
     if (!regId.trim()) return;
     const now = new Date();
-    const dateTime = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(
-      now.getDate()
-    ).padStart(2, "0")}/${now.getFullYear()} ${now.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-    const newEntry = {
-      id: `lb-new-${Date.now()}`,
-      dateTime,
-      studentId: regId.trim(),
-      name: regId.trim(),
-      age: "-",
-      dept: "-",
-      course: "-",
-      deptCourse: "-",
-      sex: "-",
-      reason: walkInReason || "-",
-      complaint: complaint.trim() || "-",
-      medicine: medTags.length ? medTags.join(", ") : "-",
-    };
-    setEntries((prev) => [newEntry, ...prev]);
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:00`;
+
+    try {
+      await logbookApi.createWalkIn({
+        student_id: regId.trim(),
+        appointment_date: `${y}-${m}-${d}`,
+        appointment_time: time,
+        reason_id:
+          reasons.indexOf(walkInReason) >= 0 ? reasons.indexOf(walkInReason) + 1 : undefined,
+        complaint: complaint.trim() || undefined,
+      });
+      // Refresh the list from the backend so the new visit shows real data.
+      const res = await logbookApi.list();
+      setEntries((res?.logbook || []).map(mapEntry));
+    } catch (err) {
+      console.error("Walk-in failed:", err);
+      alert(`Couldn't save the walk-in visit: ${err.message}`);
+      return;
+    }
+
     setRegId("");
     setWalkInReason("");
     setComplaint("");
@@ -226,7 +272,7 @@ export default function LogbookFullPanel() {
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
         >
           <option>All Reason</option>
-          {reasonOptions.map((r) => (
+          {reasons.map((r) => (
             <option key={r}>{r}</option>
           ))}
         </select>
@@ -325,7 +371,7 @@ export default function LogbookFullPanel() {
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
               >
                 <option value="">Select Reason</option>
-                {reasonOptions.map((r) => (
+                {reasons.map((r) => (
                   <option key={r}>{r}</option>
                 ))}
               </select>

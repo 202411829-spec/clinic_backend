@@ -4,6 +4,7 @@ import NavIcon from "./NavIcon";
 import ScheduleCalendar, { DEFAULT_OPEN_WEEKDAYS } from "./ScheduleCalendar";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { generateTimeBlocks } from "../../lib/schedule";
+import { clinicScheduleApi } from "../../lib/api.js";
 import { formatMDY, WEEKDAY_LABELS } from "../../lib/calendar";
 
 function InfoDot({ label }) {
@@ -17,6 +18,13 @@ function InfoDot({ label }) {
       i
     </span>
   );
+}
+
+function toYMDLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
@@ -121,6 +129,22 @@ export default function ClinicScheduleFullPanel() {
     setBlocks(computed.blocks);
   }, [computed]);
 
+  // Load the clinic's saved default settings on mount.
+  useEffect(() => {
+    clinicScheduleApi
+      .getSettings()
+      .then((res) => {
+        const s = res?.settings;
+        if (!s) return;
+        if (s.work_start) setWorkStart(String(s.work_start).slice(0, 5));
+        if (s.work_end) setWorkEnd(String(s.work_end).slice(0, 5));
+        if (s.break_start) setBreakStart(String(s.break_start).slice(0, 5));
+        if (s.break_end) setBreakEnd(String(s.break_end).slice(0, 5));
+      })
+      .catch((err) => console.error("Failed to load clinic settings:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleSaveBlock(blockId, data) {
     setBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, time: data.time, capacity: data.slots } : b))
@@ -131,7 +155,34 @@ export default function ClinicScheduleFullPanel() {
     setBlocks((prev) => prev.filter((b) => b.id !== blockId));
   }
 
-  function handleUpdateSchedule() {
+  async function handleUpdateSchedule() {
+    try {
+      // Persist global defaults.
+      await clinicScheduleApi.updateSettings({
+        work_start: workStart,
+        work_end: workEnd,
+        break_start: breakStart,
+        break_end: breakEnd,
+        max_student_per_slot: Number(computed.slotsPerBlock) || undefined,
+      });
+      // Persist per-date overrides for every selected date.
+      await Promise.all(
+        selectedDates.map((d) =>
+          clinicScheduleApi.createOverride({
+            working_date: toYMDLocal(d),
+            slot_start: workStart,
+            slot_end: workEnd,
+            break_start: breakStart || null,
+            break_end: breakEnd || null,
+            is_enabled: true,
+          })
+        )
+      );
+    } catch (err) {
+      console.error("Failed to save schedule:", err);
+      setSavedMessage("");
+      window.setTimeout(() => setSavedMessage(""), 3000);
+    }
     const dateLabel =
       scheduleMode === "days"
         ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`

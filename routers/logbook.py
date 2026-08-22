@@ -909,3 +909,83 @@ def add_medicine_to_log(log_id):
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ============================================================
+# LIST REASONS (for the walk-in form dropdown)
+#
+# GET /reasons
+# ============================================================
+
+@logbook_bp.route("/reasons", methods=["GET"])
+def get_reasons():
+
+    try:
+
+        reasons_by_id = build_reason_lookup()
+
+        reasons = [
+            {
+                "reason_id": reason_id,
+                "description": row.get("description") or "-",
+            }
+            for reason_id, row in sorted(
+                reasons_by_id.items(),
+                key=lambda kv: str(kv[1].get("description") or "")
+            )
+        ]
+
+        return jsonify({
+            "success": True,
+            "count": len(reasons),
+            "reasons": reasons
+        })
+
+    except Exception as e:
+
+        print("Reasons error:", repr(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ============================================================
+# LIST MEDICINES (for walk-in / add-medicine forms)
+#
+# GET /medicines
+# ============================================================
+
+@logbook_bp.route("/medicines", methods=["GET"])
+def get_medicines():
+
+    try:
+
+        medicines_by_id = build_medicine_lookup()
+
+        medicines = [
+            {
+                "medicine_id": medicine_id,
+                "medicine_name": row.get("medicine_name") or "-",
+            }
+            for medicine_id, row in sorted(
+                medicines_by_id.items(),
+                key=lambda kv: str(kv[1].get("medicine_name") or "")
+            )
+        ]
+
+        return jsonify({
+            "success": True,
+            "count": len(medicines),
+            "medicines": medicines
+        })
+
+    except Exception as e:
+
+        print("Medicines error:", repr(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

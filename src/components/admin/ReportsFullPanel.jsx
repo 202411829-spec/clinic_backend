@@ -3,13 +3,50 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import PeriodDropdown from "./PeriodDropdown";
 import SelectDateCalendar from "./SelectDateCalendar";
-import { getReportData } from "../../data/reportsSample";
-import { departmentOptions } from "../../data/masterlistSample";
+import { masterlistApi, reportsApi } from "../../lib/api.js";
 import { formatMDY, getPeriodLabel, shiftByPeriod } from "../../lib/calendar";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
 import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+
+// Shape the panel renders; filled in from GET /api/reports/?date=...
+const EMPTY_DATA = {
+  status: { title: "Total", rows: [] },
+  reason: { title: "Reason", rows: [] },
+  department: { title: "Department", rows: [] },
+  complaint: { title: "Complaint", rows: [] },
+  sex: { title: "Sex", rows: [] },
+  age: { title: "Age", rows: [] },
+};
+
+function toYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function pct(breakdown) {
+  return `${breakdown.count} (${breakdown.percent}% of total)`;
+}
+
+function mapResponse(json) {
+  const data = JSON.parse(JSON.stringify(EMPTY_DATA));
+  data.status.rows = [
+    { label: "Total Students", value: String(json.total_students ?? 0) },
+    ...(json.status_breakdown || []).map((b) => ({ label: b.label, value: pct(b) })),
+  ];
+  data.reason.rows = (json.reason_breakdown || []).map((b) => ({ label: b.label, value: pct(b) }));
+  data.department.rows = (json.department_breakdown || []).map((b) => ({ label: b.label, value: pct(b) }));
+  data.complaint.rows = (json.complaint_breakdown || []).map((b) => ({ label: b.label, value: pct(b) }));
+  data.sex.rows = (json.sex_breakdown || []).map((b) => ({ label: b.label, value: pct(b) }));
+  data.age.rows = (json.age_breakdown || []).map((b) => ({
+    label: String(b.label),
+    value: pct(b),
+  }));
+  return data;
+}
 
 function StatCard({ title, rows }) {
   return (
@@ -30,12 +67,49 @@ function StatCard({ title, rows }) {
 }
 
 export default function ReportsFullPanel() {
-  const [date, setDate] = useState(new Date(2026, 5, 7));
+  const [date, setDate] = useState(new Date());
   const [period, setPeriod] = useState("Day");
   const [department, setDepartment] = useState("All Departments");
+  const [departments, setDepartments] = useState([]);
+  const [data, setData] = useState(EMPTY_DATA);
   const [downloading, setDownloading] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef(null);
+
+  // Real department list for the filter dropdown.
+  useEffect(() => {
+    masterlistApi
+      .listDepartments()
+      .then((rows) =>
+        setDepartments(
+          (rows || []).map((r) => ({
+            id: r.department_id,
+            name: r.department_name,
+          }))
+        )
+      )
+      .catch(() => {});
+  }, []);
+
+  // Real report data for the selected date (+ department filter).
+  useEffect(() => {
+    let cancelled = false;
+    const deptId =
+      department === "All Departments"
+        ? undefined
+        : departments.find((d) => d.name === department)?.id;
+    reportsApi
+      .get({ date: toYMD(date), department_id: deptId })
+      .then((json) => {
+        if (!cancelled) setData(mapResponse(json));
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Failed to load report:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date, department, departments]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -47,11 +121,6 @@ export default function ReportsFullPanel() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [pickerOpen]);
-
-  // NOTE: getReportData is still placeholder data (see src/data/reportsSample.js).
-  // Once real aggregation queries are wired up, pass `period` through so the
-  // backend can bucket by day/week/month/semester/academic year/year/all-time.
-  const data = useMemo(() => getReportData(date, department, period), [date, department, period]);
 
   const periodLabel = useMemo(() => getPeriodLabel(date, period), [date, period]);
 
@@ -235,8 +304,8 @@ export default function ReportsFullPanel() {
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
             >
               <option>All Departments</option>
-              {departmentOptions.map((d) => (
-                <option key={d}>{d}</option>
+              {departments.map((d) => (
+                <option key={d.id}>{d.name}</option>
               ))}
             </select>
           </div>
