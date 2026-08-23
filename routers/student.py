@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from database import supabase
+from routers.auth_guard import require_auth, sanitize_search
 
 student_bp = Blueprint(
     "student",
@@ -25,10 +26,11 @@ student_bp = Blueprint(
     "/students",
     methods=["GET"]
 )
+@require_auth
 def get_students():
 
     try:
-        search = request.args.get("search")
+        search = sanitize_search(request.args.get("search"))
         page = request.args.get("page", default=1, type=int)
         page_size = request.args.get(
             "page_size", default=100, type=int
@@ -95,6 +97,7 @@ def get_students():
     "/students/<student_id>",
     methods=["GET"]
 )
+@require_auth
 def get_student(student_id):
 
     try:

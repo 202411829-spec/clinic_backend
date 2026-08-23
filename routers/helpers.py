@@ -27,6 +27,16 @@ from database import supabase
 # build_reason_lookup() run on almost every request in the app,
 # so this was the last unprotected call site.
 #
+# It is also the SINGLE CANONICAL HOME of execute_with_retry /
+# _looks_transient / TRANSIENT_ERRORS and of the shared lookup
+# builders (calculate_age, normalize_student_id, get_lookup,
+# build_student_lookup, build_reason_lookup,
+# build_medicine_lookup, get_medicines_for_log). logbook.py and
+# appointment.py used to carry near-identical copies that had
+# started to diverge (logbook normalized student ids with
+# str().strip().upper(); helpers did not) — they now import from
+# here instead.
+#
 # NOTE: httpx/postgrest-py wrap the raw OSError in their own
 # exception types (httpx.ConnectError, httpx.ReadError, etc.)
 # instead of letting it bubble up as a plain OSError, so we have
@@ -144,6 +154,26 @@ def calculate_age(birth_date_value):
         return None
 
 
+def normalize_student_id(student_id_value):
+    """
+    Normalize a student_id for matching between the appointment
+    table and personal_information table. Without this, a
+    student_id that's stored as an int in one table and a string
+    in the other (or has stray whitespace/case differences from
+    manual entry, e.g. a walk-in form) silently fails to join,
+    and the visit shows up with blank name/age/sex/course even
+    though the student IS registered.
+
+    This used to live only in logbook.py; it is now the single
+    canonical variant so every caller joins with the same,
+    more defensive keying.
+    """
+    if student_id_value is None:
+        return None
+
+    return str(student_id_value).strip().upper()
+
+
 def get_lookup(table, id_column):
     """
     Fetch a whole table and return it as a dict keyed by its id
@@ -162,8 +192,14 @@ def get_lookup(table, id_column):
 
 def build_student_lookup():
     """
-    Returns a dict keyed by student_id, with fully joined
-    student details: name, age, sex, department & course.
+    Returns a dict keyed by NORMALIZED student_id (see
+    normalize_student_id), with fully joined student details:
+    name, age, sex, department & course.
+
+    NOTE: keys are normalized, so callers must pass
+    normalize_student_id(raw_id) when looking a student up.
+    The raw (unmodified) student_id is still preserved in each
+    row's "student_id" field for display/response purposes.
     """
 
     personal_info_response = execute_with_retry(
@@ -183,6 +219,7 @@ def build_student_lookup():
     for info in personal_info_rows:
 
         student_id = info.get("student_id")
+        student_id_key = normalize_student_id(student_id)
 
         name_row = names_by_id.get(info.get("name_id"), {})
 
@@ -209,11 +246,13 @@ def build_student_lookup():
         else:
             dept_course = course_name or department_name or "-"
 
-        students[student_id] = {
+        students[student_id_key] = {
             "student_id": student_id,
             "name": full_name or "-",
             "age": calculate_age(info.get("birth_date")),
             "sex": info.get("gender") or "-",
+            # "dept" is required by appointment.py's
+            # GET /appointments/slots booking join — keep it.
             "dept": department_name or "-",
             "deptCourse": dept_course,
             "year_level": info.get("year_level"),

@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 
 from database import supabase
+from routers.auth_guard import require_auth, require_admin
 
 
 clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
@@ -79,6 +80,7 @@ def get_schedule_for_date(working_date):
     "/clinic-settings",
     methods=["GET"]
 )
+@require_auth
 def get_clinic_settings():
 
     try:
@@ -128,6 +130,7 @@ def get_clinic_settings():
     "/clinic-settings",
     methods=["PUT"]
 )
+@require_admin
 def update_clinic_settings():
 
     try:
@@ -210,6 +213,7 @@ def update_clinic_settings():
     "/clinic-schedule",
     methods=["GET"]
 )
+@require_auth
 def get_clinic_schedule():
 
     try:
@@ -265,6 +269,7 @@ def get_clinic_schedule():
     "/clinic-schedule/<working_date>",
     methods=["GET"]
 )
+@require_auth
 def get_clinic_schedule_by_date(working_date):
 
     try:
@@ -317,6 +322,7 @@ def get_clinic_schedule_by_date(working_date):
     "/clinic-schedule",
     methods=["POST"]
 )
+@require_admin
 def create_clinic_schedule():
 
     try:
@@ -411,6 +417,7 @@ def create_clinic_schedule():
     "/clinic-schedule/id/<int:schedule_id>",
     methods=["PUT"]
 )
+@require_admin
 def update_clinic_schedule(schedule_id):
 
     try:
@@ -488,6 +495,7 @@ def update_clinic_schedule(schedule_id):
     "/clinic-schedule/id/<int:schedule_id>",
     methods=["DELETE"]
 )
+@require_admin
 def delete_clinic_schedule(schedule_id):
 
     try:
@@ -536,6 +544,7 @@ def delete_clinic_schedule(schedule_id):
     "/clinic-schedule/preview",
     methods=["GET"]
 )
+@require_auth
 def preview_time_blocks():
 
     try:

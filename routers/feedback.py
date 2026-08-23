@@ -21,6 +21,7 @@ from flask import Blueprint, jsonify, request
 
 from database import supabase
 from routers.helpers import execute_with_retry
+from routers.auth_guard import require_auth
 
 feedback_bp = Blueprint("feedback", __name__)
 
@@ -44,6 +45,7 @@ def _format_created_at(created_at):
     "/feedback/<student_id>",
     methods=["GET"]
 )
+@require_auth
 def get_feedback(student_id):
 
     try:
@@ -106,6 +108,7 @@ def get_feedback(student_id):
     "/feedback",
     methods=["POST"]
 )
+@require_auth
 def submit_feedback():
 
     try:

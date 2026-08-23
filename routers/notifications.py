@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify
 
 from database import supabase
 from routers.helpers import execute_with_retry
+from routers.auth_guard import require_auth
 
 notifications_bp = Blueprint("notifications", __name__)
 
@@ -41,6 +42,7 @@ def _format_changed_at(changed_at):
     "/notifications/<student_id>",
     methods=["GET"]
 )
+@require_auth
 def get_notifications(student_id):
 
     try:

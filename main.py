@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask
 from flask_cors import CORS
 
@@ -14,8 +16,28 @@ from routers.reports import blueprint as reports_bp
 
 app = Flask(__name__)
 
-# Allow frontend applications to access the API
-CORS(app)
+# =========================
+# CORS
+#
+# Restrict to the frontend origins listed in FRONTEND_ORIGINS
+# (comma-separated). Default matches the Vite dev server. The
+# Authorization header must be allowed because the frontend sends
+# 'Authorization: Bearer <supabase_access_token>' on every API call.
+# supports_credentials is enabled for cookie/credential flows; note
+# this requires explicit (non-wildcard) origins, which we enforce.
+# =========================
+_origins = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
+CORS(
+    app,
+    origins=_origins,
+    allow_headers=["Content-Type", "Authorization"],
+    supports_credentials=True,
+)
 
 # =========================
 # REGISTER ROUTERS
@@ -49,7 +71,7 @@ def health():
 if __name__ == "__main__":
     print("Clinic Appointment Backend starting...")
     app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=True
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("DEBUG", "false").strip().lower() in ("1", "true", "yes", "on")
     )

@@ -1,123 +1,16 @@
-import time
-import socket
-
 from flask import Blueprint, jsonify, request
 from database import supabase
-
-try:
-    import httpx
-except ImportError:
-    httpx = None
-
 from routers.helpers import (
+    execute_with_retry,
+    normalize_student_id,
     build_student_lookup,
     build_reason_lookup,
     format_date_time
 )
+from routers.auth_guard import require_auth, require_admin
 
 
 appointment_bp = Blueprint("appointment", __name__)
-
-
-# ============================================================
-# RETRY WRAPPER — same fix as logbook.py. The Supabase/httpx
-# client occasionally hits transient low-level socket errors on
-# Windows dev machines (e.g. WinError 10035 / WSAEWOULDBLOCK)
-# when it reuses a pooled connection that isn't quite ready yet.
-# These are not real failures, just a stale connection —
-# retrying the exact same query a moment later succeeds. Every
-# .execute() call in this file should go through here instead
-# of being called directly, so a flaky socket doesn't surface
-# as a 500.
-#
-# NOTE: httpx/postgrest-py wrap the raw OSError in their own
-# exception types (httpx.ConnectError, httpx.ReadError, etc.)
-# instead of letting it bubble up as a plain OSError, so we have
-# to catch those wrapped types too — not just OSError itself.
-# ============================================================
-
-if httpx is not None:
-    TRANSIENT_ERRORS = (
-        OSError,
-        socket.error,
-        ConnectionError,
-        TimeoutError,
-        httpx.ConnectError,
-        httpx.ReadError,
-        httpx.WriteError,
-        httpx.ConnectTimeout,
-        httpx.ReadTimeout,
-        httpx.RemoteProtocolError,
-        httpx.PoolTimeout,
-    )
-else:
-    TRANSIENT_ERRORS = (OSError, socket.error, ConnectionError, TimeoutError)
-
-
-def _looks_transient(error):
-    """
-    Fallback check for transient errors that don't match
-    TRANSIENT_ERRORS by type but clearly are one by message —
-    e.g. a postgrest APIError whose __cause__ is a socket error.
-    """
-    text = str(error).lower()
-    markers = (
-        "10035", "would block", "connection reset", "connection aborted",
-        "broken pipe", "timed out", "timeout", "connection refused",
-        "server disconnected", "econnreset",
-    )
-    if any(marker in text for marker in markers):
-        return True
-
-    cause = getattr(error, "__cause__", None)
-    if cause is not None and isinstance(cause, TRANSIENT_ERRORS):
-        return True
-
-    return False
-
-
-def execute_with_retry(query, retries=5, delay=0.3):
-    """
-    Call .execute() on a Supabase query builder, retrying on
-    transient connection/socket errors (timeouts, resets,
-    "would block" errors, etc). Raises the last error if every
-    attempt fails.
-    """
-
-    last_error = None
-
-    for attempt in range(retries):
-
-        try:
-            return query.execute()
-
-        except TRANSIENT_ERRORS as e:
-
-            last_error = e
-            print(
-                f"Supabase query attempt {attempt + 1}/{retries} "
-                f"failed with transient error: {repr(e)} — retrying..."
-            )
-            time.sleep(delay * (attempt + 1))  # small backoff
-
-        except Exception as e:
-
-            if _looks_transient(e):
-                last_error = e
-                print(
-                    f"Supabase query attempt {attempt + 1}/{retries} "
-                    f"failed with transient-looking error: {repr(e)} — retrying..."
-                )
-                time.sleep(delay * (attempt + 1))
-                continue
-
-            # Non-transient errors (bad query, auth, etc) — don't retry,
-            # fail fast so the real problem surfaces immediately.
-            raise
-
-    # All retries exhausted — raise the last transient error so the
-    # calling route's except block can format a normal error response.
-    raise last_error
 
 
 # ============================================================
@@ -157,6 +50,93 @@ def get_latest_status_for_appointments(appointment_ids):
     return latest_by_appointment
 
 
+def resolve_slot_for_booking(slot_id, appointment_time):
+    """
+    Resolve the target time_slot row for a booking, mirroring how
+    GET /appointments/slots relates bookings to time_slot rows.
+
+    If an explicit slot_id was sent, use it directly. Otherwise
+    fall back to matching a slot whose slot_start equals the
+    requested appointment_time ("HH:MM"). Returns None when no
+    slot matches.
+    """
+    if slot_id:
+
+        response = execute_with_retry(
+            supabase
+            .table("time_slot")
+            .select("*")
+            .eq("slot_id", slot_id)
+        )
+
+        rows = response.data or []
+
+        return rows[0] if rows else None
+
+    if not appointment_time:
+        return None
+
+    requested_start = str(appointment_time)[:5]  # "HH:MM"
+
+    response = execute_with_retry(
+        supabase
+        .table("time_slot")
+        .select("*")
+        .order("slot_start", desc=False)
+    )
+
+    for slot in (response.data or []):
+        if str(slot.get("slot_start") or "")[:5] == requested_start:
+            return slot
+
+    return None
+
+
+def is_slot_closed_for_date(appointment_date):
+    """
+    True when a clinic_schedule override marks the given date as
+    closed/disabled (is_enabled is False).
+    """
+    response = execute_with_retry(
+        supabase
+        .table("clinic_schedule")
+        .select("is_enabled, reason")
+        .eq("working_date", appointment_date)
+        .limit(1)
+    )
+
+    rows = response.data or []
+
+    if not rows:
+        return False
+
+    return rows[0].get("is_enabled") is False
+
+
+def get_max_students_per_slot():
+    """
+    Capacity per slot comes from the global clinic_appointment_settings
+    row's max_student_per_slot; falls back to 10 — the value the rest
+    of the codebase (clinic_schedule.py's preview endpoint) has always
+    hardcoded as the default.
+    """
+    response = execute_with_retry(
+        supabase
+        .table("clinic_appointment_settings")
+        .select("max_student_per_slot")
+        .limit(1)
+    )
+
+    rows = response.data or []
+
+    try:
+        configured = int(rows[0].get("max_student_per_slot"))
+    except (TypeError, ValueError, IndexError):
+        configured = 10
+
+    return max(configured, 0) or 10
+
+
 # ============================================================
 # GET ALL APPOINTMENTS
 #
@@ -167,6 +147,7 @@ def get_latest_status_for_appointments(appointment_ids):
 # ============================================================
 
 @appointment_bp.route("/appointments", methods=["GET"])
+@require_auth
 def get_appointments():
 
     try:
@@ -218,6 +199,7 @@ def get_appointments():
     "/appointments/<int:appointment_id>",
     methods=["GET"]
 )
+@require_auth
 def get_appointment(appointment_id):
 
     try:
@@ -274,6 +256,7 @@ def get_appointment(appointment_id):
     "/appointments/slots",
     methods=["GET"]
 )
+@require_auth
 def get_time_slots():
 
     try:
@@ -351,8 +334,10 @@ def get_time_slots():
 
             slot_id = appointment.get("slot_id")
 
+            # build_student_lookup() keys students by
+            # normalize_student_id(), so normalize the raw id here too.
             student = students_by_id.get(
-                appointment.get("student_id"), {}
+                normalize_student_id(appointment.get("student_id")), {}
             )
 
             reason_row = reasons_by_id.get(
@@ -443,6 +428,7 @@ def get_time_slots():
     "/appointments/<int:appointment_id>/status",
     methods=["GET"]
 )
+@require_auth
 def get_appointment_status(appointment_id):
 
     try:
@@ -508,6 +494,7 @@ def get_appointment_status(appointment_id):
     "/appointments/<int:appointment_id>/status",
     methods=["PATCH"]
 )
+@require_admin
 def update_appointment_status(appointment_id):
 
     try:
@@ -622,9 +609,21 @@ def update_appointment_status(appointment_id):
 #
 # Creates the appointment row and seeds an initial
 # "Pending" status entry so the admin panel sees it.
+#
+# Server-side validations (all return the standard
+# {"success": false, "error": ...} envelope):
+#   - 400 when no matching time_slot exists for slot_id /
+#     appointment_time
+#   - 400 when a clinic_schedule override marks the date
+#     closed (is_enabled = false)
+#   - 409 when the slot is at capacity
+#     (clinic_appointment_settings.max_student_per_slot)
+#   - 409 when the same student already holds an ACTIVE
+#     appointment in that same slot/date
 # ============================================================
 
 @appointment_bp.route("/appointments", methods=["POST"])
+@require_auth
 def create_appointment():
 
     try:
@@ -659,9 +658,98 @@ def create_appointment():
                 "error": f"Missing required fields: {', '.join(missing)}"
             }), 400
 
+        # ----------------------------------------------------
+        # SERVER-SIDE SLOT VALIDATION
+        #
+        # GET /appointments/slots already computes full/slotsLeft,
+        # but POST used to insert blindly. Validate before writing:
+        #   1. slot exists (by slot_id, or matched by time)
+        #   2. date isn't closed via a clinic_schedule override
+        #   3. slot not at capacity (clinic_appointment_settings
+        #      .max_student_per_slot)
+        #   4. no duplicate active booking for this student+slot
+        #
+        # NOTE: Supabase gives us no transaction here, so the
+        # count-check + insert is not atomic — two simultaneous
+        # bookings could both pass the check and slightly overrun
+        # capacity. The window is tiny and acceptable for this app;
+        # a DB-level constraint/exclusion would be the real fix.
+        # ----------------------------------------------------
+
+        slot = resolve_slot_for_booking(
+            data.get("slot_id"),
+            appointment_time
+        )
+
+        if not slot:
+            return jsonify({
+                "success": False,
+                "error": "Time slot not found for the requested date/time"
+            }), 400
+
+        if is_slot_closed_for_date(appointment_date):
+            return jsonify({
+                "success": False,
+                "error": "Clinic is closed on the requested date"
+            }), 400
+
+        slot_id = slot.get("slot_id")
+
+        existing_response = execute_with_retry(
+            supabase
+            .table("appointment")
+            .select("appointment_id, student_id")
+            .eq("slot_id", slot_id)
+            .eq("appointment_date", appointment_date)
+        )
+
+        existing_appointments = existing_response.data or []
+
+        # An appointment still occupies capacity unless its LATEST
+        # status row says it was Cancelled — same "latest status wins"
+        # rule the slots endpoint uses for display.
+        latest_status_by_appointment = get_latest_status_for_appointments([
+            row.get("appointment_id") for row in existing_appointments
+        ])
+
+        def _is_active(row):
+            status_row = latest_status_by_appointment.get(
+                row.get("appointment_id")
+            )
+            latest_status = (status_row or {}).get("new_status") or ""
+            return str(latest_status).strip().lower() != "cancelled"
+
+        active_appointments = [
+            row for row in existing_appointments if _is_active(row)
+        ]
+
+        normalized_student_id = normalize_student_id(student_id)
+
+        duplicate = any(
+            normalize_student_id(row.get("student_id"))
+            == normalized_student_id
+            for row in active_appointments
+        )
+
+        if duplicate:
+            return jsonify({
+                "success": False,
+                "error": "You already have an appointment in this time slot"
+            }), 409
+
+        capacity = get_max_students_per_slot()
+
+        if len(active_appointments) >= capacity:
+            return jsonify({
+                "success": False,
+                "error": "This time slot is fully booked"
+            }), 409
+
+        # Use the resolved slot's id so bookings always line up with
+        # the time_slot rows the slots endpoint reports on.
         appointment_data = {
             "student_id": student_id,
-            "slot_id": data.get("slot_id"),
+            "slot_id": slot_id,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
             "reason_id": data.get("reason_id"),

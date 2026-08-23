@@ -20,6 +20,7 @@ from datetime import date as date_type
 from typing import Optional
 
 from supabase_client import supabase
+from routers.auth_guard import require_auth
 
 blueprint = Blueprint("reports", __name__, url_prefix="/api/reports")
 
@@ -38,6 +39,7 @@ def _breakdown(rows: list[dict], field: str, missing_label: str = "Not set") -> 
 
 
 @blueprint.route("/", methods=["GET"])
+@require_auth
 def get_report():
     date_str = request.args.get("date")
     if date_str:
@@ -78,6 +80,7 @@ def get_report():
 
 
 @blueprint.route("/departments", methods=["GET"])
+@require_auth
 def list_departments_for_filter():
     """Reuses the same department list as the Masterlist filter dropdown."""
     response = (

@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify
 from datetime import date
 
 from database import supabase
+from routers.auth_guard import require_auth
 
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -47,6 +48,7 @@ def get_date_value(row):
 # ============================================================
 
 @dashboard_bp.route("/dashboard", methods=["GET"])
+@require_auth
 def get_dashboard():
 
     try:

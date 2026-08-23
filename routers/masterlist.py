@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request
 from typing import Optional, Literal
 
 from supabase_client import supabase
+from routers.auth_guard import require_auth, sanitize_search
 
 blueprint = Blueprint("masterlist", __name__, url_prefix="/api/masterlist")
 
@@ -29,8 +30,9 @@ SORTABLE_COLUMNS = {
 
 
 @blueprint.route("/students", methods=["GET"])
+@require_auth
 def list_students():
-    search: Optional[str] = request.args.get("search")
+    search: Optional[str] = sanitize_search(request.args.get("search"))
     department_id: Optional[int] = request.args.get("department_id", type=int)
     course_id: Optional[int] = request.args.get("course_id", type=int)
     year_level: Optional[str] = request.args.get("year_level")
@@ -75,6 +77,7 @@ def list_students():
 
 
 @blueprint.route("/students/<student_id>", methods=["GET"])
+@require_auth
 def get_student_summary(student_id: str):
     """
     Lightweight lookup used when a row is clicked (before navigating into
@@ -93,6 +96,7 @@ def get_student_summary(student_id: str):
 
 
 @blueprint.route("/departments", methods=["GET"])
+@require_auth
 def list_departments():
     response = (
         supabase.table("department")
@@ -104,6 +108,7 @@ def list_departments():
 
 
 @blueprint.route("/courses", methods=["GET"])
+@require_auth
 def list_courses():
     department_id = request.args.get("department_id", type=int)
     query = supabase.table("course_dept").select("course_id, course_name, department_id")
@@ -114,6 +119,7 @@ def list_courses():
 
 
 @blueprint.route("/years", methods=["GET"])
+@require_auth
 def list_year_levels():
     """Distinct year levels actually present in the data, for the filter dropdown."""
     response = supabase.table("student_masterlist").select("year_level").execute()

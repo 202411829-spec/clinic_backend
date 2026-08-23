@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, request
 from datetime import date
 
 from supabase_client import supabase
+from routers.auth_guard import require_auth, require_admin
 
 student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
@@ -78,6 +79,7 @@ def _iso_or_none(value):
 # ---------------------------------------------------------------------------
 
 @student_record_bp.route("/<path:student_id>", methods=["GET"])
+@require_auth
 def get_student_record_header(student_id):
     profile = (
         supabase.table("student_masterlist")
@@ -116,6 +118,7 @@ def get_student_record_header(student_id):
 
 
 @student_record_bp.route("/<path:student_id>/annual-exams", methods=["POST"])
+@require_admin
 def add_annual_exam(student_id):
     body = request.get_json(silent=True) or {}
 
@@ -157,6 +160,7 @@ FINDING_FIELDS = ["skin", "heent", "heart", "abdomen", "extremities", "other_fin
 
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/physical-examination", methods=["GET"])
+@require_auth
 def get_physical_examination(annual_exam_id):
     _, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
@@ -175,6 +179,7 @@ def get_physical_examination(annual_exam_id):
 
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/physical-examination", methods=["PUT"])
+@require_admin
 def save_physical_examination(annual_exam_id):
     exam, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
@@ -247,6 +252,7 @@ def save_physical_examination(annual_exam_id):
 # ---------------------------------------------------------------------------
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/lab-results", methods=["GET"])
+@require_auth
 def get_lab_results(annual_exam_id):
     physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
     if error:
@@ -264,6 +270,7 @@ def get_lab_results(annual_exam_id):
 
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/lab-results", methods=["PUT"])
+@require_admin
 def save_lab_results(annual_exam_id):
     physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
     if error:
@@ -334,6 +341,7 @@ def save_lab_results(annual_exam_id):
 # ---------------------------------------------------------------------------
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["GET"])
+@require_auth
 def get_diagnosis(annual_exam_id):
     response = (
         supabase.table("medical_certificate")
@@ -348,6 +356,7 @@ def get_diagnosis(annual_exam_id):
 
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["PUT"])
+@require_admin
 def save_diagnosis(annual_exam_id):
     _, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
@@ -394,6 +403,7 @@ def save_diagnosis(annual_exam_id):
 # ---------------------------------------------------------------------------
 
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/medical-certificate", methods=["GET"])
+@require_auth
 def get_medical_certificate(annual_exam_id):
     exam, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
@@ -424,6 +434,7 @@ def get_medical_certificate(annual_exam_id):
 # ---------------------------------------------------------------------------
 
 @student_record_bp.route("/<path:student_id>/medical-summary", methods=["GET"])
+@require_auth
 def get_medical_summary(student_id):
     profile = (
         supabase.table("student_masterlist")
