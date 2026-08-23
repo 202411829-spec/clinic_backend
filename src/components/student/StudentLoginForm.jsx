@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EyeIcon, EyeOffIcon } from '../icons.jsx'
 
 /**
  * Login form used by the Student Portal login page.
@@ -14,6 +15,7 @@ import { useState } from 'react'
 export default function StudentLoginForm({ align = 'left', onSubmit, loading = false, error = '' }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const isCentered = align === 'center'
 
@@ -57,16 +59,26 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
           <label htmlFor="student-password" className="block text-sm font-semibold text-gray-900 mb-1.5">
             Password
           </label>
-          <input
-            id="student-password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Your password"
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
-          />
+          <div className="relative">
+            <input
+              id="student-password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
       </div>
 

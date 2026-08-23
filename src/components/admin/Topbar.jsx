@@ -16,7 +16,7 @@ function initials(name = "") {
  * onBack: optional handler for the "Back" link (defaults to browser back)
  * onMenuClick: opens the mobile sidebar overlay
  */
-export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/admin/login" }) {
+export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/admin/login", showLogout = true }) {
   const handleBack = onBack ?? (() => window.history.back());
 
   return (
@@ -40,8 +40,12 @@ export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/a
         <div className="w-10 h-10 rounded-full bg-gc-green text-white text-sm font-bold flex items-center justify-center shrink-0">
           {initials(user?.name)}
         </div>
-        <div className="w-px h-8 bg-gray-200" />
-        <LogoutMenu redirectTo={logoutRedirect} />
+        {showLogout ? (
+          <>
+            <div className="w-px h-8 bg-gray-200" />
+            <LogoutMenu redirectTo={logoutRedirect} />
+          </>
+        ) : null}
       </div>
 
       {/* mobile: rounded chip with avatar, matches the mockup */}
@@ -55,7 +59,9 @@ export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/a
             {initials(user?.name)}
           </div>
         </div>
-        <LogoutMenu redirectTo={logoutRedirect} variant="chip" className="bg-white border border-gray-100 shadow-sm rounded-full" />
+        {showLogout ? (
+          <LogoutMenu redirectTo={logoutRedirect} variant="chip" className="bg-white border border-gray-100 shadow-sm rounded-full" />
+        ) : null}
       </div>
     </header>
   );

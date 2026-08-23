@@ -59,7 +59,7 @@ export default function AdminLogin() {
             <img
               src={BRAND.logo}
               alt="Gordon College seal"
-              className="h-[150px] w-[150px] object-contain"
+              className="h-[155px] w-[155px] object-contain"
             />
             <h1 className="mt-5 text-xl font-extrabold tracking-wide text-white">
               {BRAND.name}

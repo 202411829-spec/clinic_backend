@@ -30,6 +30,7 @@ export default function StudentLayout() {
           user={currentUser}
           onMenuClick={() => setMobileNavOpen(true)}
           logoutRedirect="/student/login"
+          showLogout={false}
         />
         <main className="px-4 md:px-8 pb-10 print:p-0">
           <Outlet />
