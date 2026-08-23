@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronLeftIcon } from '../icons.jsx'
+import LogoutMenu from '../LogoutMenu.jsx'
 
 // TODO: replace with the real logged-in admin once auth/session wiring
 // lands — matches the mockup's placeholder "Joseph Daniel B. Ramos / Nurse".
@@ -40,6 +41,8 @@ export default function TopBar({ showBack = true }) {
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gc-green-700 text-sm font-bold text-white">
           {CURRENT_ADMIN.initials}
         </div>
+        <div className="h-8 w-px bg-gray-200" />
+        <LogoutMenu redirectTo="/admin/login" />
       </div>
     </div>
   )

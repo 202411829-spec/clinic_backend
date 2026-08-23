@@ -1,10 +1,7 @@
-from flask import Blueprint, jsonify, request
+from fastapi import APIRouter, HTTPException
 from database import supabase
 
-student_bp = Blueprint(
-    "student",
-    __name__
-)
+router = APIRouter()
 
 # ============================================================
 # GET STUDENTS
@@ -12,12 +9,8 @@ student_bp = Blueprint(
 # GET /students
 # ============================================================
 
-@student_bp.route(
-    "/students",
-    methods=["GET"]
-)
+@router.get("/students")
 def get_students():
-
     try:
         response = (
             supabase
@@ -28,17 +21,14 @@ def get_students():
 
         data = response.data or []
 
-        return jsonify({
+        return {
             "success": True,
             "count": len(data),
-            "students": data
-        })
+            "data": data
+        }
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================
@@ -47,10 +37,7 @@ def get_students():
 # GET /students/<id>
 # ============================================================
 
-@student_bp.route(
-    "/students/<student_id>",
-    methods=["GET"]
-)
+@router.get("/students/{student_id}")
 def get_student(student_id):
 
     try:
@@ -74,18 +61,14 @@ def get_student(student_id):
                 break
 
         if student is None:
-            return jsonify({
-                "success": False,
-                "error": "Student not found"
-            }), 404
+            raise HTTPException(status_code=404, detail="Student not found")
 
-        return jsonify({
+        return {
             "success": True,
             "student": student
-        })
+        }
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=str(e))
