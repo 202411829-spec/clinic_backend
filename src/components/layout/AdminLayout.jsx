@@ -30,7 +30,7 @@ export default function AdminLayout() {
 
       <div className="flex flex-1 flex-col overflow-y-auto bg-white lg:rounded-tl-[48px] lg:rounded-bl-[48px]">
         <TopBar />
-        <main className="px-4 pb-16 lg:px-10 md:pb-10">
+        <main className="px-4 pb-4 lg:px-10 lg:pb-6">
           <Outlet />
         </main>
       </div>

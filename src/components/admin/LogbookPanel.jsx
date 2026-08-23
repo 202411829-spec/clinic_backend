@@ -1,11 +1,11 @@
 // src/components/admin/LogbookPanel.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "./NavIcon.jsx";
 import {
   recentLogbookEntries as sampleEntries,
   reasonOptions as sampleReasons,
-} from "../../data/dashboardSample";
+} from "../../data/dashboardSample.js";
 import { logbookApi, referenceApi } from "../../lib/api.js";
 
 function mapEntry(r) {
@@ -261,6 +261,18 @@ export default function LogbookPanel() {
                   placeholder="E.g. Paracetamol"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
                 />
+                {medTags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {medTags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-500">Quantity</label>
@@ -282,19 +294,6 @@ export default function LogbookPanel() {
               </div>
             </div>
           </div>
-
-          {medTags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {medTags.map((tag, i) => (
-                <span
-                  key={i}
-                  className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
 
           <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
             <button
