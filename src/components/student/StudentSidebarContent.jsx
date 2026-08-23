@@ -1,7 +1,8 @@
 // src/components/student/StudentSidebarContent.jsx
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import NavIcon from "../admin/NavIcon";
 import { studentMainNav } from "../../data/studentNav";
+import { useAuth } from "../../context/AuthContext";
 
 /**
  * Pure nav content (logo header + MAIN group) for the student portal.
@@ -15,6 +16,17 @@ import { studentMainNav } from "../../data/studentNav";
  * and stays readable.
  */
 export default function StudentSidebarContent({ onNavigate }) {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleLogout() {
+    try {
+      await signOut();
+    } finally {
+      navigate("/student/login");
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col items-center gap-2.5 px-4 pt-6 pb-5">
@@ -94,6 +106,14 @@ export default function StudentSidebarContent({ onNavigate }) {
           <NavIcon name="info" className="w-[18px] h-[18px]" />
           <span>About</span>
         </NavLink>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white hover:bg-gc-green-900 border-t border-white/10"
+        >
+          <NavIcon name="logout" className="w-[18px] h-[18px]" />
+          <span>Log out</span>
+        </button>
       </div>
     </div>
   );

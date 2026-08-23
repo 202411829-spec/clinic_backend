@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   DashboardIcon,
   AppointmentsIcon,
@@ -7,7 +7,9 @@ import {
   ClinicScheduleIcon,
   ReportsIcon,
   InfoIcon,
+  LogoutIcon,
 } from '../icons.jsx'
+import { supabase } from '../../lib/supabaseClient.js'
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -38,6 +40,13 @@ function NavItem({ to, label, Icon }) {
 }
 
 function NavContent() {
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await supabase?.auth.signOut().catch(() => {})
+    navigate('/admin/login')
+  }
+
   return (
     <>
       <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
@@ -74,6 +83,13 @@ function NavContent() {
         <button className="flex items-center gap-3 text-[15px] font-semibold text-white/90">
           <InfoIcon className="h-5 w-5" />
           About
+        </button>
+        <button
+          onClick={handleLogout}
+          className="mt-2 flex w-full items-center gap-3 text-[15px] font-semibold text-white/90 transition-colors hover:text-white"
+        >
+          <LogoutIcon className="h-5 w-5" />
+          Log out
         </button>
       </div>
     </>

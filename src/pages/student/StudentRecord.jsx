@@ -2,9 +2,7 @@
 import { useEffect, useState } from "react";
 import StudentRecordPanel from "../../components/student/StudentRecordPanel";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
-
-// TODO: swap for the logged-in student's id once auth/session is wired.
-const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
+import { useAuth } from "../../context/AuthContext";
 
 // Adapt the backend shapes (student_masterlist row + /api/records/<id>/
 // medical-summary payload) into the shape StudentRecordPanel renders.
@@ -38,15 +36,17 @@ function adaptStudent(profile, medSummary) {
 }
 
 export default function StudentRecord() {
+  const { studentId } = useAuth();
   const [student, setStudent] = useState(null);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!studentId) return undefined;
     let cancelled = false;
     Promise.all([
-      masterlistApi.getStudent(CURRENT_STUDENT_ID),
-      recordsApi.medicalSummary(CURRENT_STUDENT_ID).catch(() => null),
+      masterlistApi.getStudent(studentId),
+      recordsApi.medicalSummary(studentId).catch(() => null),
     ])
       .then(([profile, medSummary]) => {
         if (cancelled) return;
@@ -59,7 +59,7 @@ export default function StudentRecord() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [studentId]);
 
   return (
     <div className="pt-2 md:pt-4 max-w-6xl mx-auto">

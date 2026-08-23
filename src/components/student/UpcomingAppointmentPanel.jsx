@@ -4,9 +4,7 @@ import { useNavigate } from "react-router-dom";
 import NavIcon from "../admin/NavIcon";
 import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
-
-// TODO: swap for the logged-in student's id once auth/session is wired.
-const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
+import { useAuth } from "../../context/AuthContext";
 
 function toYMD(date) {
   const y = date.getFullYear();
@@ -43,12 +41,14 @@ export default function UpcomingAppointmentPanel() {
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const { appointment: contextAppt, cancelAppointment } = useAppointment();
+  const { studentId } = useAuth();
 
   // Real next appointment from the backend (context appt from a fresh
   // booking takes priority until the list is refreshed).
   const [upcoming, setUpcoming] = useState(null);
 
   useEffect(() => {
+    if (!studentId) return undefined;
     let cancelled = false;
     appointmentsApi
       .list()
@@ -58,7 +58,7 @@ export default function UpcomingAppointmentPanel() {
         const mine = (res?.appointments || [])
           .filter(
             (a) =>
-              String(a.student_id) === String(CURRENT_STUDENT_ID) &&
+              String(a.student_id) === String(studentId) &&
               String(a.appointment_date).slice(0, 10) >= today
           )
           .sort((a, b) =>
@@ -72,7 +72,7 @@ export default function UpcomingAppointmentPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [studentId]);
 
   // A just-booked context appointment wins; otherwise show the backend's.
   const appt = contextAppt

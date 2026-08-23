@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import NavIcon from "../../components/admin/NavIcon";
 import StarRating from "../../components/student/StarRating";
 import { feedbackApi } from "../../lib/api.js";
+import { useAuth } from "../../context/AuthContext";
 
 
 const ratingLabels = {
@@ -14,10 +15,8 @@ const ratingLabels = {
   5: "Excellent",
 };
 
-// TODO: swap for the logged-in student's id once auth/session is wired.
-const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
-
 export default function Feedback() {
+  const { studentId } = useAuth();
   const [rating, setRating] = useState(0);
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState([]);
@@ -29,9 +28,10 @@ export default function Feedback() {
 
   // Load this student's past submissions.
   useEffect(() => {
+    if (!studentId) return undefined;
     let cancelled = false;
     feedbackApi
-      .list(CURRENT_STUDENT_ID)
+      .list(studentId)
       .then((res) => {
         if (!cancelled) setHistory(res?.feedback || []);
       })
@@ -39,7 +39,7 @@ export default function Feedback() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [studentId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -56,11 +56,11 @@ export default function Feedback() {
       // Persist via POST /feedback, then refresh from the backend so the
       // history shows the saved row (with its server-generated id/date).
       await feedbackApi.submit({
-        student_id: CURRENT_STUDENT_ID,
+        student_id: studentId,
         rating,
         message: message.trim(),
       });
-      const res = await feedbackApi.list(CURRENT_STUDENT_ID).catch(() => null);
+      const res = await feedbackApi.list(studentId).catch(() => null);
       if (res?.feedback) setHistory(res.feedback);
 
       setRating(0);

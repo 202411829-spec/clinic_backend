@@ -1,6 +1,26 @@
+import { supabase } from './supabaseClient.js'
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
-async function request(path, { params, ...options } = {}) {
+// The Flask backend rejects every API call (except GET / and /health)
+// without "Authorization: Bearer <supabase_access_token>".
+async function getAccessToken() {
+  try {
+    const { data } = (await supabase?.auth.getSession()) ?? {}
+    return data?.session?.access_token ?? null
+  } catch {
+    // No usable session yet — send the request unauthenticated and let the
+    // backend's 401 handling below route the user back to login.
+    return null
+  }
+}
+
+function redirectToLogin() {
+  const isAdminArea = window.location.pathname.startsWith('/admin')
+  window.location.assign(isAdminArea ? '/admin/login' : '/student/login')
+}
+
+async function request(path, { params, headers, ...options } = {}) {
   const url = new URL(path, API_BASE_URL)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -10,14 +30,27 @@ async function request(path, { params, ...options } = {}) {
     })
   }
 
+  const accessToken = await getAccessToken()
+
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...headers,
+    },
   })
+
+  // Expired/invalid session — clear local auth state and bounce to login.
+  if (response.status === 401) {
+    await supabase?.auth.signOut().catch(() => {})
+    redirectToLogin()
+    throw new Error('Your session has expired. Please sign in again.')
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new Error(body?.detail || `Request failed (${response.status})`)
+    throw new Error(body?.error || body?.detail || `Request failed (${response.status})`)
   }
 
   if (response.status === 204) return null

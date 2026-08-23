@@ -248,6 +248,13 @@ export default function NavIcon({ name, className = "w-5 h-5" }) {
           <path d="M12 20l-4-5h8l-4 5Z" opacity="0.45" />
         </svg>
       );
+    case "logout":
+      return (
+        <svg {...common}>
+          <path d="M15 17l5-5-5-5M20 12H9" />
+          <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
+        </svg>
+      );
     default:
       return null;
   }

@@ -8,6 +8,7 @@ import AppointmentSummaryCard from "../../components/student/AppointmentSummaryC
 import BookingStepIndicator from "../../components/student/BookingStepIndicator";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext";
+import { useAuth } from "../../context/AuthContext";
 
 function toYMD(date) {
   const y = date.getFullYear();
@@ -16,8 +17,9 @@ function toYMD(date) {
   return `${y}-${m}-${d}`;
 }
 
-// TODO: swap for the logged-in student's id once auth/session is wired.
-const DEFAULT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
+// TODO: once the backend exposes an identity mapping endpoint, resolve the
+// numeric masterlist student id there instead of deriving it from the login
+// email (see src/context/AuthContext.jsx).
 
 function SuccessPanel({ rescheduling, onDone }) {
   return (
@@ -56,6 +58,7 @@ export default function Book() {
   const navigate = useNavigate();
   const location = useLocation();
   const { appointment, bookAppointment, rescheduleAppointment } = useAppointment();
+  const { studentId } = useAuth();
 
   // Arrived here via the Dashboard's "Reschedule" action -> pre-fill with
   // the existing appointment and switch copy/behavior into reschedule mode.
@@ -122,7 +125,7 @@ export default function Book() {
       const matchedSlot = slots.find((s) => s.time === selectedTime);
       const matchedReason = reasonList.find((r) => r.description === reason);
       await appointmentsApi.create({
-        student_id: DEFAULT_STUDENT_ID,
+        student_id: studentId,
         slot_id: matchedSlot?.id ?? null,
         appointment_date: toYMD(selectedDate),
         appointment_time: matchedSlot?.slot_start || "08:00",

@@ -63,7 +63,16 @@ export function InfoIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
       <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v5M12 8h.01" strokeLinecap="round" />
+      <path d="M12 11v5M12 8h.01" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function LogoutIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M15 17l5-5-5-5M20 12H9" />
+      <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
     </svg>
   )
 }

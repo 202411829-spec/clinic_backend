@@ -18,17 +18,44 @@ import StudentDashboard from './pages/student/Dashboard.jsx'
 import StudentBook from './pages/student/Book.jsx'
 import StudentRecord from './pages/student/StudentRecord.jsx'
 import { AppointmentProvider } from './context/AppointmentContext.jsx'
+import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import StudentFeedback from './pages/student/Feedback.jsx'
+
+// Minimal loading state shown while the Supabase session is being restored,
+// so protected content never flashes for unauthenticated visitors.
+function SessionLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white">
+      <p className="text-sm font-semibold text-gc-green-700">Loading…</p>
+    </div>
+  )
+}
+
+function ProtectedRoute({ loginPath, children }) {
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) return <SessionLoader />
+  if (!isAuthenticated) return <Navigate to={loginPath} replace />
+  return children
+}
 
 export default function App() {
   return (
-    <Routes>
+    <AuthProvider>
+      <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
       {/* ADMIN */}
       <Route path="/admin/login" element={<AdminLogin />} />
 
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute loginPath="/admin/login">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="logbook" element={<Logbook />} />
@@ -46,9 +73,11 @@ export default function App() {
       <Route
         path="/student"
         element={
-          <AppointmentProvider>
-            <StudentLayout />
-          </AppointmentProvider>
+          <ProtectedRoute loginPath="/student/login">
+            <AppointmentProvider>
+              <StudentLayout />
+            </AppointmentProvider>
+          </ProtectedRoute>
         }
       >
         <Route path="dashboard" element={<StudentDashboard />} />
@@ -59,6 +88,7 @@ export default function App() {
 
       {/* Fallback so unmatched routes don't render a blank page */}
       <Route path="*" element={<ComingSoon title="Page not found" />} />
-    </Routes>
+      </Routes>
+    </AuthProvider>
   )
 }

@@ -2,20 +2,23 @@
 import { useEffect, useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { useAppointment } from "../../context/AppointmentContext";
-
-// TODO: swap for the logged-in student's id once auth/session is wired.
-const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
+import { useAuth } from "../../context/AuthContext";
+import { notificationsApi } from "../../lib/api.js";
 
 export default function NotificationsPanel() {
   const { notifications: liveNotifications } = useAppointment();
+  const { studentId } = useAuth();
   // Real status-change history from GET /notifications/<student_id>;
   // live in-session events (booked/rescheduled/cancelled just now) on top.
   const [history, setHistory] = useState([]);
 
   useEffect(() => {
+    if (!studentId) return undefined;
     let cancelled = false;
-    fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:5000"}/notifications/${CURRENT_STUDENT_ID}`)
-      .then((res) => res.json())
+    // Uses the shared api.js wrapper so the Supabase Bearer token is
+    // attached — the backend rejects unauthenticated calls with 401.
+    notificationsApi
+      .list(studentId)
       .then((json) => {
         if (!cancelled && json?.success) setHistory(json.notifications || []);
       })
@@ -23,7 +26,7 @@ export default function NotificationsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [studentId]);
 
   const notifications = [...liveNotifications, ...history];
 
