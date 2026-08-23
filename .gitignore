@@ -6,5 +6,15 @@ dist-ssr
 *.local
 .DS_Store
 
+# Vite PWA dev service worker output
+dev-dist/
+
+# Python
 __pycache__/
 *.pyc
+
+# Archives / build artifacts
+*.zip
+
+# Frontend env (Vite vars for local runs)
+.env.frontend
