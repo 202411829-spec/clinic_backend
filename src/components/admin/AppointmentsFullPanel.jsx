@@ -4,11 +4,16 @@ import NavIcon from "./NavIcon";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
-import {
-  appointmentSlots as initialSlots,
-  reasonOptions,
-} from "../../data/dashboardSample";
+import { reasonOptions } from "../../data/dashboardSample";
+import { appointmentsApi } from "../../lib/api.js";
 import { formatLongDate } from "../../lib/calendar";
+
+function toYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -191,11 +196,37 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
 }
 
 export default function AppointmentsFullPanel({ selectedDate }) {
-  const [slots, setSlots] = useState(initialSlots);
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [openEditId, setOpenEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Department");
   const [reason, setReason] = useState("All Reason");
+
+  // Fetch real time slots + bookings for the selected date.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    appointmentsApi
+      .slots(toYMD(selectedDate))
+      .then((res) => {
+        if (!cancelled) setSlots(res?.slots || []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSlots([]);
+          setError(err.message || "Failed to load appointments");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate]);
 
   const departments = useMemo(() => {
     const set = new Set();
@@ -204,6 +235,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   }, [slots]);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
+    // Optimistic update, persisted via PATCH /appointments/<id>/status.
     setSlots((prev) =>
       prev.map((slot) =>
         slot.id !== slotId
@@ -216,6 +248,9 @@ export default function AppointmentsFullPanel({ selectedDate }) {
             }
       )
     );
+    appointmentsApi
+      .updateStatus(bookingId, { new_status: newStatus })
+      .catch((err) => console.error("Failed to save status:", err));
   }
 
   function handleSaveTimeBlock(slotId, data) {
@@ -309,6 +344,18 @@ export default function AppointmentsFullPanel({ selectedDate }) {
           ))}
         </select>
       </div>
+
+      {loading && (
+        <div className="py-8 text-center text-sm text-gray-400">Loading appointments…</div>
+      )}
+      {!loading && error && (
+        <div className="py-8 text-center text-sm text-red-500">{error}</div>
+      )}
+      {!loading && !error && filteredSlots.length === 0 && (
+        <div className="py-8 text-center text-sm text-gray-400">
+          No time blocks for this date.
+        </div>
+      )}
 
       {filteredSlots.map((slot) => (
         <SlotGroup

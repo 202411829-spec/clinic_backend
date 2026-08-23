@@ -604,3 +604,109 @@ def update_appointment_status(appointment_id):
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ============================================================
+# CREATE APPOINTMENT (student booking)
+#
+# POST /appointments
+#
+# Body:
+# {
+#     "student_id": "202411829",
+#     "slot_id": 3,
+#     "appointment_date": "2026-08-25",
+#     "appointment_time": "09:00",
+#     "reason_id": 1
+# }
+#
+# Creates the appointment row and seeds an initial
+# "Pending" status entry so the admin panel sees it.
+# ============================================================
+
+@appointment_bp.route("/appointments", methods=["POST"])
+def create_appointment():
+
+    try:
+
+        data = request.get_json()
+
+        if not data:
+
+            return jsonify({
+                "success": False,
+                "error": "Request body is required"
+            }), 400
+
+        student_id = data.get("student_id")
+        appointment_date = data.get("appointment_date")
+        appointment_time = data.get("appointment_time")
+
+        missing = [
+            field
+            for field, value in [
+                ("student_id", student_id),
+                ("appointment_date", appointment_date),
+                ("appointment_time", appointment_time)
+            ]
+            if not value
+        ]
+
+        if missing:
+
+            return jsonify({
+                "success": False,
+                "error": f"Missing required fields: {', '.join(missing)}"
+            }), 400
+
+        appointment_data = {
+            "student_id": student_id,
+            "slot_id": data.get("slot_id"),
+            "appointment_date": appointment_date,
+            "appointment_time": appointment_time,
+            "reason_id": data.get("reason_id"),
+            "purpose": data.get("purpose")
+        }
+
+        response = execute_with_retry(
+            supabase
+            .table("appointment")
+            .insert(appointment_data)
+        )
+
+        if not response.data:
+
+            return jsonify({
+                "success": False,
+                "error": "Failed to create appointment"
+            }), 500
+
+        new_appointment = response.data[0]
+
+        # Seed the initial status so it shows up as "Pending" for staff.
+        execute_with_retry(
+            supabase
+            .table("status")
+            .insert({
+                "appointment_id": new_appointment.get("appointment_id"),
+                "old_status": None,
+                "new_status": "Pending",
+                "remarks": "Booked by student",
+                "changed_by": data.get("changed_by")
+            })
+        )
+
+        return jsonify({
+            "success": True,
+            "message": "Appointment booked",
+            "appointment": new_appointment
+        }), 201
+
+    except Exception as e:
+
+        print("Create appointment error:", repr(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

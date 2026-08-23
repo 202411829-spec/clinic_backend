@@ -3,7 +3,7 @@
 // looking at their own info (mirrors the admin Medical Summary layout, but
 // scoped to Student Information / Emergency Contact / Medical History only,
 // with a single "Edit" action instead of print/PDF export).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import EditStudentInfoModal from "./EditStudentInfoModal";
@@ -52,13 +52,34 @@ function formatDisplayName(name = "") {
   return `${rest} ${last}`;
 }
 
-export default function StudentRecordPanel({ student: initialStudent }) {
+export default function StudentRecordPanel({ student: initialStudent, error }) {
   // Kept in local state (seeded from the prop) so the Edit modal can update
   // it in place. Swap this for a real Supabase write + refetch once the
   // student-profile write path is wired up — the shape stays the same.
   const [student, setStudent] = useState(initialStudent);
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // Keep local copy in sync as the async fetch fills the prop in.
+  useEffect(() => {
+    if (initialStudent) setStudent(initialStudent);
+  }, [initialStudent]);
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-300 p-8 text-center text-sm text-red-500">
+        {error}
+      </div>
+    );
+  }
+
+  if (!student) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-300 p-8 text-center text-sm text-gray-400">
+        Loading your record…
+      </div>
+    );
+  }
 
   const age = computeAge(student.birthday);
   const emergency = student.emergencyContact ?? {};

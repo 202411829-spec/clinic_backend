@@ -1,16 +1,9 @@
-import os
-from dotenv import load_dotenv
-from supabase import create_client
+# Shared Supabase client for all backend routers.
+#
+# Kept as a thin re-export of supabase_client so there is exactly ONE
+# place that configures the client (env vars, validation, service-role
+# key). Routers may import from either module name — they get the same
+# instance either way.
+from supabase_client import supabase
 
-load_dotenv()
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL:
-    raise ValueError("SUPABASE_URL is missing from .env")
-
-if not SUPABASE_KEY:
-    raise ValueError("SUPABASE_KEY is missing from .env")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+__all__ = ["supabase"]

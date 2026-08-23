@@ -1,14 +1,31 @@
 // src/components/student/NotificationsPanel.jsx
+import { useEffect, useState } from "react";
 import NavIcon from "../admin/NavIcon";
-import { notifications as sampleNotifications } from "../../data/studentDashboardSample";
 import { useAppointment } from "../../context/AppointmentContext";
+
+// TODO: swap for the logged-in student's id once auth/session is wired.
+const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
 
 export default function NotificationsPanel() {
   const { notifications: liveNotifications } = useAppointment();
-  // Live events (booked/rescheduled/cancelled just now) show first, above
-  // the placeholder history. TODO: drop sampleNotifications once the
-  // backend returns real notification history.
-  const notifications = [...liveNotifications, ...sampleNotifications];
+  // Real status-change history from GET /notifications/<student_id>;
+  // live in-session events (booked/rescheduled/cancelled just now) on top.
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:5000"}/notifications/${CURRENT_STUDENT_ID}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json?.success) setHistory(json.notifications || []);
+      })
+      .catch((err) => console.error("Failed to load notifications:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const notifications = [...liveNotifications, ...history];
 
   return (
     <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
@@ -29,7 +46,7 @@ export default function NotificationsPanel() {
       <div className="border border-gray-200 rounded-2xl overflow-hidden">
         {notifications.map((n, i) => (
           <div
-            key={n.id}
+            key={n.id ?? `n-${i}`}
             className={`flex items-start gap-3 px-5 py-4 ${
               i !== notifications.length - 1 ? "border-b border-gray-200" : ""
             }`}
@@ -41,6 +58,11 @@ export default function NotificationsPanel() {
             </div>
           </div>
         ))}
+        {notifications.length === 0 && (
+          <div className="px-5 py-6 text-center text-sm text-gray-400">
+            No notifications yet.
+          </div>
+        )}
       </div>
     </section>
   );

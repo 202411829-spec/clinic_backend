@@ -1,12 +1,48 @@
 // src/components/admin/LogbookPanel.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
-import { recentLogbookEntries, reasonOptions } from "../../data/dashboardSample";
+import {
+  recentLogbookEntries as sampleEntries,
+  reasonOptions as sampleReasons,
+} from "../../data/dashboardSample";
+import { logbookApi, referenceApi } from "../../lib/api.js";
+
+function mapEntry(r) {
+  return {
+    id: r.id ?? r.log_id,
+    dateTime: r.dateTime || "-",
+    name: r.name || "-",
+    age: r.age ?? "-",
+    deptCourse: r.deptCourse || "-",
+    sex: r.sex || "-",
+    reason: r.reason || "-",
+    complaint: r.complaint || "-",
+    medicine: r.medicine || "-",
+  };
+}
 
 export default function LogbookPanel() {
   const navigate = useNavigate();
-  const [entries, setEntries] = useState(recentLogbookEntries);
+  const [entries, setEntries] = useState([]);
+  const [reasons, setReasons] = useState(sampleReasons);
+
+  // Recent visits for the dashboard widget + real reason dropdown.
+  useEffect(() => {
+    logbookApi
+      .list()
+      .then((res) => setEntries((res?.logbook || []).slice(0, 5).map(mapEntry)))
+      .catch((err) => console.error("Failed to load logbook:", err));
+    referenceApi
+      .reasons()
+      .then((res) => {
+        const list = (res?.reasons || [])
+          .map((r) => r.description)
+          .filter((d) => d && d !== "-");
+        if (list.length) setReasons(list);
+      })
+      .catch(() => {});
+  }, []);
 
   // walk-in form visibility — hidden by default, opened by the
   // "+ Add Walk-in Visit" button, same pattern as the full Logbook page.
@@ -71,27 +107,33 @@ export default function LogbookPanel() {
     setShowAddMedicineForm(false);
   }
 
-  function handleAddWalkIn() {
+  async function handleAddWalkIn() {
     if (!regId.trim()) return;
     const now = new Date();
-    const dateTime = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(
-      now.getDate()
-    ).padStart(2, "0")}/${now.getFullYear()} ${now.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-    const newEntry = {
-      id: `lb-new-${Date.now()}`,
-      dateTime,
-      name: regId.trim(),
-      age: "-",
-      deptCourse: "-",
-      sex: "-",
-      reason: reason || "-",
-      complaint: complaint.trim() || "-",
-      medicine: medTags.length ? medTags.join(", ") : "-",
-    };
-    setEntries((prev) => [newEntry, ...prev]);
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:00`;
+
+    try {
+      await logbookApi.createWalkIn({
+        student_id: regId.trim(),
+        appointment_date: `${y}-${m}-${d}`,
+        appointment_time: time,
+        reason_id: reasons.indexOf(reason) >= 0 ? reasons.indexOf(reason) + 1 : undefined,
+        complaint: complaint.trim() || undefined,
+      });
+      // Refresh the recent-visits list from the backend.
+      const res = await logbookApi.list();
+      setEntries((res?.logbook || []).slice(0, 5).map(mapEntry));
+    } catch (err) {
+      console.error("Walk-in failed:", err);
+      alert(`Couldn't save the walk-in visit: ${err.message}`);
+      return;
+    }
+
     resetWalkInForm();
     setShowWalkInForm(false);
   }
@@ -340,7 +382,7 @@ export default function LogbookPanel() {
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
               >
                 <option value="">Select Reason</option>
-                {reasonOptions.map((r) => (
+                {reasons.map((r) => (
                   <option key={r}>{r}</option>
                 ))}
               </select>

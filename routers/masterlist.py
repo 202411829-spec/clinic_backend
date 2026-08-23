@@ -1,5 +1,4 @@
-"""
-Student Masterlist endpoints.
+"""Student Masterlist endpoints.
 
 Backs the Masterlist page: search bar (surname/name/student ID/course),
 Department/Course/Year filters, sortable columns, and pagination over
@@ -10,12 +9,12 @@ Reads from the `student_masterlist` view (see Supabase migration
 student_name + department + course_dept into one row per student.
 """
 
-from fastapi import APIRouter, HTTPException, Query
-from typing import Literal, Optional
+from flask import Blueprint, jsonify, request
+from typing import Optional, Literal
 
 from supabase_client import supabase
 
-router = APIRouter(prefix="/api/masterlist", tags=["masterlist"])
+blueprint = Blueprint("masterlist", __name__, url_prefix="/api/masterlist")
 
 # Columns the UI is allowed to sort by (mockup shows sort arrows on these).
 # Whitelisted explicitly so a client can't pass an arbitrary column name.
@@ -29,21 +28,20 @@ SORTABLE_COLUMNS = {
 }
 
 
-@router.get("/students")
-def list_students(
-    search: Optional[str] = Query(None, description="Matches surname, first name, student ID, or course"),
-    department_id: Optional[int] = Query(None),
-    course_id: Optional[int] = Query(None),
-    year_level: Optional[str] = Query(None),
-    sort_by: Literal["name", "student_number", "department", "course", "year_level", "sex"] = "name",
-    sort_dir: Literal["asc", "desc"] = "asc",
-    page: int = Query(1, ge=1),
-    page_size: int = Query(15, ge=1, le=100),
-):
+@blueprint.route("/students", methods=["GET"])
+def list_students():
+    search: Optional[str] = request.args.get("search")
+    department_id: Optional[int] = request.args.get("department_id", type=int)
+    course_id: Optional[int] = request.args.get("course_id", type=int)
+    year_level: Optional[str] = request.args.get("year_level")
+    sort_by: Literal["name", "student_number", "department", "course", "year_level", "sex"] = request.args.get("sort_by", "name")
+    sort_dir: Literal["asc", "desc"] = request.args.get("sort_dir", "asc")
+    page: int = int(request.args.get("page", 1))
+    page_size: int = int(request.args.get("page_size", 15))
+
     query = supabase.table("student_masterlist").select("*", count="exact")
 
     if search:
-        # Matches the mockup's "search by surname, name, student ID, or course"
         like = f"%{search}%"
         query = query.or_(
             f"last_name.ilike.{like},"
@@ -76,7 +74,7 @@ def list_students(
     }
 
 
-@router.get("/students/{student_id}")
+@blueprint.route("/students/<student_id>", methods=["GET"])
 def get_student_summary(student_id: str):
     """
     Lightweight lookup used when a row is clicked (before navigating into
@@ -90,11 +88,11 @@ def get_student_summary(student_id: str):
         .execute()
     )
     if not response.data:
-        raise HTTPException(status_code=404, detail="Student not found")
+        return jsonify({"error": "Student not found"}), 404
     return response.data
 
 
-@router.get("/departments")
+@blueprint.route("/departments", methods=["GET"])
 def list_departments():
     response = (
         supabase.table("department")
@@ -105,8 +103,9 @@ def list_departments():
     return response.data
 
 
-@router.get("/courses")
-def list_courses(department_id: Optional[int] = Query(None)):
+@blueprint.route("/courses", methods=["GET"])
+def list_courses():
+    department_id = request.args.get("department_id", type=int)
     query = supabase.table("course_dept").select("course_id, course_name, department_id")
     if department_id is not None:
         query = query.eq("department_id", department_id)
@@ -114,7 +113,7 @@ def list_courses(department_id: Optional[int] = Query(None)):
     return response.data
 
 
-@router.get("/years")
+@blueprint.route("/years", methods=["GET"])
 def list_year_levels():
     """Distinct year levels actually present in the data, for the filter dropdown."""
     response = supabase.table("student_masterlist").select("year_level").execute()

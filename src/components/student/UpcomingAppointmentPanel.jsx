@@ -3,12 +3,86 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../admin/NavIcon";
 import { useAppointment } from "../../context/AppointmentContext";
+import { appointmentsApi } from "../../lib/api.js";
+
+// TODO: swap for the logged-in student's id once auth/session is wired.
+const CURRENT_STUDENT_ID = localStorage.getItem("studentId") || "202411829";
+
+function toYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatTime(value) {
+  if (!value) return "-";
+  const [h, m] = String(value).slice(0, 5).split(":");
+  const hour = Number(h);
+  const period = hour < 12 ? "AM" : "PM";
+  const h12 = hour % 12 || 12;
+  return `${h12}:${m} ${period}`;
+}
+
+// Map a raw /appointments row onto the card's display shape.
+function mapAppointment(a) {
+  const d = new Date(`${String(a.appointment_date).slice(0, 10)}T00:00:00`);
+  return {
+    id: a.appointment_id,
+    month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
+    day: String(d.getDate()),
+    weekday: d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase(),
+    time: formatTime(a.appointment_time),
+    reason: a.purpose ?? "-",
+    badge: a.current_status ?? "Pending",
+  };
+}
 
 export default function UpcomingAppointmentPanel() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
-  const { appointment: appt, cancelAppointment } = useAppointment();
+  const { appointment: contextAppt, cancelAppointment } = useAppointment();
+
+  // Real next appointment from the backend (context appt from a fresh
+  // booking takes priority until the list is refreshed).
+  const [upcoming, setUpcoming] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    appointmentsApi
+      .list()
+      .then((res) => {
+        if (cancelled) return;
+        const today = toYMD(new Date());
+        const mine = (res?.appointments || [])
+          .filter(
+            (a) =>
+              String(a.student_id) === String(CURRENT_STUDENT_ID) &&
+              String(a.appointment_date).slice(0, 10) >= today
+          )
+          .sort((a, b) =>
+            `${a.appointment_date} ${a.appointment_time}`.localeCompare(
+              `${b.appointment_date} ${b.appointment_time}`
+            )
+          );
+        setUpcoming(mine.length ? mapAppointment(mine[0]) : null);
+      })
+      .catch((err) => console.error("Failed to load appointments:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // A just-booked context appointment wins; otherwise show the backend's.
+  const appt = contextAppt
+    ? {
+        ...contextAppt,
+        month: contextAppt.date?.toLocaleString("en-US", { month: "short" }).toUpperCase(),
+        day: String(contextAppt.date?.getDate()),
+        weekday: contextAppt.date?.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase(),
+      }
+    : upcoming;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -26,9 +100,20 @@ export default function UpcomingAppointmentPanel() {
     navigate("/student/book", { state: { reschedule: true } });
   }
 
-  function handleCancel() {
+  async function handleCancel() {
     setMenuOpen(false);
     cancelAppointment();
+    if (appt?.id) {
+      try {
+        await appointmentsApi.updateStatus(appt.id, {
+          new_status: "Cancelled",
+          remarks: "Cancelled by student",
+        });
+        setUpcoming(null);
+      } catch (err) {
+        console.error("Failed to cancel appointment:", err);
+      }
+    }
   }
 
   return (

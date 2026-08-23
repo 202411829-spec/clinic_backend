@@ -4,7 +4,14 @@ import NavIcon from "./NavIcon";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
-import { appointmentSlots, appointmentDate } from "../../data/dashboardSample";
+import { appointmentsApi } from "../../lib/api.js";
+
+function todayYMD() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+}
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -179,8 +186,26 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
 }
 
 export default function AppointmentsPanel() {
-  const [slots, setSlots] = useState(appointmentSlots);
+  const [slots, setSlots] = useState([]);
+  const [dateLabel, setDateLabel] = useState("");
   const [openEditId, setOpenEditId] = useState(null);
+
+  // Today's real slots for the dashboard widget.
+  useEffect(() => {
+    appointmentsApi
+      .slots(todayYMD())
+      .then((res) => {
+        setSlots(res?.slots || []);
+        setDateLabel(
+          new Date().toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
+        );
+      })
+      .catch((err) => console.error("Failed to load today's slots:", err));
+  }, []);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     setSlots((prev) =>
@@ -195,6 +220,9 @@ export default function AppointmentsPanel() {
             }
       )
     );
+    appointmentsApi
+      .updateStatus(bookingId, { new_status: newStatus })
+      .catch((err) => console.error("Failed to save status:", err));
   }
 
   function handleSaveTimeBlock(slotId, data) {
@@ -231,7 +259,7 @@ export default function AppointmentsPanel() {
           </h2>
         </div>
         <span className="text-xs font-semibold text-gray-500">
-          {appointmentDate}
+          {dateLabel || "Today"}
         </span>
       </div>
 
@@ -253,6 +281,12 @@ export default function AppointmentsPanel() {
           <option>All Reason</option>
         </select>
       </div>
+
+      {slots.length === 0 && (
+        <div className="py-6 text-center text-sm text-gray-400">
+          No time blocks for today.
+        </div>
+      )}
 
       {slots.map((slot) => (
         <SlotGroup
