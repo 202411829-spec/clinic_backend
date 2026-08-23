@@ -8,6 +8,7 @@ import {
   ReportsIcon,
   InfoIcon,
 } from '../icons.jsx'
+import LogoutMenu from '../LogoutMenu.jsx'
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -70,7 +71,10 @@ function NavContent() {
         </div>
       </nav>
 
-      <div className="bg-gc-green-800 px-4 py-4">
+      <div className="bg-gc-green-800 px-4 py-3 space-y-1">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-0 [&>button]:py-2 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white/90 [&>button]:transition-colors [&>button:hover]:text-white [&>button:hover]:bg-transparent [&_svg]:h-5 [&_svg]:w-5">
+          <LogoutMenu redirectTo="/admin/login" />
+        </div>
         <button className="flex items-center gap-3 text-[15px] font-semibold text-white/90">
           <InfoIcon className="h-5 w-5" />
           About

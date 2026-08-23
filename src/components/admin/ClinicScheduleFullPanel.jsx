@@ -1,11 +1,11 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
-import ScheduleCalendar, { DEFAULT_OPEN_WEEKDAYS } from "./ScheduleCalendar";
+import ScheduleCalendar from "./ScheduleCalendar";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import { generateTimeBlocks } from "../../lib/schedule";
 import { clinicScheduleApi } from "../../lib/api.js";
-import { formatMDY, WEEKDAY_LABELS } from "../../lib/calendar";
+import { formatMDY } from "../../lib/calendar";
 
 function InfoDot({ label }) {
   return (
@@ -103,8 +103,6 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
 export default function ClinicScheduleFullPanel() {
   const [selectedDates, setSelectedDates] = useState([new Date(2026, 5, 6)]);
-  const [scheduleMode, setScheduleMode] = useState("date"); // "date" | "days"
-  const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
 
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("17:00");
@@ -184,9 +182,7 @@ export default function ClinicScheduleFullPanel() {
       window.setTimeout(() => setSavedMessage(""), 3000);
     }
     const dateLabel =
-      scheduleMode === "days"
-        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
-        : selectedDates.length > 1
+      selectedDates.length > 1
         ? `${selectedDates.length} dates`
         : formatMDY(selectedDates[0]);
     setSavedMessage(`Schedule updated for ${dateLabel}.`);
@@ -195,9 +191,7 @@ export default function ClinicScheduleFullPanel() {
 
   function handleOpenBooking() {
     const dateLabel =
-      scheduleMode === "days"
-        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
-        : selectedDates.length > 1
+      selectedDates.length > 1
         ? `${selectedDates.length} dates`
         : formatMDY(selectedDates[0]);
     setBookingOpenMessage(`Booking is now open for ${dateLabel}.`);
@@ -216,16 +210,9 @@ export default function ClinicScheduleFullPanel() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-stretch">
         {/* left: calendar */}
-        <ScheduleCalendar
-          selectedDates={selectedDates}
-          onChange={setSelectedDates}
-          scheduleMode={scheduleMode}
-          onScheduleModeChange={setScheduleMode}
-          selectedWeekdays={selectedWeekdays}
-          onWeekdaysChange={setSelectedWeekdays}
-        />
+        <ScheduleCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
 
         {/* middle: working hours / break time / time block config */}
         <div className="border border-gray-200 rounded-2xl p-4 md:p-5 space-y-5">
@@ -325,12 +312,13 @@ export default function ClinicScheduleFullPanel() {
           </div>
         </div>
 
-        {/* right: live preview */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5">
-          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3">
+        {/* right: live preview — same height as the Select Date column (grid
+            row is stretched), scrolls internally once blocks overflow it */}
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col lg:max-h-[560px]">
+          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0">
             Time Block Preview
           </h3>
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
             {blocks.map((block) => (
               <TimeBlockRow
                 key={block.id}

@@ -15,7 +15,7 @@ export default function AdminLayout() {
   const hideMobileNav = HIDE_ON_PATTERNS.some((re) => re.test(location.pathname))
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-screen overflow-hidden bg-gc-green-700">
       <Sidebar />
 
       {!hideMobileNav && (
@@ -28,7 +28,7 @@ export default function AdminLayout() {
         </>
       )}
 
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div className="flex flex-1 flex-col overflow-y-auto bg-white lg:rounded-tl-[48px] lg:rounded-bl-[48px]">
         <TopBar />
         <main className="px-4 pb-16 lg:px-10 md:pb-10">
           <Outlet />
