@@ -19,7 +19,7 @@ export default function TopBar({ showBack = true }) {
   }
 
   return (
-    <div className="flex items-center justify-between px-6 py-5 lg:px-10 print:hidden">
+    <div className="flex items-center justify-between px-6 py-4 lg:px-10 print:hidden">
       {showBack ? (
         <button
           onClick={() => navigate(-1)}

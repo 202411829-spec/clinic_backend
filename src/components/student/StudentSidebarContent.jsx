@@ -1,6 +1,7 @@
 // src/components/student/StudentSidebarContent.jsx
 import { NavLink, useNavigate } from "react-router-dom";
 import NavIcon from "../admin/NavIcon";
+import LogoutMenu from "../LogoutMenu";
 import { studentMainNav } from "../../data/studentNav";
 import { useAuth } from "../../context/AuthContext";
 
@@ -34,12 +35,12 @@ export default function StudentSidebarContent({ onNavigate }) {
           <img
             src="/gordon-college-badge.png"
             alt="Gordon College seal"
-            className="w-[70px] h-[70px] shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 object-contain"
           />
           <img
             src="/health-service-badge.png"
             alt="Health Service Unit seal"
-            className="w-[70px] h-[70px] shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 object-contain"
           />
         </div>
         <div className="text-center leading-tight">
@@ -81,6 +82,12 @@ export default function StudentSidebarContent({ onNavigate }) {
           ))}
         </ul>
       </nav>
+
+      <div className="px-2 pb-2">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white/95 [&>button]:transition-colors [&>button:hover]:bg-black/10 [&_svg]:h-[18px] [&_svg]:w-[18px]">
+          <LogoutMenu redirectTo="/student/login" />
+        </div>
+      </div>
 
       <div className="border-t border-white/20">
         <NavLink

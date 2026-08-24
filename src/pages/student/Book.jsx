@@ -179,6 +179,7 @@ export default function Book() {
             <SelectDateCalendar
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
+              navigationMode="month"
             />
             <button
               type="button"
@@ -247,7 +248,11 @@ export default function Book() {
 
       {/* ---------- Desktop: all panels visible at once ---------- */}
       <div className="hidden md:grid md:grid-cols-[1fr_1fr_1fr_1fr] md:gap-5 md:items-start">
-        <SelectDateCalendar selectedDate={selectedDate} onSelectDate={handleSelectDate} />
+        <SelectDateCalendar
+          selectedDate={selectedDate}
+          onSelectDate={handleSelectDate}
+          navigationMode="month"
+        />
         <SelectTimeSlots
           slots={slots}
           selectedTime={selectedTime}

@@ -1,11 +1,11 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import NavIcon from "./NavIcon";
-import ScheduleCalendar, { DEFAULT_OPEN_WEEKDAYS } from "./ScheduleCalendar";
-import TimeBlockEditPopover from "./TimeBlockEditPopover";
-import { generateTimeBlocks } from "../../lib/schedule";
+import NavIcon from "./NavIcon.jsx";
+import ScheduleCalendar from "./ScheduleCalendar.jsx";
+import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
+import { generateTimeBlocks } from "../../lib/schedule.js";
 import { clinicScheduleApi } from "../../lib/api.js";
-import { formatMDY, WEEKDAY_LABELS } from "../../lib/calendar";
+import { formatMDY } from "../../lib/calendar.js";
 
 function InfoDot({ label }) {
   return (
@@ -44,7 +44,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-2.5">
         <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
           {block.time}
         </span>
@@ -102,9 +102,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 }
 
 export default function ClinicScheduleFullPanel() {
-  const [selectedDates, setSelectedDates] = useState([new Date(2026, 5, 6)]);
-  const [scheduleMode, setScheduleMode] = useState("date"); // "date" | "days"
-  const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
+  const [selectedDates, setSelectedDates] = useState([new Date()]);
 
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("17:00");
@@ -184,9 +182,7 @@ export default function ClinicScheduleFullPanel() {
       window.setTimeout(() => setSavedMessage(""), 3000);
     }
     const dateLabel =
-      scheduleMode === "days"
-        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
-        : selectedDates.length > 1
+      selectedDates.length > 1
         ? `${selectedDates.length} dates`
         : formatMDY(selectedDates[0]);
     setSavedMessage(`Schedule updated for ${dateLabel}.`);
@@ -195,9 +191,7 @@ export default function ClinicScheduleFullPanel() {
 
   function handleOpenBooking() {
     const dateLabel =
-      scheduleMode === "days"
-        ? `${selectedWeekdays.map((i) => WEEKDAY_LABELS[i]).join(", ")} (every week)`
-        : selectedDates.length > 1
+      selectedDates.length > 1
         ? `${selectedDates.length} dates`
         : formatMDY(selectedDates[0]);
     setBookingOpenMessage(`Booking is now open for ${dateLabel}.`);
@@ -205,9 +199,9 @@ export default function ClinicScheduleFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       {/* header */}
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 mb-3">
         <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
           <NavIcon name="calendar" className="w-4 h-4" />
         </span>
@@ -216,19 +210,14 @@ export default function ClinicScheduleFullPanel() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-stretch">
         {/* left: calendar */}
-        <ScheduleCalendar
-          selectedDates={selectedDates}
-          onChange={setSelectedDates}
-          scheduleMode={scheduleMode}
-          onScheduleModeChange={setScheduleMode}
-          selectedWeekdays={selectedWeekdays}
-          onWeekdaysChange={setSelectedWeekdays}
-        />
+        <ScheduleCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
 
-        {/* middle: working hours / break time / time block config */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 space-y-5">
+        {/* middle: working hours / break time / time block config — self-start
+            so it hugs its own content instead of stretching to match the
+            taller calendar/preview columns */}
+        <div className="self-start border border-gray-200 rounded-2xl p-4 md:p-5 space-y-4">
           <div>
             <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-2">
               Working Hours
@@ -325,12 +314,15 @@ export default function ClinicScheduleFullPanel() {
           </div>
         </div>
 
-        {/* right: live preview */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5">
-          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3">
+        {/* right: live preview — on lg screens this stretches to match the
+            calendar column's height (CSS grid default); on smaller screens
+            (single-column stack) it falls back to a capped height. Either
+            way the list itself scrolls once blocks overflow that height. */}
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[420px] lg:max-h-none">
+          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0">
             Time Block Preview
           </h3>
-          <div className="space-y-2.5">
+          <div className="space-y-2 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
             {blocks.map((block) => (
               <TimeBlockRow
                 key={block.id}
@@ -351,7 +343,7 @@ export default function ClinicScheduleFullPanel() {
       </div>
 
       {/* footer: save + open booking actions */}
-      <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
+      <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
         {(savedMessage || bookingOpenMessage) && (
           <p className="text-sm font-semibold text-gc-green">
             {savedMessage || bookingOpenMessage}
@@ -359,13 +351,13 @@ export default function ClinicScheduleFullPanel() {
         )}
         <button
           onClick={handleOpenBooking}
-          className="w-full md:w-auto rounded-xl bg-gc-accent px-6 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors"
+          className="w-full md:w-auto rounded-xl bg-gc-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors"
         >
           Open Booking
         </button>
         <button
           onClick={handleUpdateSchedule}
-          className="w-full md:w-auto rounded-xl bg-gc-green px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
+          className="w-full md:w-auto rounded-xl bg-gc-green px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
         >
           Update Schedule
         </button>

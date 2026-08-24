@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   DashboardIcon,
   AppointmentsIcon,
@@ -7,9 +7,8 @@ import {
   ClinicScheduleIcon,
   ReportsIcon,
   InfoIcon,
-  LogoutIcon,
 } from '../icons.jsx'
-import { supabase } from '../../lib/supabaseClient.js'
+import LogoutMenu from '../LogoutMenu.jsx'
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -40,13 +39,6 @@ function NavItem({ to, label, Icon }) {
 }
 
 function NavContent() {
-  const navigate = useNavigate()
-
-  async function handleLogout() {
-    await supabase?.auth.signOut().catch(() => {})
-    navigate('/admin/login')
-  }
-
   return (
     <>
       <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
@@ -79,17 +71,16 @@ function NavContent() {
         </div>
       </nav>
 
-      <div className="bg-gc-green-800 px-4 py-4">
-        <button className="flex items-center gap-3 text-[15px] font-semibold text-white/90">
+      <div className="px-3 pb-2">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-3 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white [&>button]:transition-colors [&>button:hover]:bg-white/5 [&_svg]:h-5 [&_svg]:w-5">
+          <LogoutMenu redirectTo="/admin/login" />
+        </div>
+      </div>
+
+      <div className="bg-gc-green-800 px-3 py-3">
+        <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-white/5">
           <InfoIcon className="h-5 w-5" />
           About
-        </button>
-        <button
-          onClick={handleLogout}
-          className="mt-2 flex w-full items-center gap-3 text-[15px] font-semibold text-white/90 transition-colors hover:text-white"
-        >
-          <LogoutIcon className="h-5 w-5" />
-          Log out
         </button>
       </div>
     </>

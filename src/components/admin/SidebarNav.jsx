@@ -2,6 +2,7 @@
 import { NavLink } from "react-router-dom";
 import NavIcon from "./NavIcon";
 import { mainNav, managementNav } from "../../data/adminNav";
+import LogoutMenu from "../LogoutMenu";
 
 function NavGroup({ title, items, onNavigate }) {
   return (
@@ -86,7 +87,10 @@ export default function SidebarNav({ onNavigate }) {
         <NavGroup title="Management" items={managementNav} onNavigate={onNavigate} />
       </nav>
 
-      <div className="px-2 pb-5 pt-3 border-t border-white/15 mx-2">
+      <div className="px-2 pb-5 pt-3 border-t border-white/15 mx-2 space-y-1">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-medium [&>button]:text-white/85 [&>button:hover]:bg-white/10 [&>button:hover]:text-white/85 [&_svg]:w-[18px] [&_svg]:h-[18px]">
+          <LogoutMenu redirectTo="/admin/login" />
+        </div>
         <NavLink
           to="/admin/about"
           onClick={onNavigate}

@@ -8,59 +8,126 @@ import {
   WEEKDAY_LABELS,
 } from "../../lib/calendar";
 
-// Default set of open days — Mon–Fri. Admin can change this any time by
-// clicking the day buttons in "By Day(s)" mode.
-export const DEFAULT_OPEN_WEEKDAYS = [1, 2, 3, 4, 5];
+// Default set of open days — all 7, open by default. The weekday header row
+// (Sun/Mon/.../Sat) doubles as the on/off control for this: turning a day
+// off disables every date on that weekday throughout the calendar below.
+// The admin decides which days (including Sun/Sat) to close, nothing is
+// closed automatically.
+export const DEFAULT_OPEN_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
 /**
  * selectedDates: Date[] — always at least the "primary" date at index 0
  * onChange: (dates: Date[]) => void
- * selectedWeekdays: number[] — 0=Sun..6=Sat, used when scheduleMode is "days"
- * onWeekdaysChange: (weekdays: number[]) => void
- * scheduleMode: "date" | "days"
- * onScheduleModeChange: (mode: "date" | "days") => void
+ * selectedWeekdays: number[] — 0=Sun..6=Sat, which weekdays are open for
+ *   booking by default. Click a weekday header to turn it on/off. Optional —
+ *   if not passed, the calendar manages this itself.
+ * onWeekdaysChange: (weekdays: number[]) => void — optional, pairs with
+ *   selectedWeekdays for a controlled parent.
  */
 export default function ScheduleCalendar({
   selectedDates,
   onChange,
-  selectedWeekdays = DEFAULT_OPEN_WEEKDAYS,
+  selectedWeekdays: selectedWeekdaysProp,
   onWeekdaysChange,
-  scheduleMode = "date",
-  onScheduleModeChange,
 }) {
-  const primary = selectedDates[0] ?? new Date();
+  const today = new Date();
+  const primary = selectedDates[0] ?? today;
   const [viewYear, setViewYear] = useState(primary.getFullYear());
   const [viewMonth, setViewMonth] = useState(primary.getMonth());
-  const [multiMode, setMultiMode] = useState(false); // mobile toggle
 
-  function toggleWeekday(dayIndex) {
-    if (!onWeekdaysChange) return;
-    if (selectedWeekdays.includes(dayIndex)) {
-      const next = selectedWeekdays.filter((d) => d !== dayIndex);
-      onWeekdaysChange(next.length ? next : selectedWeekdays);
+  // Self-managed by default so the toggle works even when the parent
+  // doesn't pass selectedWeekdays/onWeekdaysChange. If the parent does pass
+  // them, they take over (controlled mode).
+  const [internalWeekdays, setInternalWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
+  const isWeekdaysControlled = selectedWeekdaysProp !== undefined;
+  const selectedWeekdays = isWeekdaysControlled ? selectedWeekdaysProp : internalWeekdays;
+
+  function setWeekdays(next) {
+    if (isWeekdaysControlled) {
+      onWeekdaysChange?.(next);
     } else {
-      onWeekdaysChange([...selectedWeekdays, dayIndex].sort());
+      setInternalWeekdays(next);
     }
   }
 
+  // Specific individual dates the admin has closed (e.g. holidays), on top
+  // of the weekday defaults above. Turned on/off via the "Mark dates as
+  // unavailable" switch below the calendar — while that's on, clicking a
+  // date toggles it closed/open instead of selecting it for scheduling.
+  const [offDates, setOffDates] = useState([]);
+  const [offMode, setOffMode] = useState(false);
+
   const weeks = getMonthMatrix(viewYear, viewMonth);
 
-  function shiftDay(delta) {
-    const next = new Date(primary);
-    next.setDate(next.getDate() + delta);
-    onChange([next]);
-    setViewYear(next.getFullYear());
-    setViewMonth(next.getMonth());
+  // The date box shows the selected date while you're viewing its month,
+  // but once you navigate to a different month via the arrows, it switches
+  // to show that month so the box actually reflects what's on screen.
+  const isViewingPrimaryMonth =
+    primary.getFullYear() === viewYear && primary.getMonth() === viewMonth;
+  const displayDate = isViewingPrimaryMonth
+    ? primary
+    : new Date(viewYear, viewMonth, 1);
+
+  function toggleWeekday(dayIndex) {
+    if (selectedWeekdays.includes(dayIndex)) {
+      const next = selectedWeekdays.filter((d) => d !== dayIndex);
+      // always keep at least one day open
+      setWeekdays(next.length ? next : selectedWeekdays);
+    } else {
+      setWeekdays([...selectedWeekdays, dayIndex].sort());
+    }
+  }
+
+  // Arrows navigate the calendar by month, not by individual date.
+  function shiftMonth(delta) {
+    let nextMonth = viewMonth + delta;
+    let nextYear = viewYear;
+    if (nextMonth < 0) {
+      nextMonth = 11;
+      nextYear -= 1;
+    } else if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear += 1;
+    }
+    setViewMonth(nextMonth);
+    setViewYear(nextYear);
   }
 
   function isSelected(date) {
     return selectedDates.some((d) => isSameDate(d, date));
   }
 
+  function isWeekdayOpen(date) {
+    return selectedWeekdays.includes(date.getDay());
+  }
+
+  function isDateOff(date) {
+    return offDates.some((d) => isSameDate(d, date));
+  }
+
+  function isToday(date) {
+    return isSameDate(date, today);
+  }
+
   function pickDay(day, event) {
     if (!day) return;
     const date = new Date(viewYear, viewMonth, day);
-    const wantsMulti = multiMode || event?.shiftKey;
+    if (!isWeekdayOpen(date)) return; // that weekday is turned off — not pickable
+
+    // "Mark dates as unavailable" mode — clicking closes/reopens this exact
+    // date instead of selecting it.
+    if (offMode) {
+      setOffDates((prev) =>
+        prev.some((d) => isSameDate(d, date))
+          ? prev.filter((d) => !isSameDate(d, date))
+          : [...prev, date]
+      );
+      return;
+    }
+
+    if (isDateOff(date)) return; // closed date — not pickable
+
+    const wantsMulti = event?.shiftKey;
 
     if (!wantsMulti) {
       onChange([date]);
@@ -76,74 +143,35 @@ export default function ScheduleCalendar({
     }
   }
 
+  function resetToDefault() {
+    const now = new Date();
+    setViewYear(now.getFullYear());
+    setViewMonth(now.getMonth());
+    setOffDates([]);
+    setOffMode(false);
+    setWeekdays(DEFAULT_OPEN_WEEKDAYS);
+    onChange([now]);
+  }
+
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-3">
-        Select Date
-      </h2>
-
-      {/* mode tabs: pick specific date(s), or set default open day(s) of the week */}
-      <div className="grid grid-cols-2 gap-1.5 mb-4 bg-gray-100 rounded-lg p-1">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <h2 className="font-bold text-gray-800 text-sm md:text-base">
+          Select Date
+        </h2>
         <button
           type="button"
-          onClick={() => onScheduleModeChange?.("date")}
-          className={`text-xs font-semibold rounded-md py-1.5 transition-colors ${
-            scheduleMode === "date"
-              ? "bg-white text-gc-green shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          onClick={resetToDefault}
+          className="text-[11px] font-semibold text-gc-accent hover:text-gc-green transition-colors"
         >
-          By Date
-        </button>
-        <button
-          type="button"
-          onClick={() => onScheduleModeChange?.("days")}
-          className={`text-xs font-semibold rounded-md py-1.5 transition-colors ${
-            scheduleMode === "days"
-              ? "bg-white text-gc-green shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          By Day(s)
+          Reset to default
         </button>
       </div>
 
-      {scheduleMode === "days" ? (
-        <div>
-          <p className="text-xs text-gray-500 mb-3">
-            Choose which days of the week the clinic is open for booking by
-            default. Click a day to turn it on or off.
-          </p>
-          <div className="grid grid-cols-7 gap-1.5">
-            {WEEKDAY_LABELS.map((label, i) => {
-              const on = selectedWeekdays.includes(i);
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => toggleWeekday(i)}
-                  aria-pressed={on}
-                  className={`flex flex-col items-center justify-center rounded-xl py-3 text-xs font-bold transition-colors ${
-                    on
-                      ? "bg-gc-accent text-white shadow-sm"
-                      : "bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-xs font-semibold text-gc-green">
-            {selectedWeekdays.length} day{selectedWeekdays.length === 1 ? "" : "s"} open by default
-          </p>
-        </div>
-      ) : (
-        <>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-2">
         <button
-          onClick={() => shiftDay(-1)}
-          aria-label="Previous day"
+          onClick={() => shiftMonth(-1)}
+          aria-label="Previous month"
           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
@@ -151,38 +179,77 @@ export default function ScheduleCalendar({
 
         <div className="flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700">
           <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
-          {formatMDY(primary)}
+          {formatMDY(displayDate)}
         </div>
 
         <button
-          onClick={() => shiftDay(1)}
-          aria-label="Next day"
+          onClick={() => shiftMonth(1)}
+          aria-label="Next month"
           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
         >
           <NavIcon name="chevron-right" className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-2 text-center">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="text-[11px] font-bold text-gray-500 tracking-wide">
-            {label}
-          </div>
-        ))}
+      <p className="text-[11px] text-gray-400 mb-3">
+        Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
+      </p>
+
+      <p className="text-xs text-gray-500 mb-3">
+        Choose which days of the week the clinic is open for booking by
+        default. Click a day to turn it on or off.
+      </p>
+
+      <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center">
+        {WEEKDAY_LABELS.map((label, i) => {
+          const on = selectedWeekdays.includes(i);
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => toggleWeekday(i)}
+              aria-pressed={on}
+              title={`Turn ${label} ${on ? "off" : "on"} for default booking`}
+              className={`mx-auto w-8 h-8 flex items-center justify-center rounded-full text-[10px] font-bold tracking-wide transition-colors ${
+                on
+                  ? "bg-gc-accent text-white shadow-sm"
+                  : "bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100"
+              }`}
+            >
+              {label.slice(0, 3)}
+            </button>
+          );
+        })}
 
         {weeks.flat().map((day, i) => {
           const date = day ? new Date(viewYear, viewMonth, day) : null;
           const selected = date && isSelected(date);
+          const weekdayOpen = date && isWeekdayOpen(date);
+          const closed = date && isDateOff(date);
+          const isTodayDate = date && isToday(date);
+
+          let stateClasses = "text-gray-700 hover:bg-gray-100";
+          if (!weekdayOpen) {
+            stateClasses = "text-gray-300 cursor-not-allowed";
+          } else if (closed) {
+            stateClasses = "text-red-300 bg-red-50 line-through cursor-not-allowed";
+          } else if (selected) {
+            stateClasses = "bg-gc-accent text-white shadow-sm";
+          } else if (isTodayDate) {
+            stateClasses = "text-gc-green font-bold border border-gc-accent/40 hover:bg-gray-100";
+          } else if (offMode) {
+            stateClasses = "text-gray-700 ring-1 ring-red-200 hover:bg-red-50";
+          }
+
           return (
             <div key={i} className="flex items-center justify-center py-0.5">
               {day ? (
                 <button
                   onClick={(e) => pickDay(day, e)}
-                  className={`w-8 h-8 rounded-full text-sm font-semibold transition-colors ${
-                    selected
-                      ? "bg-gc-accent text-white shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  disabled={!weekdayOpen}
+                  aria-disabled={!weekdayOpen}
+                  title={closed ? "Marked unavailable" : undefined}
+                  className={`w-8 h-8 rounded-full text-sm font-semibold transition-colors ${stateClasses}`}
                 >
                   {day}
                 </button>
@@ -192,37 +259,51 @@ export default function ScheduleCalendar({
         })}
       </div>
 
-      {/* desktop: shift+click hint */}
-      <p className="hidden md:block mt-4 text-xs text-gray-400 italic">
-        Shift + click to select multiple days.
+      <p className="mt-3 text-xs font-semibold text-gc-green">
+        {selectedWeekdays.length} day{selectedWeekdays.length === 1 ? "" : "s"} open by default
       </p>
 
-      {/* mobile: explicit toggle, since there's no shift key on a touchscreen */}
-      <label className="md:hidden mt-4 flex items-center gap-2.5 text-xs text-gray-500">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={multiMode}
-          onClick={() => setMultiMode((v) => !v)}
-          className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${
-            multiMode ? "bg-gc-accent" : "bg-gray-200"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              multiMode ? "translate-x-4" : ""
-            }`}
-          />
-        </button>
-        Click to select multiple days.
-      </label>
-
       {selectedDates.length > 1 && (
-        <p className="mt-2 text-xs font-semibold text-gc-green">
+        <p className="mt-1 text-xs font-semibold text-gc-green">
           {selectedDates.length} days selected
         </p>
       )}
-        </>
+
+      {/* on/off switch for marking specific individual dates unavailable —
+          sits right below the "days open by default" summary. While on,
+          tapping a date closes it (greyed + unclickable) instead of
+          selecting it. */}
+      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5">
+        <div>
+          <span className="block text-xs font-semibold text-gray-700">
+            Mark dates as unavailable
+          </span>
+          <span className="block text-[11px] text-gray-400">
+            {offMode ? "Tap a date to close it" : "Turn on to close specific dates"}
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={offMode}
+          aria-label="Toggle marking dates as unavailable"
+          onClick={() => setOffMode((v) => !v)}
+          className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
+            offMode ? "bg-red-500" : "bg-gray-200"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+              offMode ? "translate-x-5" : ""
+            }`}
+          />
+        </button>
+      </div>
+
+      {offDates.length > 0 && (
+        <p className="mt-2 text-[11px] font-semibold text-red-400">
+          {offDates.length} date{offDates.length === 1 ? "" : "s"} marked unavailable
+        </p>
       )}
     </section>
   );
