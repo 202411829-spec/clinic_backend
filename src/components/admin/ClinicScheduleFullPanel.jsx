@@ -154,8 +154,10 @@ export default function ClinicScheduleFullPanel() {
   }
 
   async function handleUpdateSchedule() {
+    const failures = [];
+
+    // 1) Persist global defaults.
     try {
-      // Persist global defaults.
       await clinicScheduleApi.updateSettings({
         work_start: workStart,
         work_end: workEnd,
@@ -163,29 +165,44 @@ export default function ClinicScheduleFullPanel() {
         break_end: breakEnd,
         max_student_per_slot: Number(computed.slotsPerBlock) || undefined,
       });
-      // Persist per-date overrides for every selected date.
-      await Promise.all(
-        selectedDates.map((d) =>
-          clinicScheduleApi.createOverride({
-            working_date: toYMDLocal(d),
-            slot_start: workStart,
-            slot_end: workEnd,
-            break_start: breakStart || null,
-            break_end: breakEnd || null,
-            is_enabled: true,
-          })
-        )
-      );
     } catch (err) {
-      console.error("Failed to save schedule:", err);
-      setSavedMessage("");
-      window.setTimeout(() => setSavedMessage(""), 3000);
+      console.error("Failed to save settings:", err);
+      failures.push("Settings");
     }
-    const dateLabel =
-      selectedDates.length > 1
-        ? `${selectedDates.length} dates`
-        : formatMDY(selectedDates[0]);
-    setSavedMessage(`Schedule updated for ${dateLabel}.`);
+
+    // 2) Persist per-date overrides — track each date individually.
+    const results = await Promise.allSettled(
+      selectedDates.map((d) =>
+        clinicScheduleApi.createOverride({
+          working_date: toYMDLocal(d),
+          slot_start: workStart,
+          slot_end: workEnd,
+          break_start: breakStart || null,
+          break_end: breakEnd || null,
+          is_enabled: true,
+        })
+      )
+    );
+
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        console.error(`Failed to save override for ${selectedDates[i]}:`, result.reason);
+        failures.push(`Date ${toYMDLocal(selectedDates[i])}`);
+      }
+    });
+
+    // 3) Show toast ONLY if ALL succeeded; otherwise show explicit error list.
+    if (failures.length === 0) {
+      const dateLabel =
+        selectedDates.length > 1
+          ? `${selectedDates.length} dates`
+          : formatMDY(selectedDates[0]);
+      setSavedMessage(`Schedule updated for ${dateLabel}.`);
+    } else {
+      setSavedMessage(
+        `Failed to update: ${failures.join(", ")}. Check console for details.`
+      );
+    }
     window.setTimeout(() => setSavedMessage(""), 3000);
   }
 

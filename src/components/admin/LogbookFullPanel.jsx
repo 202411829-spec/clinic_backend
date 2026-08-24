@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import NavIcon from "./NavIcon";
 import {
   logbookEntries as sampleEntries,
-  reasonOptions as sampleReasons,
 } from "../../data/dashboardSample";
 import { logbookApi, referenceApi } from "../../lib/api.js";
 
@@ -98,7 +97,12 @@ function Pagination({ page, pageCount, onChange }) {
 
 export default function LogbookFullPanel() {
   const [entries, setEntries] = useState([]);
-  const [reasons, setReasons] = useState(sampleReasons);
+  const [reasonRecords, setReasonRecords] = useState([]);
+  const [medicineRecords, setMedicineRecords] = useState([]);
+
+  // Derived for dropdowns
+  const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
+  const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
 
   // Load real visit history + reference dropdowns.
   useEffect(() => {
@@ -109,10 +113,15 @@ export default function LogbookFullPanel() {
     referenceApi
       .reasons()
       .then((res) => {
-        const list = (res?.reasons || [])
-          .map((r) => r.description)
-          .filter((d) => d && d !== "-");
-        if (list.length) setReasons(list);
+        const list = (res?.reasons || []).filter((r) => r.description && r.description !== "-");
+        if (list.length) setReasonRecords(list);
+      })
+      .catch(() => {});
+    referenceApi
+      .medicines()
+      .then((res) => {
+        const list = (res?.medicines || []).filter((m) => m.medicine_name);
+        if (list.length) setMedicineRecords(list);
       })
       .catch(() => {});
   }, []);
@@ -129,9 +138,9 @@ export default function LogbookFullPanel() {
 
   // walk-in visit form
   const [regId, setRegId] = useState("");
-  const [walkInReason, setWalkInReason] = useState("");
+  const [walkInReasonId, setWalkInReasonId] = useState("");
   const [complaint, setComplaint] = useState("");
-  const [medicine, setMedicine] = useState("");
+  const [medicineInput, setMedicineInput] = useState("");
   const [quantity, setQuantity] = useState("");
   const [medTags, setMedTags] = useState([]);
 
@@ -175,15 +184,20 @@ export default function LogbookFullPanel() {
   }
 
   function handleAddMedicine() {
-    if (!medicine.trim()) return;
-    const qty = quantity ? `x${quantity}` : "";
-    setMedTags((tags) => [...tags, `${medicine.trim()} ${qty}`.trim()]);
-    setMedicine("");
+    if (!medicineInput.trim()) return;
+    const qty = quantity ? Number(quantity) : 1;
+    const match = medicineRecords.find((m) => m.medicine_name.toLowerCase() === medicineInput.trim().toLowerCase());
+    const medId = match?.medicine_id;
+    setMedTags((tags) => [
+      ...tags,
+      { name: medicineInput.trim(), quantity: qty, medicine_id: medId },
+    ]);
+    setMedicineInput("");
     setQuantity("");
   }
 
   async function handleAddWalkIn() {
-    if (!regId.trim()) return;
+    if (!regId.trim() || !walkInReasonId) return;
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -192,14 +206,18 @@ export default function LogbookFullPanel() {
       now.getMinutes()
     ).padStart(2, "0")}:00`;
 
+    const medicinesPayload = medTags
+      .filter((t) => t.medicine_id)
+      .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
+
     try {
       await logbookApi.createWalkIn({
         student_id: regId.trim(),
         appointment_date: `${y}-${m}-${d}`,
         appointment_time: time,
-        reason_id:
-          reasons.indexOf(walkInReason) >= 0 ? reasons.indexOf(walkInReason) + 1 : undefined,
+        reason_id: Number(walkInReasonId),
         complaint: complaint.trim() || undefined,
+        medicines: medicinesPayload.length > 0 ? medicinesPayload : undefined,
       });
       // Refresh the list from the backend so the new visit shows real data.
       const res = await logbookApi.list();
@@ -211,7 +229,7 @@ export default function LogbookFullPanel() {
     }
 
     setRegId("");
-    setWalkInReason("");
+    setWalkInReasonId("");
     setComplaint("");
     setMedTags([]);
     setPage(1);
@@ -366,13 +384,15 @@ export default function LogbookFullPanel() {
             <div>
               <label className="text-xs font-semibold text-gray-500">Reason</label>
               <select
-                value={walkInReason}
-                onChange={(e) => setWalkInReason(e.target.value)}
+                value={walkInReasonId}
+                onChange={(e) => setWalkInReasonId(e.target.value)}
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
               >
                 <option value="">Select Reason</option>
-                {reasons.map((r) => (
-                  <option key={r}>{r}</option>
+                {reasonRecords.map((r) => (
+                  <option key={r.reason_id} value={r.reason_id}>
+                    {r.description}
+                  </option>
                 ))}
               </select>
             </div>
@@ -389,8 +409,8 @@ export default function LogbookFullPanel() {
               <div>
                 <label className="text-xs font-semibold text-gray-500">Medicine</label>
                 <input
-                  value={medicine}
-                  onChange={(e) => setMedicine(e.target.value)}
+                  value={medicineInput}
+                  onChange={(e) => setMedicineInput(e.target.value)}
                   placeholder="E.g. Paracetamol"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
                 />
@@ -401,7 +421,7 @@ export default function LogbookFullPanel() {
                         key={i}
                         className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
                       >
-                        {tag}
+                        {tag.name} x{tag.quantity}
                       </span>
                     ))}
                   </div>
