@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 from database import supabase
 from routers.auth_guard import require_auth, require_admin
+from routers.helpers import execute_with_retry
 
 
 clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
@@ -38,12 +39,11 @@ def get_default_settings():
     """
     Fetch the single global settings row.
     """
-    response = (
+    response = execute_with_retry(
         supabase
         .table(SETTINGS_TABLE)
         .select("*")
         .limit(1)
-        .execute()
     )
 
     rows = response.data or []
@@ -56,18 +56,258 @@ def get_schedule_for_date(working_date):
     Fetch a clinic_schedule override row for a specific date,
     if one exists.
     """
-    response = (
+    response = execute_with_retry(
         supabase
         .table(SCHEDULE_TABLE)
         .select("*")
         .eq("working_date", working_date)
         .limit(1)
-        .execute()
     )
 
     rows = response.data or []
 
     return rows[0] if rows else None
+
+
+def resolve_day_config(override):
+    """
+    Decide which hours/capacity config governs a date.
+
+    When an override (clinic_schedule row) is passed, its slot hours
+    and break window win; the global clinic_appointment_settings row
+    still supplies slot_interval / max_student_per_slot (defaults 30
+    minutes and 10 students). With no override, everything comes from
+    the settings row.
+
+    Returns a config dict:
+        {
+            "work_start": "HH:MM",
+            "work_end": "HH:MM",
+            "break_start": "HH:MM" | None,
+            "break_end": "HH:MM" | None,
+            "slot_interval": int,
+            "max_students": int,
+        }
+    or None when no override was passed AND no settings row exists
+    (the caller decides how to surface that — preview returns 404).
+    """
+
+    settings = get_default_settings()
+
+    if override:
+
+        work_start = override.get("slot_start")
+        work_end = override.get("slot_end")
+        break_start = override.get("break_start")
+        break_end = override.get("break_end")
+
+    else:
+
+        if not settings:
+            return None
+
+        work_start = settings.get("work_start")
+        work_end = settings.get("work_end")
+        break_start = settings.get("break_start")
+        break_end = settings.get("break_end")
+
+    try:
+        slot_interval = int(
+            (settings or {}).get("slot_interval", 30)
+        )
+    except (TypeError, ValueError):
+        slot_interval = 30
+
+    if slot_interval <= 0:
+        slot_interval = 30
+
+    try:
+        max_students = int(
+            (settings or {}).get("max_student_per_slot", 10)
+        )
+    except (TypeError, ValueError):
+        max_students = 10
+
+    return {
+        "work_start": work_start,
+        "work_end": work_end,
+        "break_start": break_start,
+        "break_end": break_end,
+        "slot_interval": slot_interval,
+        "max_students": max_students,
+    }
+
+
+def generate_time_blocks(config):
+    """
+    The SINGLE CANONICAL block-math used by BOTH the preview endpoint
+    AND time_slot materialization. Walks work_start -> work_end in
+    slot_interval steps, dropping any block that overlaps the break
+    window, and returns:
+
+        [{"start": "08:00", "end": "08:30", "capacity": 10}, ...]
+    """
+
+    start = datetime.strptime(
+        normalize_time(config["work_start"]),
+        "%H:%M"
+    )
+
+    end = datetime.strptime(
+        normalize_time(config["work_end"]),
+        "%H:%M"
+    )
+
+    break_start_dt = None
+    break_end_dt = None
+
+    if config["break_start"] and config["break_end"]:
+
+        break_start_dt = datetime.strptime(
+            normalize_time(config["break_start"]),
+            "%H:%M"
+        )
+
+        break_end_dt = datetime.strptime(
+            normalize_time(config["break_end"]),
+            "%H:%M"
+        )
+
+    blocks = []
+
+    current = start
+
+    while current < end:
+
+        block_end = current + timedelta(
+            minutes=config["slot_interval"]
+        )
+
+        if block_end > end:
+            break
+
+        is_break = (
+            break_start_dt is not None
+            and break_end_dt is not None
+            and current < break_end_dt
+            and block_end > break_start_dt
+        )
+
+        if not is_break:
+
+            blocks.append({
+                "start": current.strftime("%H:%M"),
+                "end": block_end.strftime("%H:%M"),
+                "capacity": config["max_students"]
+            })
+
+        current = block_end
+
+    return blocks
+
+
+def delete_time_slot_children(schedule_id):
+    """
+    Remove every time_slot child of a clinic_schedule row. Called
+    before regenerating children (so stale slots never linger) and
+    before deleting/disabling an override itself.
+
+    Appointments hold an FK into time_slot (fk_appointment_slot), so
+    any appointment ever booked into one of these slots — including
+    CANCELLED ones — would make the bulk child delete fail with a
+    23503 violation (and surface as a 500). Before deleting, detach
+    those appointments by nulling appointment.slot_id; the rows keep
+    appointment_date/appointment_time, so booking history survives.
+    """
+    child_rows = (
+        execute_with_retry(
+            supabase
+            .table("time_slot")
+            .select("slot_id")
+            .eq("schedule_id", schedule_id)
+        ).data
+        or []
+    )
+
+    if child_rows:
+
+        execute_with_retry(
+            supabase
+            .table("appointment")
+            .update({"slot_id": None})
+            .in_(
+                "slot_id",
+                [row["slot_id"] for row in child_rows]
+            )
+        )
+
+    execute_with_retry(
+        supabase
+        .table("time_slot")
+        .delete()
+        .eq("schedule_id", schedule_id)
+    )
+
+
+def materialize_time_slots(schedule_row):
+    """
+    Regenerate the time_slot CHILDREN of a clinic_schedule row.
+
+    This fixes the reported bug where POST/PUT /clinic-schedule wrote
+    a parent row with zero time_slot children, so
+    GET /appointments/slots?date=... resolved that override as
+    applicable and returned [] (admin adjusts schedule -> student
+    slots disappear).
+
+    Semantics:
+      - ALWAYS deletes the row's existing time_slot children first so
+        stale slots (old hours, old capacity) never linger.
+      - If the row is enabled, generates fresh children from the row's
+        slot_start -> slot_end using the shared block math (same as
+        GET /clinic-schedule/preview), one time_slot per block with
+        max_capacity from clinic_appointment_settings.
+      - If the row is disabled (clinic closed), no children are
+        created — matching the preview/closed-day behaviour.
+
+    Returns the number of children created.
+    """
+
+    schedule_id = schedule_row.get("schedule_id")
+
+    # Clear stale children first — even for disabled rows, so a
+    # re-enabled/re-hours override never leaves orphaned slots behind.
+    delete_time_slot_children(schedule_id)
+
+    if schedule_row.get("is_enabled") is False:
+        return 0
+
+    config = resolve_day_config(schedule_row)
+
+    if not config:
+        return 0
+
+    blocks = generate_time_blocks(config)
+
+    if not blocks:
+        return 0
+
+    payload = [
+        {
+            "schedule_id": schedule_id,
+            "slot_start": block["start"],
+            "slot_end": block["end"],
+            "max_capacity": block["capacity"]
+        }
+        for block in blocks
+    ]
+
+    response = execute_with_retry(
+        supabase
+        .table("time_slot")
+        .insert(payload)
+    )
+
+    return len(response.data or [])
 
 
 # ============================================================
@@ -176,12 +416,11 @@ def update_clinic_settings():
                 "error": "No valid fields provided to update"
             }), 400
 
-        response = (
+        response = execute_with_retry(
             supabase
             .table(SETTINGS_TABLE)
             .update(update_data)
             .eq("setting_id", existing["setting_id"])
-            .execute()
         )
 
         return jsonify({
@@ -233,10 +472,9 @@ def get_clinic_schedule():
         if end_date:
             query = query.lte("working_date", end_date)
 
-        response = (
+        response = execute_with_retry(
             query
             .order("working_date", desc=False)
-            .execute()
         )
 
         schedule = response.data or []
@@ -367,12 +605,51 @@ def create_clinic_schedule():
             "reason": data.get("reason")
         }
 
-        response = (
-            supabase
-            .table(SCHEDULE_TABLE)
-            .insert(schedule_data)
-            .execute()
+        # ----------------------------------------------------
+        # UPSERT by working_date: if clinic_schedule rows already
+        # exist for this date, UPDATE the oldest and COLLAPSE any
+        # duplicates (legacy saves stacked multiple childless
+        # overrides per date; resolution then picked a childless
+        # one and students saw zero slots). Children of removed
+        # duplicates are purged too.
+        # ----------------------------------------------------
+
+        existing_rows = (
+            execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .select("schedule_id")
+                .eq("working_date", working_date)
+                .order("schedule_id", desc=False)
+            ).data
+            or []
         )
+
+        if existing_rows:
+
+            target = existing_rows[0]
+
+            response = (
+                supabase
+                .table(SCHEDULE_TABLE)
+                .update(schedule_data)
+                .eq("schedule_id", target["schedule_id"])
+                .execute()
+            )
+
+            for duplicate in existing_rows[1:]:
+                delete_time_slot_children(duplicate["schedule_id"])
+
+                supabase.table(SCHEDULE_TABLE).delete().eq(
+                    "schedule_id", duplicate["schedule_id"]
+                ).execute()
+
+        else:
+            response = execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .insert(schedule_data)
+            )
 
         if not response.data:
 
@@ -381,10 +658,18 @@ def create_clinic_schedule():
                 "error": "Failed to create schedule entry"
             }), 500
 
+        schedule_row = response.data[0]
+
+        # Materialize the time_slot children so students actually see
+        # bookable slots for this date. Deletes stale children first,
+        # then regenerates when the row is enabled (no-op children-wise
+        # for disabled/closed days).
+        materialize_time_slots(schedule_row)
+
         return jsonify({
             "success": True,
             "message": "Schedule entry created",
-            "schedule": response.data[0]
+            "schedule": schedule_row
         }), 201
 
     except Exception as e:
@@ -454,12 +739,11 @@ def update_clinic_schedule(schedule_id):
                 "error": "No valid fields provided to update"
             }), 400
 
-        response = (
+        response = execute_with_retry(
             supabase
             .table(SCHEDULE_TABLE)
             .update(update_data)
             .eq("schedule_id", schedule_id)
-            .execute()
         )
 
         if not response.data:
@@ -500,12 +784,11 @@ def delete_clinic_schedule(schedule_id):
 
     try:
 
-        response = (
+        response = execute_with_retry(
             supabase
             .table(SCHEDULE_TABLE)
             .delete()
             .eq("schedule_id", schedule_id)
-            .execute()
         )
 
         if not response.data:

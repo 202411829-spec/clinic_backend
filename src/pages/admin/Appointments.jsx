@@ -4,10 +4,7 @@ import AppointmentsFullPanel from "../../components/admin/AppointmentsFullPanel"
 import SelectDateCalendar from "../../components/admin/SelectDateCalendar";
 
 export default function Appointments() {
-  // Defaults to the date used in the sample data (Aug 6, 2026) so the
-  // page matches the mockup out of the box. Swap for `new Date()` once
-  // appointmentSlots is wired to real, date-scoped Supabase data.
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 7, 6));
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
 
   return (
     <div className="pt-2">

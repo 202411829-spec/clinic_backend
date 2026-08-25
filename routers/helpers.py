@@ -311,3 +311,36 @@ def format_date_time(created_at):
 
     except Exception:
         return created_at
+
+
+def get_latest_status_for_appointments(appointment_ids):
+    """
+    Returns a dict keyed by appointment_id, with that
+    appointment's most recent status row (or None).
+    """
+
+    if not appointment_ids:
+        return {}
+
+    response = execute_with_retry(
+        supabase
+        .table("status")
+        .select("*")
+        .in_("appointment_id", appointment_ids)
+        .order("changed_at", desc=True)
+    )
+
+    rows = response.data or []
+
+    latest_by_appointment = {}
+
+    for row in rows:
+
+        appointment_id = row.get("appointment_id")
+
+        # Rows are already ordered newest-first, so the first
+        # one we see per appointment_id is the latest.
+        if appointment_id not in latest_by_appointment:
+            latest_by_appointment[appointment_id] = row
+
+    return latest_by_appointment

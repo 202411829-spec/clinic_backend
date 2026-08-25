@@ -53,8 +53,59 @@ function SlotAvailabilityLabel({ slot }) {
  * slots: [{ id, time, capacity, booked }]
  * selectedTime: string | null (matches a slot.time)
  * onSelectTime: (time: string) => void
+ * status: "loading" | "error" | "ready" (optional)
+ * errorMessage: string (optional, for error state)
  */
-export default function SelectTimeSlots({ slots, selectedTime, onSelectTime }) {
+export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, status = "ready", errorMessage }) {
+  // Loading state
+  if (status === "loading") {
+    return (
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+        <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+          Select Time
+        </h2>
+        <div className="flex flex-col items-center justify-center py-8 gap-3">
+          <div className="w-8 h-8 border-4 border-gc-accent/30 border-t-gc-accent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Loading available time slots…</p>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state
+  if (status === "error") {
+    return (
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+        <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+          Select Time
+        </h2>
+        <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+          <NavIcon name="alert-triangle" className="w-8 h-8 text-red-500" />
+          <p className="text-sm text-red-600 font-medium">{errorMessage || "Couldn't load time slots."}</p>
+          <p className="text-xs text-gray-400">Please try again later.</p>
+        </div>
+      </section>
+    );
+  }
+
+  // Empty state
+  if (!slots || slots.length === 0) {
+    return (
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+        <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+          Select Time
+        </h2>
+        <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+          <NavIcon name="calendar-x" className="w-8 h-8 text-gray-400" />
+          <p className="text-sm text-gray-600 font-medium">
+            The clinic is closed on this date or no time slots are configured.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Ready state with slots
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
@@ -86,7 +137,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime }) {
                   : selected
                   ? "border-gc-accent bg-gc-accent/5 cursor-pointer"
                   : "border-gray-200 hover:border-gc-accent/50 cursor-pointer",
-              ].join(" ")}
+              ].join(" ")
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">

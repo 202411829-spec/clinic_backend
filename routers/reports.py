@@ -21,6 +21,7 @@ from typing import Optional
 
 from supabase_client import supabase
 from routers.auth_guard import require_auth
+from routers.helpers import execute_with_retry
 
 blueprint = Blueprint("reports", __name__, url_prefix="/api/reports")
 
@@ -61,7 +62,7 @@ def get_report():
     if department_id is not None:
         query = query.eq("department_id", department_id)
 
-    rows = query.execute().data
+    rows = execute_with_retry(query).data
 
     total_students = len({row["student_id"] for row in rows})
 
@@ -83,10 +84,9 @@ def get_report():
 @require_auth
 def list_departments_for_filter():
     """Reuses the same department list as the Masterlist filter dropdown."""
-    response = (
+    response = execute_with_retry(
         supabase.table("department")
         .select("department_id, department_name")
         .order("department_name")
-        .execute()
     )
     return response.data

@@ -93,25 +93,28 @@ export default function UpcomingAppointmentPanel() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  function handleReschedule() {
+function handleReschedule() {
     setMenuOpen(false);
     // Book page reads this to pre-fill the date/time/reason and switch
-    // its copy + confirmation flow into "reschedule" mode.
-    navigate("/student/book", { state: { reschedule: true } });
+    // its copy/behavior into "reschedule" mode.
+    // Pass the appointmentId so Book.jsx can cancel the old appointment.
+    navigate("/student/book", { state: { reschedule: true, appointmentId: appt?.id } });
   }
 
   async function handleCancel() {
     setMenuOpen(false);
-    cancelAppointment();
     if (appt?.id) {
       try {
         await appointmentsApi.updateStatus(appt.id, {
           new_status: "Cancelled",
           remarks: "Cancelled by student",
         });
+        // Only clear after successful API response
+        cancelAppointment();
         setUpcoming(null);
       } catch (err) {
         console.error("Failed to cancel appointment:", err);
+        alert("Failed to cancel appointment. Please try again.");
       }
     }
   }

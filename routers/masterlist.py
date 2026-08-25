@@ -14,6 +14,7 @@ from typing import Optional, Literal
 
 from supabase_client import supabase
 from routers.auth_guard import require_auth, sanitize_search
+from routers.helpers import execute_with_retry
 
 blueprint = Blueprint("masterlist", __name__, url_prefix="/api/masterlist")
 
@@ -66,7 +67,7 @@ def list_students():
     end = start + page_size - 1
     query = query.range(start, end)
 
-    response = query.execute()
+    response = execute_with_retry(query)
 
     return {
         "data": response.data,
@@ -83,12 +84,11 @@ def get_student_summary(student_id: str):
     Lightweight lookup used when a row is clicked (before navigating into
     the full Student Record page, which is a separate module).
     """
-    response = (
+    response = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
         .eq("student_id", student_id)
         .maybe_single()
-        .execute()
     )
     if not response.data:
         return jsonify({"error": "Student not found"}), 404
@@ -98,11 +98,10 @@ def get_student_summary(student_id: str):
 @blueprint.route("/departments", methods=["GET"])
 @require_auth
 def list_departments():
-    response = (
+    response = execute_with_retry(
         supabase.table("department")
         .select("department_id, department_name")
         .order("department_name")
-        .execute()
     )
     return response.data
 
@@ -114,7 +113,7 @@ def list_courses():
     query = supabase.table("course_dept").select("course_id, course_name, department_id")
     if department_id is not None:
         query = query.eq("department_id", department_id)
-    response = query.order("course_name").execute()
+    response = execute_with_retry(query.order("course_name"))
     return response.data
 
 
@@ -122,6 +121,8 @@ def list_courses():
 @require_auth
 def list_year_levels():
     """Distinct year levels actually present in the data, for the filter dropdown."""
-    response = supabase.table("student_masterlist").select("year_level").execute()
+    response = execute_with_retry(
+        supabase.table("student_masterlist").select("year_level")
+    )
     years = sorted({row["year_level"] for row in response.data if row["year_level"]})
     return years

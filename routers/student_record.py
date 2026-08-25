@@ -12,6 +12,7 @@ from datetime import date
 
 from supabase_client import supabase
 from routers.auth_guard import require_auth, require_admin
+from routers.helpers import execute_with_retry
 
 student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
@@ -81,21 +82,19 @@ def _iso_or_none(value):
 @student_record_bp.route("/<path:student_id>", methods=["GET"])
 @require_auth
 def get_student_record_header(student_id):
-    profile = (
+    profile = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
         .eq("student_id", student_id)
         .maybe_single()
-        .execute()
     )
     if not profile.data:
         return _error("Student not found", 404)
 
-    exams_resp = (
+    exams_resp = execute_with_retry(
         supabase.table("annual_examination")
         .select("*")
         .eq("student_id", student_id)
-        .execute()
     )
     by_year = {row["year_label"]: row for row in exams_resp.data}
 
@@ -126,18 +125,17 @@ def add_annual_exam(student_id):
     if year_label not in YEAR_LABELS:
         return _error(f"year_label must be one of {YEAR_LABELS}", 400)
 
-    existing = (
+    existing = execute_with_retry(
         supabase.table("annual_examination")
         .select("annual_exam_id")
         .eq("student_id", student_id)
         .eq("year_label", year_label)
         .maybe_single()
-        .execute()
     )
     if existing.data:
         return _error(f"{year_label} already exists for this student", 409)
 
-    response = (
+    response = execute_with_retry(
         supabase.table("annual_examination")
         .insert({
             "student_id": student_id,
@@ -147,7 +145,6 @@ def add_annual_exam(student_id):
             "date_examined": _iso_or_none(body.get("date_examined")),
             "examined_by": body.get("examined_by"),
         })
-        .execute()
     )
     return jsonify(response.data[0])
 
@@ -165,12 +162,11 @@ def get_physical_examination(annual_exam_id):
     _, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
         return error
-    response = (
+    response = execute_with_retry(
         supabase.table("physical_examination")
         .select("*")
         .eq("annual_exam_id", annual_exam_id)
         .maybe_single()
-        .execute()
     )
     # null (None) if not yet saved — matches original FastAPI behaviour.
     if response.data is None:
@@ -221,22 +217,22 @@ def save_physical_examination(annual_exam_id):
         row[f"{column}_result"] = finding_result(key)
         row[column] = finding_remarks(key)
 
-    existing = (
+    existing = execute_with_retry(
         supabase.table("physical_examination")
         .select("examination_id")
         .eq("annual_exam_id", annual_exam_id)
         .maybe_single()
-        .execute()
     )
     if existing.data:
-        response = (
+        response = execute_with_retry(
             supabase.table("physical_examination")
             .update(row)
             .eq("examination_id", existing.data["examination_id"])
-            .execute()
         )
     else:
-        response = supabase.table("physical_examination").insert(row).execute()
+        response = execute_with_retry(
+            supabase.table("physical_examination").insert(row)
+        )
 
     # First saved physical exam moves the annual exam out of "no_record".
     if exam["status"] == "no_record":
@@ -257,12 +253,11 @@ def get_lab_results(annual_exam_id):
     physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
     if error:
         return error
-    lab = (
+    lab = execute_with_retry(
         supabase.table("laboratory_result")
         .select("*, chest_xray(*)")
         .eq("examination_id", physical_exam["examination_id"])
         .maybe_single()
-        .execute()
     )
     if lab.data is None:
         return "null", 200, {"Content-Type": "application/json"}
@@ -295,12 +290,11 @@ def save_lab_results(annual_exam_id):
         "other_results": body.get("other_results"),
     }
 
-    existing = (
+    existing = execute_with_retry(
         supabase.table("laboratory_result")
         .select("lab_result_id")
         .eq("examination_id", physical_exam["examination_id"])
         .maybe_single()
-        .execute()
     )
     if existing.data:
         lab_result_id = existing.data["lab_result_id"]
@@ -308,10 +302,12 @@ def save_lab_results(annual_exam_id):
             "lab_result_id", lab_result_id
         ).execute()
     else:
-        inserted = supabase.table("laboratory_result").insert(lab_row).execute()
+        inserted = execute_with_retry(
+            supabase.table("laboratory_result").insert(lab_row)
+        )
         lab_result_id = inserted.data[0]["lab_result_id"]
 
-    # Chest X-ray is its own table.
+# Chest X-ray is its own table.
     if body.get("chest_xray_date") or body.get("chest_xray_result") or body.get("chest_xray_notes"):
         xray_row = {
             "lab_result_id": lab_result_id,
@@ -319,19 +315,22 @@ def save_lab_results(annual_exam_id):
             "chest_xray_result": body.get("chest_xray_result"),
             "chest_xray_notes": body.get("chest_xray_notes"),
         }
-        existing_xray = (
+        existing_xray = execute_with_retry(
             supabase.table("chest_xray")
             .select("chest_xray_id")
             .eq("lab_result_id", lab_result_id)
             .maybe_single()
-            .execute()
         )
         if existing_xray.data:
-            supabase.table("chest_xray").update(xray_row).eq(
-                "chest_xray_id", existing_xray.data["chest_xray_id"]
-            ).execute()
+            execute_with_retry(
+                supabase.table("chest_xray").update(xray_row).eq(
+                    "chest_xray_id", existing_xray.data["chest_xray_id"]
+                )
+            )
         else:
-            supabase.table("chest_xray").insert(xray_row).execute()
+            execute_with_retry(
+                supabase.table("chest_xray").insert(xray_row)
+            )
 
     return get_lab_results(annual_exam_id)
 
@@ -343,12 +342,11 @@ def save_lab_results(annual_exam_id):
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["GET"])
 @require_auth
 def get_diagnosis(annual_exam_id):
-    response = (
+    response = execute_with_retry(
         supabase.table("medical_certificate")
         .select("*")
         .eq("annual_exam_id", annual_exam_id)
         .maybe_single()
-        .execute()
     )
     if response.data is None:
         return "null", 200, {"Content-Type": "application/json"}
@@ -374,22 +372,22 @@ def save_diagnosis(annual_exam_id):
         "date_issued": _iso_or_none(body.get("issued_on")) or date.today().isoformat(),
     }
 
-    existing = (
+    existing = execute_with_retry(
         supabase.table("medical_certificate")
         .select("certificate_id")
         .eq("annual_exam_id", annual_exam_id)
         .maybe_single()
-        .execute()
     )
     if existing.data:
-        response = (
+        response = execute_with_retry(
             supabase.table("medical_certificate")
             .update(row)
             .eq("certificate_id", existing.data["certificate_id"])
-            .execute()
         )
     else:
-        response = supabase.table("medical_certificate").insert(row).execute()
+        response = execute_with_retry(
+            supabase.table("medical_certificate").insert(row)
+        )
 
     supabase.table("annual_examination").update({"status": "cleared"}).eq(
         "annual_exam_id", annual_exam_id
@@ -409,19 +407,17 @@ def get_medical_certificate(annual_exam_id):
     if error:
         return error
 
-    profile = (
+    profile = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
         .eq("student_id", exam["student_id"])
         .maybe_single()
-        .execute()
     )
-    certificate = (
+    certificate = execute_with_retry(
         supabase.table("medical_certificate")
         .select("*, admin!fk_certificate_prepared(firstname, last_name, license_no)")
         .eq("annual_exam_id", annual_exam_id)
         .maybe_single()
-        .execute()
     )
     if not certificate.data:
         return _error("No diagnosis saved for this year yet", 404)
@@ -436,36 +432,32 @@ def get_medical_certificate(annual_exam_id):
 @student_record_bp.route("/<path:student_id>/medical-summary", methods=["GET"])
 @require_auth
 def get_medical_summary(student_id):
-    profile = (
+    profile = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
         .eq("student_id", student_id)
         .maybe_single()
-        .execute()
     )
     if not profile.data:
         return _error("Student not found", 404)
 
-    emergency_contact = (
+    emergency_contact = execute_with_retry(
         supabase.table("emergency_contact")
         .select("*")
         .eq("student_id", student_id)
         .maybe_single()
-        .execute()
     )
-    medical_history = (
+    medical_history = execute_with_retry(
         supabase.table("medical_histories")
         .select("*")
         .eq("student_id", student_id)
         .maybe_single()
-        .execute()
     )
 
-    exams = (
+    exams = execute_with_retry(
         supabase.table("annual_examination")
         .select("*, physical_examination(*), laboratory_result(*, chest_xray(*))")
         .eq("student_id", student_id)
-        .execute()
     )
     by_year = {row["year_label"]: row for row in exams.data}
     years = {label: by_year.get(label) for label in YEAR_LABELS}

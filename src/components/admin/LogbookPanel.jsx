@@ -1,10 +1,9 @@
 // src/components/admin/LogbookPanel.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon.jsx";
 import {
   recentLogbookEntries as sampleEntries,
-  reasonOptions as sampleReasons,
 } from "../../data/dashboardSample.js";
 import { logbookApi, referenceApi } from "../../lib/api.js";
 
@@ -25,7 +24,12 @@ function mapEntry(r) {
 export default function LogbookPanel() {
   const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
-  const [reasons, setReasons] = useState(sampleReasons);
+  const [reasonRecords, setReasonRecords] = useState([]);
+  const [medicineRecords, setMedicineRecords] = useState([]);
+
+  // Derived for dropdowns
+  const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
+  const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
 
   // Recent visits for the dashboard widget + real reason dropdown.
   useEffect(() => {
@@ -36,10 +40,15 @@ export default function LogbookPanel() {
     referenceApi
       .reasons()
       .then((res) => {
-        const list = (res?.reasons || [])
-          .map((r) => r.description)
-          .filter((d) => d && d !== "-");
-        if (list.length) setReasons(list);
+        const list = (res?.reasons || []).filter((r) => r.description && r.description !== "-");
+        if (list.length) setReasonRecords(list);
+      })
+      .catch(() => {});
+    referenceApi
+      .medicines()
+      .then((res) => {
+        const list = (res?.medicines || []).filter((m) => m.medicine_name);
+        if (list.length) setMedicineRecords(list);
       })
       .catch(() => {});
   }, []);
@@ -65,9 +74,9 @@ export default function LogbookPanel() {
 
   function resetWalkInForm() {
     setRegId("");
-    setReason("");
+    setWalkInReasonId("");
     setComplaint("");
-    setMedicine("");
+    setMedicineInput("");
     setQuantity("");
     setMedTags([]);
   }
@@ -233,13 +242,15 @@ export default function LogbookPanel() {
             <div>
               <label className="text-xs font-semibold text-gray-500">Reason</label>
               <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                value={walkInReasonId}
+                onChange={(e) => setWalkInReasonId(e.target.value)}
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
               >
                 <option value="">Select Reason</option>
-                {reasons.map((r) => (
-                  <option key={r}>{r}</option>
+                {reasonRecords.map((r) => (
+                  <option key={r.reason_id} value={r.reason_id}>
+                    {r.description}
+                  </option>
                 ))}
               </select>
             </div>
@@ -256,8 +267,8 @@ export default function LogbookPanel() {
               <div>
                 <label className="text-xs font-semibold text-gray-500">Medicine</label>
                 <input
-                  value={medicine}
-                  onChange={(e) => setMedicine(e.target.value)}
+                  value={medicineInput}
+                  onChange={(e) => setMedicineInput(e.target.value)}
                   placeholder="E.g. Paracetamol"
                   className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
                 />
@@ -268,29 +279,11 @@ export default function LogbookPanel() {
                         key={i}
                         className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
                       >
-                        {tag}
+                        {tag.name} x{tag.quantity}
                       </span>
                     ))}
                   </div>
                 )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Quantity</label>
-                <div className="mt-1 flex gap-1.5">
-                  <input
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    type="number"
-                    min="0"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                  />
-                  <button
-                    onClick={handleAddMedicine}
-                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
-                  >
-                    + Add
-                  </button>
-                </div>
               </div>
             </div>
           </div>

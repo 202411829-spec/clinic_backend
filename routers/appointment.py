@@ -1,11 +1,12 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from database import supabase
 from routers.helpers import (
     execute_with_retry,
     normalize_student_id,
     build_student_lookup,
     build_reason_lookup,
-    format_date_time
+    format_date_time,
+    get_latest_status_for_appointments
 )
 from routers.auth_guard import require_auth, require_admin
 
@@ -16,39 +17,6 @@ appointment_bp = Blueprint("appointment", __name__)
 # ============================================================
 # HELPERS
 # ============================================================
-
-def get_latest_status_for_appointments(appointment_ids):
-    """
-    Returns a dict keyed by appointment_id, with that
-    appointment's most recent status row (or None).
-    """
-
-    if not appointment_ids:
-        return {}
-
-    response = execute_with_retry(
-        supabase
-        .table("status")
-        .select("*")
-        .in_("appointment_id", appointment_ids)
-        .order("changed_at", desc=True)
-    )
-
-    rows = response.data or []
-
-    latest_by_appointment = {}
-
-    for row in rows:
-
-        appointment_id = row.get("appointment_id")
-
-        # Rows are already ordered newest-first, so the first
-        # one we see per appointment_id is the latest.
-        if appointment_id not in latest_by_appointment:
-            latest_by_appointment[appointment_id] = row
-
-    return latest_by_appointment
-
 
 def resolve_slot_for_booking(slot_id, appointment_time):
     """
@@ -172,6 +140,14 @@ def get_appointments():
         )
 
         appointments = response.data or []
+
+        # Join latest status for each appointment
+        appointment_ids = [a["appointment_id"] for a in appointments]
+        latest_status_map = get_latest_status_for_appointments(appointment_ids)
+
+        for appt in appointments:
+            status_row = latest_status_map.get(appt["appointment_id"])
+            appt["current_status"] = status_row.get("new_status") if status_row else None
 
         return jsonify({
             "success": True,
@@ -510,13 +486,50 @@ def update_appointment_status(appointment_id):
 
         new_status = data.get("new_status")
         remarks = data.get("remarks")
-        changed_by = data.get("changed_by")
 
         if not new_status:
 
             return jsonify({
                 "success": False,
                 "error": "new_status is required"
+            }), 400
+
+        # Auto-resolve changed_by from authenticated admin user
+        # g.user.email is set by require_admin (via require_auth)
+        changed_by = None
+        if g.user and g.user.get("email"):
+            admin_email = g.user.get("email")
+            # Try to find admin by email
+            admin_response = execute_with_retry(
+                supabase
+                .table("admin")
+                .select("admin_id")
+                .eq("email", admin_email)
+                .maybe_single()
+            )
+            if admin_response.data:
+                changed_by = admin_response.data.get("admin_id")
+            else:
+                # Fallback: try to match by username (local part of email)
+                local_part = admin_email.split("@")[0] if "@" in admin_email else admin_email
+                admin_response = execute_with_retry(
+                    supabase
+                    .table("admin")
+                    .select("admin_id")
+                    .eq("username", local_part)
+                    .maybe_single()
+                )
+                if admin_response.data:
+                    changed_by = admin_response.data.get("admin_id")
+
+        # Fallback to provided changed_by if auto-resolve failed
+        if changed_by is None:
+            changed_by = data.get("changed_by")
+
+        if changed_by is None:
+            return jsonify({
+                "success": False,
+                "error": "Unable to determine admin identity (changed_by)"
             }), 400
 
         appointment_response = execute_with_retry(
@@ -747,8 +760,10 @@ def create_appointment():
 
         # Use the resolved slot's id so bookings always line up with
         # the time_slot rows the slots endpoint reports on.
+        # Normalize student_id for FK matching (Supabase lowercases emails)
+        normalized_student_id = normalize_student_id(student_id)
         appointment_data = {
-            "student_id": student_id,
+            "student_id": normalized_student_id,
             "slot_id": slot_id,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
@@ -793,6 +808,108 @@ def create_appointment():
     except Exception as e:
 
         print("Create appointment error:", repr(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# ============================================================
+# STUDENT SELF-CANCEL APPOINTMENT
+#
+# DELETE /appointments/<appointment_id>
+#
+# Allows a student to cancel their own appointment.
+# Requires authentication; the student can only cancel
+# their own appointments (verified by student_id match).
+# Updates the status to "Cancelled" with a remark.
+# ============================================================
+
+@appointment_bp.route(
+    "/appointments/<int:appointment_id>",
+    methods=["DELETE"]
+)
+@require_auth
+def cancel_appointment(appointment_id):
+
+    try:
+
+        # Get the appointment to check ownership
+        appointment_response = execute_with_retry(
+            supabase
+            .table("appointment")
+            .select("appointment_id, student_id")
+            .eq("appointment_id", appointment_id)
+            .maybe_single()
+        )
+
+        if not appointment_response.data:
+            return jsonify({
+                "success": False,
+                "error": "Appointment not found"
+            }), 404
+
+        appointment = appointment_response.data
+
+        # Verify ownership: normalize both IDs for comparison
+        # g.user.email is set by require_auth; student_id comes from email local-part
+        student_email = g.user.get("email")
+        if not student_email:
+            return jsonify({
+                "success": False,
+                "error": "Unable to verify student identity"
+            }), 403
+
+        # Extract student_id from email (local part before @)
+        token_student_id = student_email.split("@")[0] if "@" in student_email else student_email
+        appointment_student_id = appointment.get("student_id")
+
+        if normalize_student_id(token_student_id) != normalize_student_id(appointment.get("student_id")):
+            return jsonify({
+                "success": False,
+                "error": "You can only cancel your own appointments"
+            }), 403
+
+        # Check if already cancelled
+        status_response = execute_with_retry(
+            supabase
+            .table("status")
+            .select("new_status")
+            .eq("appointment_id", appointment_id)
+            .order("changed_at", desc=True)
+            .limit(1)
+        )
+
+        statuses = status_response.data or []
+        if statuses and str(statuses[0].get("new_status", "")).strip().lower() == "cancelled":
+            return jsonify({
+                "success": False,
+                "error": "Appointment is already cancelled"
+            }), 400
+
+        # Insert cancelled status
+        # Use admin_id=1 (admintest) as the system admin for student cancellations
+        # since changed_by expects a valid admin_id (bigint FK to admin table)
+        execute_with_retry(
+            supabase
+            .table("status")
+            .insert({
+                "appointment_id": appointment_id,
+                "old_status": "Pending",  # We don't track previous status here
+                "new_status": "Cancelled",
+                "remarks": "Cancelled by student",
+                "changed_by": 1
+            })
+        )
+
+        return jsonify({
+            "success": True,
+            "message": "Appointment cancelled"
+        })
+
+    except Exception as e:
+        print("Cancel appointment error:", repr(e))
 
         return jsonify({
             "success": False,

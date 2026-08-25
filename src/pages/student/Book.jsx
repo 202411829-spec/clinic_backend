@@ -71,16 +71,18 @@ export default function Book() {
   const [selectedTime, setSelectedTime] = useState(
     isReschedule ? appointment.time : null
   );
-  const [reason, setReason] = useState(isReschedule ? appointment.reason : "");
+  const [reasonId, setReasonId] = useState(isReschedule ? appointment.reason_id || "" : "");
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(false);
 
   // Real slot availability for the selected date + real reason list.
-  const [slots, setSlots] = useState([]);
-  const [reasonList, setReasonList] = useState([]);
+const [slots, setSlots] = useState([]);
+const [reasonList, setReasonList] = useState([]);
+const [slotsStatus, setSlotsStatus] = useState("loading");
 
   useEffect(() => {
     let cancelled = false;
+    setSlotsStatus("loading");
     appointmentsApi
       .slots(toYMD(selectedDate))
       .then((res) => {
@@ -94,11 +96,13 @@ export default function Book() {
             slot_start: s.slot_start,
           }))
         );
+        setSlotsStatus("ready");
       })
       .catch((err) => {
         if (!cancelled) {
           console.error("Failed to load slots:", err);
           setSlots([]);
+          setSlotsStatus("error");
         }
       });
     return () => {
@@ -123,16 +127,16 @@ export default function Book() {
     setBooking(true);
     try {
       const matchedSlot = slots.find((s) => s.time === selectedTime);
-      const matchedReason = reasonList.find((r) => r.description === reason);
+      const matchedReason = reasonList.find((r) => r.reason_id === reasonId);
       await appointmentsApi.create({
         student_id: studentId,
         slot_id: matchedSlot?.id ?? null,
         appointment_date: toYMD(selectedDate),
         appointment_time: matchedSlot?.slot_start || "08:00",
         reason_id: matchedReason?.reason_id,
-        purpose: reason,
+        purpose: matchedReason?.description || "",
       });
-      const payload = { date: selectedDate, time: selectedTime, reason };
+      const payload = { date: selectedDate, time: selectedTime, reason: matchedReason?.description || "" };
       if (isReschedule) {
         rescheduleAppointment(payload);
       } else {
@@ -197,6 +201,7 @@ export default function Book() {
               slots={slots}
               selectedTime={selectedTime}
               onSelectTime={setSelectedTime}
+              status={slotsStatus}
             />
             <button
               type="button"
@@ -216,14 +221,14 @@ export default function Book() {
 
         {step === 3 && (
           <div className="space-y-4">
-            <SelectReasonPanel reason={reason} onSelectReason={setReason} />
+            <SelectReasonPanel reasons={reasonList} reasonId={reasonId} onSelectReason={setReasonId} />
             <button
               type="button"
-              disabled={!reason}
+              disabled={!reasonId}
               onClick={() => setStep(4)}
               className={[
                 "w-full rounded-lg py-2.5 text-sm font-bold transition-colors",
-                reason
+                reasonId
                   ? "bg-gc-green text-white hover:bg-gc-green-600"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed",
               ].join(" ")}
@@ -258,7 +263,7 @@ export default function Book() {
           selectedTime={selectedTime}
           onSelectTime={setSelectedTime}
         />
-        <SelectReasonPanel reason={reason} onSelectReason={setReason} />
+        <SelectReasonPanel reasons={reasonList} reasonId={reasonId} onSelectReason={setReasonId} />
         <AppointmentSummaryCard
           date={selectedDate}
           time={selectedTime}
