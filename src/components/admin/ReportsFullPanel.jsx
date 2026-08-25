@@ -291,6 +291,7 @@ export default function ReportsFullPanel() {
                     setDate(d);
                     setPickerOpen(false);
                   }}
+                  onNavigate={setDate}
                 />
               </div>
             )}

@@ -164,7 +164,7 @@ export default function ScheduleCalendar({
           onClick={resetToDefault}
           className="text-[11px] font-semibold text-gc-accent hover:text-gc-green transition-colors"
         >
-          Reset to default
+          Set a default
         </button>
       </div>
 
@@ -190,10 +190,6 @@ export default function ScheduleCalendar({
           <NavIcon name="chevron-right" className="w-4 h-4" />
         </button>
       </div>
-
-      <p className="text-[11px] text-gray-400 mb-3">
-        Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
-      </p>
 
       <p className="text-xs text-gray-500 mb-3">
         Choose which days of the week the clinic is open for booking by
@@ -305,6 +301,10 @@ export default function ScheduleCalendar({
           {offDates.length} date{offDates.length === 1 ? "" : "s"} marked unavailable
         </p>
       )}
+
+      <p className="mt-3 text-[11px] text-gray-400">
+        Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
+      </p>
     </section>
   );
 }

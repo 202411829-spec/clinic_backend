@@ -10,7 +10,14 @@ import {
 
 /**
  * selectedDate: Date
- * onSelectDate: (date: Date) => void
+ * onSelectDate: (date: Date) => void — fired when the user taps a day cell
+ *   (a final pick). Callers that close a popup on selection (e.g. Reports)
+ *   should do that here.
+ * onNavigate: (date: Date) => void — optional. Fired instead of
+ *   onSelectDate when the prev/next arrows step the date in "day" mode.
+ *   Lets a popup stay open while browsing with the arrows; falls back to
+ *   onSelectDate when not provided, so existing always-visible usages
+ *   (Appointments, student Book) keep working unchanged.
  * navigationMode: "day" (default) — arrows step the selected date by a
  *   single day, matching it forward/back (used by the admin Appointments /
  *   Reports daily views). "month" — arrows page the calendar view a whole
@@ -21,6 +28,7 @@ import {
 export default function SelectDateCalendar({
   selectedDate,
   onSelectDate,
+  onNavigate,
   navigationMode = "day",
 }) {
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
@@ -32,7 +40,7 @@ export default function SelectDateCalendar({
   function shiftDay(delta) {
     const next = new Date(selectedDate);
     next.setDate(next.getDate() + delta);
-    onSelectDate(next);
+    (onNavigate || onSelectDate)(next);
     setViewYear(next.getFullYear());
     setViewMonth(next.getMonth());
   }

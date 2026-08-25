@@ -331,11 +331,11 @@ export default function ClinicScheduleFullPanel() {
           </div>
         </div>
 
-        {/* right: live preview — on lg screens this stretches to match the
-            calendar column's height (CSS grid default); on smaller screens
-            (single-column stack) it falls back to a capped height. Either
-            way the list itself scrolls once blocks overflow that height. */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[420px] lg:max-h-none">
+        {/* right: live preview — capped at all breakpoints (viewport-relative
+            on lg screens) so a long block list scrolls within this panel
+            instead of stretching the grid row and forcing the whole page
+            to scroll. */}
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[420px] lg:max-h-[calc(100vh-160px)]">
           <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0">
             Time Block Preview
           </h3>
