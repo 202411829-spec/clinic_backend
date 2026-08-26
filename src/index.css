@@ -21,3 +21,59 @@
     -webkit-box-shadow: 0 0 0px 1000px white inset;
   }
 }
+
+/* ---------- print stylesheet ----------
+   Referenced by MedicalCertificatePanel / MedicalSummaryPanel / ReportsFullPanel.
+   Without this, the admin layout's on-screen scroll container (h-screen +
+   overflow-y-auto in AdminLayout.jsx) stays fixed-height during print, so the
+   browser only prints whatever currently fits in that one scrolled viewport
+   and silently drops everything below the fold. This resets height/overflow
+   to their natural values for print so content paginates across as many
+   physical pages as it needs, and locks the printable documents to A4
+   portrait sizing (matching the 10mm margin used by the "Download PDF"
+   exporters). */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .print-a4-portrait {
+    width: 190mm; /* A4 210mm minus the 10mm @page margin on each side */
+    margin: 0 auto;
+  }
+
+  .print-a4-portrait-cert {
+    width: 190mm;
+    margin: 0 auto;
+  }
+
+  /* Medical Certificate only: let the 3 stacked copies size themselves
+     naturally (their real content is short — well under a third of a page
+     each) instead of forcing each into an exact fraction of the sheet.
+     Forcing exact heights via CSS Grid `fr` tracks or fixed-height Flexbox
+     items turned out unreliable across print pagination: browsers kept
+     over-allocating height per row (pushing each copy onto its own page)
+     or clipping the footer when a row's forced height came in a hair short.
+     Plain block stacking with a small gap avoids both problems — content
+     defines its own height, all 3 comfortably fit within one A4 page, and
+     max-height + overflow here is only a safety net in case a diagnosis/
+     remark ever runs unusually long. This never touches Medical Summary or
+     Reports, which use the separate .print-a4-portrait class above. */
+  .print-cert-grid {
+    display: block !important;
+    max-height: 277mm; /* A4 297mm minus the 10mm @page margin top/bottom */
+    overflow: hidden;
+  }
+
+  .print-cert-grid > * + * {
+    margin-top: 3mm !important;
+  }
+}

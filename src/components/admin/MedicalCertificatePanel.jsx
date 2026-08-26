@@ -7,10 +7,12 @@
 // sheet (per the clinic's paper trail — one for the student, one for the
 // department, one for the clinic's own file).
 import { useRef, useState } from "react";
-import NavIcon from "./NavIcon";
-import { computeAge } from "../../data/studentRecordSample";
-import { formatMDY } from "../../lib/calendar";
-import { getCertificateDefaults } from "../../lib/certificateSync";
+import { useNavigate } from "react-router-dom";
+import NavIcon from "./NavIcon.jsx";
+import { ChevronLeftIcon } from "../icons.jsx";
+import { computeAge } from "../../data/studentRecordSample.js";
+import { formatMDY } from "../../lib/calendar.js";
+import { getCertificateDefaults } from "../../lib/certificateSync.js";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
@@ -34,13 +36,13 @@ function pronounFor(sex) {
 // print output, where three of these stack on a single portrait A4 page.
 function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark, purpose, issuedOn, copyLabel, copyNumber }) {
   return (
-    <div className="border border-gray-400 rounded-lg p-3 relative flex flex-col text-[9px] leading-snug h-full">
+    <div className="border border-gray-400 rounded-lg p-2.5 relative flex flex-col text-[9px] leading-snug">
       <p className="absolute top-1.5 right-2 text-[8px] text-gray-500">{copyNumber}</p>
       <p className="absolute top-1.5 left-2 text-[8px] font-semibold text-gray-500 uppercase tracking-wide">
         {copyLabel}
       </p>
 
-      <div className="flex items-start gap-1 mt-3">
+      <div className="flex items-start gap-1 mt-2">
         <div className="flex items-start gap-1 shrink-0">
           <img src={gordonCollegeSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
           <img src={oswsSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
@@ -55,23 +57,23 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
         <img src={healthServicesSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
       </div>
 
-      <div className="text-center mt-1">
+      <div className="text-center mt-0.5">
         <p className="font-bold text-gc-green text-[8px] leading-tight">
           Office of Student Welfare and Service — Health Services Unit
         </p>
       </div>
 
-      <h2 className="text-center font-bold text-gc-green text-[10px] tracking-[0.15em] underline underline-offset-2 mt-1.5 mb-2">
+      <h2 className="text-center font-bold text-gc-green text-[10px] tracking-[0.15em] underline underline-offset-2 mt-1 mb-1.5">
         MEDICAL CERTIFICATE
       </h2>
 
-      <p className="text-gray-800 mb-2">
+      <p className="text-gray-800 mb-1.5">
         This is to certify that {pronounFor(student.sex)} {formatDisplayName(student.name)},{" "}
         {age != null ? age : "__"} years old, {student.sex || "____"} has submitted all required
         medical requirements and upon physical examination.
       </p>
 
-      <div className="flex items-start gap-1 mb-1.5">
+      <div className="flex items-start gap-1 mb-1">
         <span className="font-semibold text-gray-800 shrink-0">Findings:</span>
         <span className="flex-1 flex items-center gap-1 text-gray-700">
           <span
@@ -83,17 +85,17 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
         </span>
       </div>
 
-      <div className="mb-1.5">
+      <div className="mb-1">
         <span className="font-semibold text-gray-800 block">Diagnosis:</span>
         <span className="block border-b border-gray-400 min-h-[10px] text-gray-700">{diagnosis}</span>
       </div>
 
-      <div className="flex items-start gap-1 mb-1.5">
+      <div className="flex items-start gap-1 mb-1">
         <span className="font-semibold text-gray-800 shrink-0">Final Remark:</span>
         <span className="flex-1 border-b border-gray-400 min-h-[10px] text-gray-700">{finalRemark}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
         <span className="font-semibold text-gray-800 shrink-0">Purpose:</span>
         {PURPOSE_OPTIONS.map((label) => (
           <span key={label} className="flex items-center gap-0.5 text-gray-700">
@@ -107,7 +109,7 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
         ))}
       </div>
 
-      <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+      <div className="pt-1.5 flex items-center justify-between gap-2">
         <span className="text-gray-700">
           <span className="font-semibold text-gray-800">Issued on:</span> {issuedOn}
         </span>
@@ -122,6 +124,7 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
 }
 
 export default function MedicalCertificatePanel({ student }) {
+  const navigate = useNavigate();
   // Pre-fill from whatever was last saved on the Diagnosis and Final Remark
   // section of this student's Student Record — the nurse can still edit any
   // of these here, this just saves re-typing them.
@@ -201,6 +204,15 @@ export default function MedicalCertificatePanel({ student }) {
 
   return (
     <div className="flex flex-col gap-5 pb-10 print:pb-0 print:gap-0">
+      {/* ---------- back ---------- */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700 print:hidden"
+      >
+        <ChevronLeftIcon className="h-4 w-4" />
+        Back
+      </button>
+
       {/* ---------- action row ---------- */}
       <div className="grid grid-cols-3 md:flex md:items-center md:justify-end gap-2 print:hidden">
         <button
@@ -345,7 +357,7 @@ export default function MedicalCertificatePanel({ student }) {
           "Download PDF" button — display:none elements have no layout box to snapshot. */}
       <div
         ref={printRef}
-        className="grid grid-cols-1 grid-rows-3 gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait-cert print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
+        className="flex flex-col gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait-cert print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
       >
         {COPY_LABELS.map((label, i) => (
           <CertificateCopy key={label} {...copyProps} copyLabel={label} copyNumber={i + 1} />

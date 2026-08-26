@@ -267,7 +267,7 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
         <AppointmentSummaryCard
           date={selectedDate}
           time={selectedTime}
-          reason={reason}
+          reason={reasonList.find((r) => r.id === reasonId)}
           booking={booking}
           onBook={handleBook}
           actionLabel={summaryActionLabel}

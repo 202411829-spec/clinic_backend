@@ -4,13 +4,14 @@
 // button on the Student Record page.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "./NavIcon.jsx";
+import { ChevronLeftIcon } from "../icons.jsx";
 import {
   academicYears,
   getStudentAnnualHistory,
   computeAge,
   formatLongDate,
-} from "../../data/studentRecordSample";
+} from "../../data/studentRecordSample.js";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
@@ -332,7 +333,16 @@ export default function MedicalSummaryPanel({ student }) {
       </h2>
 
       {/* ---------- title row + actions ---------- */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 print:hidden">
+      <div className="flex flex-col gap-4 print:hidden">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Back
+        </button>
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
             <NavIcon name="file" className="w-5 h-5" />
@@ -369,6 +379,7 @@ export default function MedicalSummaryPanel({ student }) {
             <NavIcon name="download" className="w-4 h-4" />
             {downloading ? "Preparing…" : "Download PDF"}
           </button>
+        </div>
         </div>
       </div>
 
@@ -428,7 +439,12 @@ export default function MedicalSummaryPanel({ student }) {
       </section>
 
       {/* ---------- physical examinations ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4">
+      {/* print:break-before-page keeps the "Physical Examinations" title and
+          the "Vital Signs and Measurements..." label bar attached to their
+          table when printing. Without it the browser can end a page right
+          after the header, stranding it alone with mostly blank space below,
+          while the table (with no title of its own) starts on the next page. */}
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4 print:break-before-page">
         <SectionHeader
           icon="user"
           title="Physical Examinations"

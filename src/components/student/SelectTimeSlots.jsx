@@ -137,13 +137,13 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
                   : selected
                   ? "border-gc-accent bg-gc-accent/5 cursor-pointer"
                   : "border-gray-200 hover:border-gc-accent/50 cursor-pointer",
-              ].join(" ")
+              ].join(" ")}
             >
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
                 <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
                   {slot.time}
                 </span>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <SlotBadge slot={slot} />
                   <SlotAvailabilityLabel slot={slot} />
                 </div>

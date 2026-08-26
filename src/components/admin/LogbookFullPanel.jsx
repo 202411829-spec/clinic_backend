@@ -1,9 +1,9 @@
 // src/components/admin/LogbookFullPanel.jsx
 import { useEffect, useMemo, useState } from "react";
-import NavIcon from "./NavIcon";
+import NavIcon from "./NavIcon.jsx";
 import {
   logbookEntries as sampleEntries,
-} from "../../data/dashboardSample";
+} from "../../data/dashboardSample.js";
 import { logbookApi, referenceApi } from "../../lib/api.js";
 
 const PAGE_SIZE = 20;
@@ -296,32 +296,32 @@ export default function LogbookFullPanel() {
         </select>
       </div>
 
-      {/* table */}
-      <div className="overflow-x-auto -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
-        <table className="w-full text-sm min-w-[820px] border-collapse">
+      {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
+      <div className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
+        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
               <th className="py-2.5 px-4 font-semibold border border-gray-300 whitespace-nowrap">Date / Time</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300">Name</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Name</th>
               <th className="py-2.5 px-3 font-semibold border border-gray-300">Age</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap">Dept &amp; Course</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300">Sex</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300">Reason</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300">Complaint</th>
-              <th className="py-2.5 px-4 font-semibold border border-gray-300">Medicine</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept &amp; Course</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Reason</th>
+              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Complaint</th>
+              <th className="py-2.5 px-4 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50/60">
                 <td className="py-3 px-4 text-gray-700 border border-gray-300 whitespace-nowrap">{row.dateTime}</td>
-                <td className="py-3 px-3 text-gray-800 font-medium border border-gray-300">{row.name}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.age}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.deptCourse}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.sex}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.reason}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300">{row.complaint}</td>
-                <td className="py-3 px-4 text-gray-700 border border-gray-300">{row.medicine}</td>
+                <td className="py-3 px-3 text-gray-800 font-medium border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.name}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.age}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.deptCourse}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.sex}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.reason}</td>
+                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.complaint}</td>
+                <td className="py-3 px-4 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.medicine}</td>
               </tr>
             ))}
             {pageRows.length === 0 && (

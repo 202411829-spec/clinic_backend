@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { masterlistApi } from '../../lib/api.js'
 import {
@@ -239,23 +240,15 @@ export default function Masterlist() {
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.gender || '—'}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatDate(student.birth_date)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.contact_number || '—'}</td>
-                    <td className="relative whitespace-nowrap px-4 py-3">
-                      <button
-                        onClick={() => setOpenMenuId(openMenuId === student.student_id ? null : student.student_id)}
-                        className="text-gc-green-700"
-                      >
-                        <DotsIcon className="h-5 w-5" />
-                      </button>
-                      {openMenuId === student.student_id && (
-                        <div className="absolute right-4 top-10 z-10 w-40 rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
-                          <button
-                            onClick={() => navigate(`/admin/masterlist/${student.student_id}`)}
-                            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            View Record
-                          </button>
-                        </div>
-                      )}
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <RowActionsMenu
+                        open={openMenuId === student.student_id}
+                        onToggle={() =>
+                          setOpenMenuId(openMenuId === student.student_id ? null : student.student_id)
+                        }
+                        onClose={() => setOpenMenuId(null)}
+                        onViewRecord={() => navigate(`/admin/masterlist/${student.student_id}`)}
+                      />
                     </td>
                   </tr>
                 ))
@@ -291,6 +284,84 @@ export default function Masterlist() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+const MENU_WIDTH = 160 // matches w-40
+
+// Renders the row's "..." action menu in a portal at document.body, positioned
+// with `fixed` coordinates computed from the button's location. This avoids the
+// menu being clipped by the table wrapper's `overflow-x-auto`, which forces
+// `overflow-y: auto` on that container too (a CSS quirk) and was cutting the
+// "View Record" option off, requiring a scroll to reach it.
+function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
+  const [coords, setCoords] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef(null)
+  const menuRef = useRef(null)
+
+  const updatePosition = useCallback(() => {
+    const btn = buttonRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    setCoords({
+      top: rect.bottom + 4,
+      left: Math.min(Math.max(8, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8),
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    updatePosition()
+
+    function handleClickOutside(e) {
+      if (
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target)
+      ) {
+        onClose()
+      }
+    }
+
+    // Keep the menu glued to the button, even while the table underneath scrolls.
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [open, updatePosition, onClose])
+
+  return (
+    <div className="relative inline-block">
+      <button ref={buttonRef} onClick={onToggle} className="text-gc-green-700" aria-label="Row actions">
+        <DotsIcon className="h-5 w-5" />
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
+            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg"
+          >
+            <button
+              onClick={() => {
+                onViewRecord()
+                onClose()
+              }}
+              className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            >
+              View Record
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

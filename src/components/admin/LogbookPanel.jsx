@@ -156,19 +156,19 @@ export default function LogbookPanel() {
         </select>
       </div>
 
-      {/* table */}
-      <div className="overflow-x-auto -mx-4 md:mx-0">
-        <table className="w-full text-sm min-w-[640px] border-collapse">
+      {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
+      <div className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0">
+        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
               <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300">Date / Time</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300">Name</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Name</th>
               <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300">Dept. &amp; Course</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Sex</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Reason</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Complaint</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">Medicine</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept. &amp; Course</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody>
@@ -177,19 +177,19 @@ export default function LogbookPanel() {
                 <td className="py-2.5 px-4 md:px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
                   {row.dateTime}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.name}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.age}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{row.deptCourse}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.name}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{row.age}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.deptCourse}</td>
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
                   {row.sex}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
                   {row.reason}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
                   {row.complaint}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
                   {row.medicine}
                 </td>
               </tr>
