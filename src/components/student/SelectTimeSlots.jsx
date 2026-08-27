@@ -21,14 +21,12 @@ function SlotBar({ slot }) {
 
 function SlotBadge({ slot }) {
   const full = isSlotFull(slot);
+  const badgeText = slot.booked + " / " + slot.capacity + " Booked";
+  const bgClass = full ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700";
+  const classNames = ["text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap", bgClass].join(" ");
   return (
-    <span
-      className={[
-        "text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap",
-        full ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700",
-      ].join(" ")}
-    >
-      {slot.booked} / {slot.capacity} Booked
+    <span className={classNames}>
+      {badgeText}
     </span>
   );
 }
@@ -37,14 +35,19 @@ function SlotAvailabilityLabel({ slot }) {
   const remaining = remainingSlots(slot);
   const full = remaining <= 0;
 
+  let labelClass;
+  if (full) {
+    labelClass = "text-red-600";
+  } else if (remaining <= 2) {
+    labelClass = "text-red-500";
+  } else {
+    labelClass = "text-gray-400";
+  }
+
+  const classNames = ["text-[11px] font-bold whitespace-nowrap", labelClass].join(" ");
   return (
-    <span
-      className={[
-        "text-[11px] font-bold whitespace-nowrap",
-        full ? "text-red-600" : remaining <= 2 ? "text-red-500" : "text-gray-400",
-      ].join(" ")}
-    >
-      {full ? "Full" : `${remaining} Slot${remaining === 1 ? "" : "s"} Left`}
+    <span className={classNames}>
+      {full ? "Full" : remaining + " Slot" + (remaining === 1 ? "" : "s") + " Left"}
     </span>
   );
 }
@@ -66,7 +69,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
         </h2>
         <div className="flex flex-col items-center justify-center py-8 gap-3">
           <div className="w-8 h-8 border-4 border-gc-accent/30 border-t-gc-accent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading available time slots…</p>
+          <p className="text-sm text-gray-500">Loading available time slots...</p>
         </div>
       </section>
     );
@@ -124,20 +127,22 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
           const full = isSlotFull(slot);
           const selected = selectedTime === slot.time;
 
+          const btnClass = [
+            "w-full text-left rounded-xl border px-3.5 py-3 transition-colors",
+            full
+              ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-70"
+              : selected
+              ? "border-gc-accent bg-gc-accent/5 cursor-pointer"
+              : "border-gray-200 hover:border-gc-accent/50 cursor-pointer",
+          ].join(" ");
+
           return (
             <button
               key={slot.id}
               type="button"
               disabled={full}
               onClick={() => onSelectTime(slot.time)}
-              className={[
-                "w-full text-left rounded-xl border px-3.5 py-3 transition-colors",
-                full
-                  ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-70"
-                  : selected
-                  ? "border-gc-accent bg-gc-accent/5 cursor-pointer"
-                  : "border-gray-200 hover:border-gc-accent/50 cursor-pointer",
-              ].join(" ")}
+              className={btnClass}
             >
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
                 <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">

@@ -58,17 +58,71 @@ export default function LogbookPanel() {
   const [showWalkInForm, setShowWalkInForm] = useState(false);
 
   const [regId, setRegId] = useState("");
-  const [reason, setReason] = useState("");
+  const [walkInReasonId, setWalkInReasonId] = useState("");
   const [complaint, setComplaint] = useState("");
-  const [medicine, setMedicine] = useState("");
+  const [medicineInput, setMedicineInput] = useState("");
   const [quantity, setQuantity] = useState("");
   const [medTags, setMedTags] = useState([]);
 
+  // Search and filter state
+  const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("All Departments");
+  const [course, setCourse] = useState("All Course");
+  const [reasonFilter, setReasonFilter] = useState("All Reason");
+
+  // Derive departments and courses from entries
+  const departments = useMemo(() => {
+    const set = new Set(entries.map((e) => e.deptCourse.split(" — ")[1]?.trim() || e.deptCourse).filter(Boolean));
+    return ["All Departments", ...Array.from(set)];
+  }, [entries]);
+
+  const courses = useMemo(() => {
+    const set = new Set(entries.map((e) => e.deptCourse.split(" — ")[0]?.trim() || e.deptCourse).filter(Boolean));
+    return ["All Course", ...Array.from(set)];
+  }, [entries]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return entries.filter((e) => {
+      const matchesSearch =
+        !q ||
+        e.name.toLowerCase().includes(q) ||
+        e.studentId.toLowerCase().includes(q) ||
+        e.course.toLowerCase().includes(q) ||
+        e.dept.toLowerCase().includes(q);
+      const matchesDept = department === "All Departments" || e.dept === department;
+      const matchesCourse = course === "All Course" || e.course === course;
+      const matchesReason = reasonFilter === "All Reason" || e.reason === reasonFilter;
+      return matchesSearch && matchesDept && matchesCourse && matchesReason;
+    });
+  }, [entries, search, department, course, reasonFilter]);
+
+  const PAGE_SIZE = 5;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const [page, setPage] = useState(1);
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  function updateFilter(setter) {
+    return (e) => {
+      setter(e.target.value);
+      setPage(1);
+    };
+  }
+
   function handleAddMedicine() {
-    if (!medicine.trim()) return;
-    const qty = quantity ? `x${quantity}` : "";
-    setMedTags((tags) => [...tags, `${medicine.trim()} ${qty}`.trim()]);
-    setMedicine("");
+    if (!medicineInput.trim()) return;
+    const qty = quantity ? Number(quantity) : 1;
+    const match = medicineRecords.find((m) => m.medicine_name.toLowerCase() === medicineInput.trim().toLowerCase());
+    const medId = match?.medicine_id;
+    setMedTags((tags) => [
+      ...tags,
+      { name: medicineInput.trim(), quantity: qty, medicine_id: medId },
+    ]);
+    setMedicineInput("");
     setQuantity("");
   }
 
@@ -82,7 +136,7 @@ export default function LogbookPanel() {
   }
 
   async function handleAddWalkIn() {
-    if (!regId.trim()) return;
+    if (!regId.trim() || !walkInReasonId) return;
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -91,13 +145,18 @@ export default function LogbookPanel() {
       now.getMinutes()
     ).padStart(2, "0")}:00`;
 
+    const medicinesPayload = medTags
+      .filter((t) => t.medicine_id)
+      .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
+
     try {
       await logbookApi.createWalkIn({
         student_id: regId.trim(),
         appointment_date: `${y}-${m}-${d}`,
         appointment_time: time,
-        reason_id: reasons.indexOf(reason) >= 0 ? reasons.indexOf(reason) + 1 : undefined,
+        reason_id: Number(walkInReasonId),
         complaint: complaint.trim() || undefined,
+        medicines: medicinesPayload.length > 0 ? medicinesPayload : undefined,
       });
       // Refresh the recent-visits list from the backend.
       const res = await logbookApi.list();
@@ -141,18 +200,39 @@ export default function LogbookPanel() {
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
           <NavIcon name="user" className="w-4 h-4 shrink-0" />
           <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by surname, name, student ID, or course..."
             className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Department</option>
+        <select
+          value={department}
+          onChange={updateFilter(setDepartment)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-sm text-gray-600"
+        >
+          {departments.map((d) => (
+            <option key={d}>{d}</option>
+          ))}
         </select>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Courses</option>
+        <select
+          value={course}
+          onChange={updateFilter(setCourse)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
+        >
+          {courses.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
         </select>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Reason</option>
+        <select
+          value={reasonFilter}
+          onChange={updateFilter(setReasonFilter)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
+        >
+          <option value="All Reason">All Reason</option>
+          {reasons.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
         </select>
       </div>
 
@@ -163,8 +243,8 @@ export default function LogbookPanel() {
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
               <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300">Date / Time</th>
               <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Name</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept. &amp; Course</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Age</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept. & Course</th>
               <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
               <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Reason</th>
               <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Complaint</th>
@@ -172,7 +252,7 @@ export default function LogbookPanel() {
             </tr>
           </thead>
           <tbody>
-            {entries.map((row) => (
+            {pageRows.map((row) => (
               <tr key={row.id}>
                 <td className="py-2.5 px-4 md:px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
                   {row.dateTime}
@@ -194,8 +274,47 @@ export default function LogbookPanel() {
                 </td>
               </tr>
             ))}
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
+                  No visits match your search or filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+      </div>
+
+      {/* pagination */}
+      <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+        <p className="text-xs text-gray-400">
+          {filtered.length} search result{filtered.length === 1 ? "" : "s"}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            aria-label="Previous page"
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 hover:bg-gray-50"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <span className="text-sm font-medium text-gray-700 w-8 text-center">
+            {page} / {pageCount}
+          </span>
+          <button
+            onClick={() => setPage(Math.min(pageCount, page + 1))}
+            disabled={page === pageCount}
+            aria-label="Next page"
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 hover:bg-gray-50"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
+              <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* bottom trigger — hidden once the form is open */}
@@ -284,6 +403,24 @@ export default function LogbookPanel() {
                     ))}
                   </div>
                 )}
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Quantity</label>
+                <div className="mt-1 flex gap-1.5">
+                  <input
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    type="number"
+                    min="0"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                  />
+                  <button
+                    onClick={handleAddMedicine}
+                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
+                  >
+                    + Add
+                  </button>
+                </div>
               </div>
             </div>
           </div>
