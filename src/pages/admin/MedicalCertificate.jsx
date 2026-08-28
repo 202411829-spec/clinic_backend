@@ -13,9 +13,13 @@ function resolveYearParam(raw) {
   const s = String(raw).trim();
   if (YKEY_TO_LABEL[s]) return { yearKey: s, yearLabel: YKEY_TO_LABEL[s] };
   if (LABEL_TO_YKEY[s]) return { yearKey: LABEL_TO_YKEY[s], yearLabel: s };
-  const m = s.match(/^(Year\s+[IV]+)/);
-  if (m && LABEL_TO_YKEY[m[1]]) return { yearKey: LABEL_TO_YKEY[m[1]], yearLabel: m[1] };
-  if (m && YKEY_TO_LABEL[m[1]]) return { yearKey: m[1], yearLabel: YKEY_TO_LABEL[m[1]] };
+  const m = s.match(/^(Year\s+(?:[IVXLCDM]+|[0-9]+))/);
+  if (m) {
+    const label = m[1];
+    if (LABEL_TO_YKEY[label]) return { yearKey: LABEL_TO_YKEY[label], yearLabel: label };
+    // dynamic year label beyond the fixed base years (e.g. "Year V")
+    return { yearKey: label, yearLabel: label };
+  }
   return { yearKey: null, yearLabel: null };
 }
 
@@ -88,7 +92,7 @@ export default function MedicalCertificate() {
             const yearsMap =
               medSummary?.years ??
               Object.fromEntries(hist.map((r) => [r.year_label, r]));
-            for (const lbl of ["Year IV", "Year III", "Year II", "Year I"]) {
+            for (const lbl of Object.keys(yearsMap)) {
               if (yearsMap[lbl]?.annual_exam_id === examId) {
                 resolvedLabel = lbl;
                 break;

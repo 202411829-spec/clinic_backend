@@ -146,11 +146,16 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
   const [diagnosisOpen, setDiagnosisOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
-  const records = academicYears.reduce((acc, yr) => {
-    const label = yr.label.split(" (")[0];
-    acc[yr.key] = adaptMedicalSummaryYear(medicalSummary?.years?.[label]);
-    return acc;
-  }, {});
+  // Columns = base Year I-IV (defaults) PLUS any dynamic year labels the
+  // backend returns (e.g. "Year V"), so Year V+ survive in the summary too.
+  const summaryYears = Object.keys(medicalSummary?.years ?? {});
+  const baseLabels = academicYears.map((y) => y.label.split(" (")[0]);
+  const yearLabels = Array.from(new Set([...baseLabels, ...summaryYears]));
+
+  const records = {};
+  yearLabels.forEach((label) => {
+    records[label] = adaptMedicalSummaryYear(medicalSummary?.years?.[label]);
+  });
   const age = computeAge(student.birthday);
   const conditions = student.medicalConditions ?? [];
   const emergency = student.emergencyContact ?? {};
@@ -223,7 +228,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       const physCols = [14, 60, 95, 130, 165];
       doc.setFont(undefined, "bold");
       doc.text("Examination", physCols[0], y);
-      academicYears.forEach((yr, i) => doc.text(yr.label.split(" (")[0], physCols[i + 1], y));
+      yearLabels.forEach((yrLabel, i) => doc.text(yrLabel, physCols[i + 1], y));
       y += 5;
       doc.setFont(undefined, "normal");
       [
@@ -248,7 +253,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           y = 18;
         }
         doc.text(label, physCols[0], y);
-        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), physCols[i + 1], y));
+        yearLabels.forEach((yrLabel, i) => doc.text(String(getVal(records[yrLabel])), physCols[i + 1], y));
         y += 5.5;
       });
 
@@ -256,7 +261,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       const labCols = [14, 60, 95, 130, 165];
       doc.setFont(undefined, "bold");
       doc.text("Chest X-Ray", labCols[0], y);
-      academicYears.forEach((yr, i) => doc.text(yr.label.split(" (")[0], labCols[i + 1], y));
+      yearLabels.forEach((yrLabel, i) => doc.text(yrLabel, labCols[i + 1], y));
       y += 5;
       doc.setFont(undefined, "normal");
       [
@@ -265,7 +270,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
         ["Findings", (r) => r.chestXray.remarks || "-"],
       ].forEach(([label, getVal]) => {
         doc.text(label, labCols[0], y);
-        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), labCols[i + 1], y));
+        yearLabels.forEach((yrLabel, i) => doc.text(String(getVal(records[yrLabel])), labCols[i + 1], y));
         y += 5.5;
       });
       y += 3;
@@ -285,7 +290,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           y = 18;
         }
         doc.text(label, labCols[0], y);
-        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), labCols[i + 1], y));
+        yearLabels.forEach((yrLabel, i) => doc.text(String(getVal(records[yrLabel])), labCols[i + 1], y));
         y += 5.5;
       });
       y += 3;
@@ -299,7 +304,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
         ["Protein", (r) => r.urinalysis.protein || "-"],
       ].forEach(([label, getVal]) => {
         doc.text(label, labCols[0], y);
-        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), labCols[i + 1], y));
+        yearLabels.forEach((yrLabel, i) => doc.text(String(getVal(records[yrLabel])), labCols[i + 1], y));
         y += 5.5;
       });
 
@@ -307,7 +312,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       const diagCols = [14, 60, 95, 130, 165];
       doc.setFont(undefined, "bold");
       doc.text("Item", diagCols[0], y);
-      academicYears.forEach((yr, i) => doc.text(yr.label.split(" (")[0], diagCols[i + 1], y));
+      yearLabels.forEach((yrLabel, i) => doc.text(yrLabel, diagCols[i + 1], y));
       y += 5;
       doc.setFont(undefined, "normal");
       [
@@ -322,7 +327,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           y = 18;
         }
         doc.text(label, diagCols[0], y);
-        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), diagCols[i + 1], y));
+        yearLabels.forEach((yrLabel, i) => doc.text(String(getVal(records[yrLabel])), diagCols[i + 1], y));
         y += 5.5;
       });
 
@@ -489,8 +494,8 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                 <thead>
                   <tr className="text-left text-xs text-gray-500 bg-gray-50">
                     <Th wide>Examination</Th>
-                    {academicYears.map((y) => (
-                      <Th key={y.key}>{y.label.split(" (")[0]}</Th>
+                    {yearLabels.map((label) => (
+                      <Th key={label}>{label}</Th>
                     ))}
                   </tr>
                 </thead>
@@ -508,8 +513,8 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   ].map(([label, getVal]) => (
                     <tr key={label}>
                       <Td>{label}</Td>
-                      {academicYears.map((y) => (
-                        <Td key={y.key}>{getVal(records[y.key])}</Td>
+                      {yearLabels.map((label) => (
+                        <Td key={label}>{getVal(records[label])}</Td>
                       ))}
                     </tr>
                   ))}
@@ -522,20 +527,20 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   ].map(([key, label]) => (
                     <tr key={key}>
                       <Td>{label}</Td>
-                      {academicYears.map((y) => (
-                        <Td key={y.key}>
-                          <Pill value={records[y.key].findings[key]} />
+                      {yearLabels.map((label) => (
+                        <Td key={label}>
+                          <Pill value={records[label].findings[key]} />
                         </Td>
                       ))}
                     </tr>
                   ))}
                   <tr>
                     <Td>
-                      Others{academicYears.some((y) => records[y.key].othersSpecify) ? "" : ": -"}
+                      Others{yearLabels.some((label) => records[label].othersSpecify) ? "" : ": -"}
                     </Td>
-                    {academicYears.map((y) => (
-                      <Td key={y.key}>
-                        <Pill value={records[y.key].findings.others} />
+                    {yearLabels.map((label) => (
+                      <Td key={label}>
+                        <Pill value={records[label].findings.others} />
                       </Td>
                     ))}
                   </tr>
@@ -568,36 +573,36 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
               <thead>
                 <tr className="text-left text-xs text-gray-500 bg-gray-50">
                   <Th wide>Chest X-Ray</Th>
-                  {academicYears.map((y) => (
-                    <Th key={y.key}>{y.label.split(" (")[0]}</Th>
+                  {yearLabels.map((label) => (
+                    <Th key={label}>{label}</Th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <Td>Date</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>
-                      {records[y.key].chestXray.date ? formatLongDate(records[y.key].chestXray.date) : "-"}
+                  {yearLabels.map((label) => (
+                    <Td key={label}>
+                      {records[label].chestXray.date ? formatLongDate(records[label].chestXray.date) : "-"}
                     </Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Result</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>
-                      <Pill value={records[y.key].chestXray.date ? records[y.key].chestXray.result : ""} />
+                  {yearLabels.map((label) => (
+                    <Td key={label}>
+                      <Pill value={records[label].chestXray.date ? records[label].chestXray.result : ""} />
                     </Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Findings / Remarks</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>{v(records[y.key].chestXray.remarks)}</Td>
+                  {yearLabels.map((label) => (
+                    <Td key={label}>{v(records[label].chestXray.remarks)}</Td>
                   ))}
                 </tr>
 
-                <GroupRow label="CBC" span={academicYears.length + 1} />
+                <GroupRow label="CBC" span={yearLabels.length + 1} />
                 {[
                   ["Date", (r) => (r.cbc.date ? formatLongDate(r.cbc.date) : "-")],
                   ["Hemoglobin (g/dL)", (r) => v(r.cbc.hemoglobin)],
@@ -607,34 +612,34 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                 ].map(([label, getVal]) => (
                   <tr key={label}>
                     <Td>{label}</Td>
-                    {academicYears.map((y) => (
-                      <Td key={y.key}>{getVal(records[y.key])}</Td>
+                    {yearLabels.map((label) => (
+                      <Td key={label}>{getVal(records[label])}</Td>
                     ))}
                   </tr>
                 ))}
 
-                <GroupRow label="Urinalysis" span={academicYears.length + 1} />
+                <GroupRow label="Urinalysis" span={yearLabels.length + 1} />
                 <tr>
                   <Td>Date</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>
-                      {records[y.key].urinalysis.date ? formatLongDate(records[y.key].urinalysis.date) : "-"}
+                  {yearLabels.map((label) => (
+                    <Td key={label}>
+                      {records[label].urinalysis.date ? formatLongDate(records[label].urinalysis.date) : "-"}
                     </Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Glucose / Sugar</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>
-                      <Pill value={records[y.key].urinalysis.glucose} />
+                  {yearLabels.map((label) => (
+                    <Td key={label}>
+                      <Pill value={records[label].urinalysis.glucose} />
                     </Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Protein</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>
-                      <Pill value={records[y.key].urinalysis.protein} />
+                  {yearLabels.map((label) => (
+                    <Td key={label}>
+                      <Pill value={records[label].urinalysis.protein} />
                     </Td>
                   ))}
                 </tr>
@@ -658,30 +663,30 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
               <thead>
                 <tr className="text-left text-xs text-gray-500 bg-gray-50">
                   <Th wide>Item</Th>
-                  {academicYears.map((y) => (
-                    <Th key={y.key}>{y.label.split(" (")[0]}</Th>
+                  {yearLabels.map((label) => (
+                    <Th key={label}>{label}</Th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <Td>Diagnosis</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>{v(records[y.key].diagnosis)}</Td>
+                  {yearLabels.map((label) => (
+                    <Td key={label}>{v(records[label].diagnosis)}</Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Final Remark</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>{v(records[y.key].finalRemark)}</Td>
+                  {yearLabels.map((label) => (
+                    <Td key={label}>{v(records[label].finalRemark)}</Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>Essentially normal physical findings</Td>
-                  {academicYears.map((y) => {
-                    const checked = records[y.key].diagnosisNormalFindingsChecked ?? records[y.key].normalFindingsChecked;
+                  {yearLabels.map((label) => {
+                    const checked = records[label].diagnosisNormalFindingsChecked ?? records[label].normalFindingsChecked;
                     return (
-                      <Td key={y.key}>
+                      <Td key={label}>
                         <Pill value={checked ? "Normal" : "With Findings"} />
                       </Td>
                     );
@@ -689,14 +694,14 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                 </tr>
                 <tr>
                   <Td>Examined By</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>{v(records[y.key].diagnosisExaminedBy)}</Td>
+                  {yearLabels.map((label) => (
+                    <Td key={label}>{v(records[label].diagnosisExaminedBy)}</Td>
                   ))}
                 </tr>
                 <tr>
                   <Td>License No.</Td>
-                  {academicYears.map((y) => (
-                    <Td key={y.key}>{v(records[y.key].diagnosisLicenseNo)}</Td>
+                  {yearLabels.map((label) => (
+                    <Td key={label}>{v(records[label].diagnosisLicenseNo)}</Td>
                   ))}
                 </tr>
               </tbody>

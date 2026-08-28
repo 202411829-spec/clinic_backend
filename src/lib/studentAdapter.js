@@ -202,9 +202,29 @@ export function latestAnnualExamId(medSummaryOrHeader) {
       (medSummaryOrHeader?.annual_exam_history || []).map((row) => [row.year_label, row])
     ) ??
     {};
-  for (const label of ["Year IV", "Year III", "Year II", "Year I"]) {
-    const row = years[label];
-    if (row?.annual_exam_id) return row.annual_exam_id;
+  // Iterate ALL labels (not just the fixed Year I-IV) so a Year V+ exam id
+  // is found too. Prefer the highest year index, matching the original
+  // "Year IV > III > II > I" ordering.
+  const available = [];
+  for (const label of Object.keys(years)) {
+    if (years[label]?.annual_exam_id) available.push(years[label]);
   }
-  return null;
+  available.sort((a, b) => yearIndexOf(a.year_label) - yearIndexOf(b.year_label));
+  const latest = available[available.length - 1];
+  return latest?.annual_exam_id ?? null;
+}
+
+function yearIndexOf(label) {
+  const m = String(label || "").match(/^Year\s+([IVXLCDM]+|[0-9]+)$/i);
+  if (!m) return 0;
+  const part = m[1].toUpperCase();
+  if (/^[0-9]+$/.test(part)) return parseInt(part, 10);
+  const vals = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  let total = 0;
+  for (let i = 0; i < part.length; i++) {
+    const cur = vals[part[i]];
+    const next = vals[part[i + 1]] ?? 0;
+    total += cur < next ? -cur : cur;
+  }
+  return total;
 }

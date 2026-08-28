@@ -53,7 +53,7 @@ export const labOtherFieldsConfig = {
   ],
 };
 
-function emptyYearRecord() {
+export function createEmptyYearRecord() {
   return {
     dateExamined: "",
     bp: "",
@@ -100,6 +100,10 @@ function emptyYearRecord() {
   };
 }
 
+function emptyYearRecord() {
+  return createEmptyYearRecord();
+}
+
 // Matches the mockup: Year I already has a cleared record on file, the
 // other three years are still blank ("No Record") until a nurse fills them in.
 export function getStudentAnnualHistory() {
@@ -125,11 +129,14 @@ export function getStudentAnnualHistory() {
 
 /** Rows for the Annual Examination History table at the top of the page. */
 export function getHistorySummary(records, examinerLabel) {
-  return academicYears.map((y) => {
-    const rec = records[y.key];
+  const keys = Object.keys(records || {});
+  return keys.map((key) => {
+    const rec = records[key];
     const hasRecord = Boolean(rec.dateExamined);
     return {
-      ...y,
+      key,
+      label: key,
+      schoolYear: rec.schoolYear,
       dateExamined: hasRecord ? formatLongDate(rec.dateExamined) : "-",
       examinedBy: hasRecord ? examinerLabel : "-",
       status: hasRecord ? "Cleared" : "No Record",

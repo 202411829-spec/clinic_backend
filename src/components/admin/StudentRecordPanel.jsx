@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon";
+import AddAnnualExamModal from "./AddAnnualExamModal";
 import {
   academicYears,
   resultOptions,
@@ -10,31 +11,61 @@ import {
   bloodTypeOptions,
   labExamTypeOptions,
   labOtherFieldsConfig,
-  getStudentAnnualHistory,
+  createEmptyYearRecord,
   getHistorySummary,
   computeAge,
 } from "../../data/studentRecordSample";
 import { saveCertificateDefaults } from "../../lib/certificateSync";
 import { recordsApi } from "../../lib/api";
+import { yearIndexFromLabel, formatYearLabel } from "../../lib/yearLabel";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
 // once auth is wired up — matches the placeholder used in AdminLayout.
 const currentExaminer = "Joseph Daniel B. Ramos";
 
-const YEAR_LABEL_BY_KEY = {
-  y1: "Year I",
-  y2: "Year II",
-  y3: "Year III",
-  y4: "Year IV",
-};
+// Fixed base years every student has; dynamic years (Year V+) are appended
+// on top. Keys are the canonical year_label string itself.
+const DEFAULT_YEAR_LABELS = ["Year I", "Year II", "Year III", "Year IV"];
 
-function schoolYearForKey(key) {
-  const found = academicYears.find((y) => y.key === key);
-  if (!found) return null;
-  // "Year I (2025 - 2026)" -> "2025-2026"
-  const m = found.label.match(/(\d{4})\s*-\s*(\d{4})/);
-  if (m) return `${m[1]}-${m[2]}`;
-  return null;
+// "Year I (2025 - 2026)" -> { "Year I": "2025-2026", ... }
+const DEFAULT_YEAR_SCHOOL_YEAR = Object.fromEntries(
+  academicYears.map((y) => [
+    y.label.split(" (")[0],
+    (y.label.match(/(\d{4})\s*-\s*(\d{4}|\d{2})/) || []).slice(1).join("-") || null,
+  ])
+);
+
+function defaultYearList() {
+  return DEFAULT_YEAR_LABELS.map((label) => ({
+    key: label,
+    label,
+    schoolYear: DEFAULT_YEAR_SCHOOL_YEAR[label] ?? null,
+  }));
+}
+
+function defaultRecords() {
+  const rec = {};
+  DEFAULT_YEAR_LABELS.forEach((label) => {
+    rec[label] = createEmptyYearRecord();
+  });
+  return rec;
+}
+
+/** Highest school_year end across known years, +1 -> "2029-2030". */
+function nextSchoolYear(yearsList) {
+  let maxEnd = null;
+  for (const y of yearsList || []) {
+    const m = String(y.schoolYear || "").match(/(\d{4})\s*-\s*(\d{4}|\d{2})/);
+    if (m) {
+      const end = parseInt(m[2].length === 2 ? `20${m[2]}` : m[2], 10);
+      if (maxEnd === null || end > maxEnd) maxEnd = end;
+    }
+  }
+  if (maxEnd === null) {
+    const now = new Date().getFullYear();
+    return `${now}-${now + 1}`;
+  }
+  return `${maxEnd}-${maxEnd + 1}`;
 }
 
 function parseNumberOrNull(v) {
@@ -314,13 +345,15 @@ function buildDiagnosisPayload(rec) {
 
 export default function StudentRecordPanel({ student }) {
   const navigate = useNavigate();
-  const [records, setRecords] = useState(getStudentAnnualHistory);
-  const [activeYear, setActiveYear] = useState("y1");
+  const [records, setRecords] = useState(defaultRecords);
+  const [yearsList, setYearsList] = useState(defaultYearList);
+  const [activeYear, setActiveYear] = useState(defaultYearList()[0].key);
   const [savedSection, setSavedSection] = useState(null);
   const [savingSection, setSavingSection] = useState(null);
   const [saveError, setSaveError] = useState(null);
-  const [annualExamIds, setAnnualExamIds] = useState({ y1: null, y2: null, y3: null, y4: null });
+  const [annualExamIds, setAnnualExamIds] = useState({});
   const [hydrated, setHydrated] = useState({});
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const physicalExamRef = useRef(null);
 
   const history = useMemo(
@@ -330,6 +363,13 @@ export default function StudentRecordPanel({ student }) {
 
   const rec = records[activeYear];
   const age = computeAge(student.birthday);
+
+  // Next year a student can be admitted to (one past the highest known year).
+  const maxYearIndex = yearsList.reduce((max, y) => {
+    const idx = yearIndexFromLabel(y.label);
+    return idx != null && idx > max ? idx : max;
+  }, 0);
+  const nextYearLabel = formatYearLabel(maxYearIndex + 1);
 
   // Fetch header on mount to discover existing annual_exam_ids
   useEffect(() => {
@@ -342,28 +382,48 @@ export default function StudentRecordPanel({ student }) {
         if (cancelled) return;
         const hist = data?.annual_exam_history;
         if (Array.isArray(hist)) {
-          const labelToKey = Object.fromEntries(Object.entries(YEAR_LABEL_BY_KEY).map(([k, v]) => [v, k]));
-          const nextIds = { y1: null, y2: null, y3: null, y4: null };
+          // Iterate the history rows DIRECTLY (keyed by year_label), so any
+          // label outside the fixed Year I-IV set (e.g. "Year V") is kept.
+          const nextIds = {};
+          const nextYears = [];
+          const seenLabels = new Set();
           const patch = {};
           hist.forEach((row) => {
-            const key = labelToKey[row.year_label];
-            if (!key) return;
-            if (row.annual_exam_id) nextIds[key] = row.annual_exam_id;
+            const yrLabel = row.year_label;
+            if (!yrLabel) return;
+            if (row.annual_exam_id) nextIds[yrLabel] = row.annual_exam_id;
+            if (!seenLabels.has(yrLabel)) {
+              seenLabels.add(yrLabel);
+              nextYears.push({ key: yrLabel, label: yrLabel, schoolYear: row.school_year ?? null });
+            }
             // use backend date_examined to hydrate history status even before physical fetch
             if (row.date_examined) {
-              patch[key] = row.date_examined;
+              patch[yrLabel] = row.date_examined;
+            }
+          });
+          // Ensure the base 4 years always render even if the backend ever
+          // omits one (defensive; current backend always returns them).
+          DEFAULT_YEAR_LABELS.forEach((label) => {
+            if (!seenLabels.has(label)) {
+              seenLabels.add(label);
+              nextYears.push({ key: label, label, schoolYear: DEFAULT_YEAR_SCHOOL_YEAR[label] ?? null });
             }
           });
           setAnnualExamIds(nextIds);
-          if (Object.keys(patch).length) {
-            setRecords((prev) => {
-              const next = { ...prev };
-              for (const [k, d] of Object.entries(patch)) {
-                next[k] = { ...next[k], dateExamined: d ? String(d).slice(0, 10) : next[k].dateExamined };
-              }
-              return next;
+          setYearsList(nextYears);
+          setRecords((prev) => {
+            const next = { ...prev };
+            nextYears.forEach((y) => {
+              if (!next[y.key]) next[y.key] = { ...createEmptyYearRecord(), schoolYear: y.schoolYear };
             });
-          }
+            for (const [k, d] of Object.entries(patch)) {
+              next[k] = { ...next[k], dateExamined: d ? String(d).slice(0, 10) : next[k].dateExamined };
+            }
+            return next;
+          });
+          setActiveYear((prev) =>
+            nextYears.some((y) => y.key === prev) ? prev : nextYears[0]?.key ?? null
+          );
         }
       } catch {
         // keep sample fallback
@@ -568,19 +628,19 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ urinalysis: { ...rec.urinalysis, ...patch } });
   }
 
-  async function ensureAnnualExamId(yearKey) {
-    const existing = annualExamIds[yearKey];
+  async function ensureAnnualExamId(yearLabel) {
+    const existing = annualExamIds[yearLabel];
     if (existing) return existing;
-    const year_label = YEAR_LABEL_BY_KEY[yearKey];
-    const school_year = schoolYearForKey(yearKey);
+    const yearObj = yearsList.find((y) => y.key === yearLabel);
+    const school_year = yearObj?.schoolYear ?? null;
     const created = await recordsApi.addAnnualExam(student.id, {
-      year_label,
+      year_label: yearLabel,
       school_year,
-      date_examined: records[yearKey]?.dateExamined || null,
+      date_examined: records[yearLabel]?.dateExamined || null,
     });
     const newId = created?.annual_exam_id ?? created?.annualExamId ?? created?.id;
     if (!newId) throw new Error("Failed to create annual examination");
-    setAnnualExamIds((prev) => ({ ...prev, [yearKey]: newId }));
+    setAnnualExamIds((prev) => ({ ...prev, [yearLabel]: newId }));
     return newId;
   }
 
@@ -633,7 +693,7 @@ export default function StudentRecordPanel({ student }) {
     setSavingSection("diagnosis");
     try {
       const cur = records[activeYear];
-      const yearLabel = YEAR_LABEL_BY_KEY[activeYear] ?? activeYear;
+      const yearLabel = activeYear;
       saveCertificateDefaults(student.id, {
         diagnosis: cur.diagnosis,
         finalRemark: cur.finalRemark,
@@ -658,8 +718,29 @@ export default function StudentRecordPanel({ student }) {
   }
 
   function handleAddAnnualExamination() {
-    const nextEmptyYear = academicYears.find((y) => !records[y.key].dateExamined);
-    setActiveYear(nextEmptyYear ? nextEmptyYear.key : "y1");
+    setAddModalOpen(true);
+  }
+
+  async function handleAddAnnualExamSubmit(yearLabel, schoolYear) {
+    const created = await recordsApi.addAnnualExam(student.id, {
+      year_label: yearLabel,
+      school_year: schoolYear,
+      date_examined: null,
+    });
+    const newId = created?.annual_exam_id ?? created?.annualExamId ?? created?.id;
+    if (!newId) throw new Error("Failed to create annual examination");
+    setAnnualExamIds((prev) => ({ ...prev, [yearLabel]: newId }));
+    setYearsList((prev) =>
+      prev.some((y) => y.key === yearLabel)
+        ? prev
+        : [...prev, { key: yearLabel, label: yearLabel, schoolYear }]
+    );
+    setRecords((prev) => ({
+      ...prev,
+      [yearLabel]: { ...createEmptyYearRecord(), schoolYear },
+    }));
+    setActiveYear(yearLabel);
+    setAddModalOpen(false);
     physicalExamRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -781,7 +862,7 @@ export default function StudentRecordPanel({ student }) {
 
       {/* ---------- year tabs ---------- */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
-        {academicYears.map((y) => (
+        {yearsList.map((y) => (
           <button
             key={y.key}
             onClick={() => setActiveYear(y.key)}
@@ -1188,6 +1269,15 @@ export default function StudentRecordPanel({ student }) {
           </SaveButton>
         </div>
       </section>
+
+      {addModalOpen && (
+        <AddAnnualExamModal
+          nextYearLabel={nextYearLabel}
+          initialSchoolYear={nextSchoolYear(yearsList)}
+          onClose={() => setAddModalOpen(false)}
+          onSubmit={handleAddAnnualExamSubmit}
+        />
+      )}
     </div>
   );
 }

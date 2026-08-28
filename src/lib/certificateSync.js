@@ -27,7 +27,7 @@ function yearVariants(yearLabel) {
   if (YKEY_TO_LABEL[yearLabel]) v.push(YKEY_TO_LABEL[yearLabel]);
   if (LABEL_TO_YKEY[yearLabel]) v.push(LABEL_TO_YKEY[yearLabel]);
   // also handle full academicYears label like "Year I (2025 - 2026)" -> "Year I"
-  const m = String(yearLabel).match(/^(Year\s+[IV]+)/);
+  const m = String(yearLabel).match(/^(Year\s+(?:[IVXLCDM]+|[0-9]+))/);
   if (m && m[1] !== yearLabel) v.push(m[1]);
   if (m && LABEL_TO_YKEY[m[1]]) v.push(LABEL_TO_YKEY[m[1]]);
   return [...new Set(v)];

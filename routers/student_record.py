@@ -7,6 +7,7 @@ forms, plus the Medical Certificate and Medical Summary views.
 Converted from FastAPI to a Flask blueprint.
 """
 
+import re
 from types import SimpleNamespace
 from flask import Blueprint, g, jsonify, request
 from datetime import date
@@ -18,6 +19,10 @@ from routers.helpers import execute_with_retry, normalize_student_id
 student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
 YEAR_LABELS = ["Year I", "Year II", "Year III", "Year IV"]
+
+# Accepts any well-formed year label: "Year V", "Year VI", ... (Roman numerals)
+# or ordinal "Year 5", "Year 6", ... — rejecting free-form garbage.
+_YEAR_LABEL_RE = re.compile(r"^Year\s+(?:[IVXLCDM]+|[0-9]+)$", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -109,9 +114,11 @@ def get_student_record_header(student_id):
     by_year = {row["year_label"]: row for row in exams_resp.data}
 
     history = []
+    seen = set()
     for label in YEAR_LABELS:
         if label in by_year:
             history.append(by_year[label])
+            seen.add(label)
         else:
             history.append({
                 "annual_exam_id": None,
@@ -122,6 +129,12 @@ def get_student_record_header(student_id):
                 "date_examined": None,
                 "examined_by_admin_id": None,
             })
+            seen.add(label)
+
+    # Any year labels beyond the fixed Year I-IV set (e.g. Year V+) are
+    # appended so they survive a page reload.
+    for label in sorted(k for k in by_year if k not in seen):
+        history.append(by_year[label])
 
     return jsonify({"profile": profile.data, "annual_exam_history": history})
 
@@ -136,8 +149,9 @@ def add_annual_exam(student_id):
     body = request.get_json(silent=True) or {}
 
     year_label = body.get("year_label")
-    if year_label not in YEAR_LABELS:
-        return _error(f"year_label must be one of {YEAR_LABELS}", 400)
+    if not year_label or not isinstance(year_label, str) or len(year_label) > 32 or not _YEAR_LABEL_RE.match(year_label.strip()):
+        return _error("year_label must be a valid year label like 'Year V' or 'Year 5'", 400)
+    year_label = year_label.strip()
 
     existing = execute_with_retry(
         supabase.table("annual_examinations")
@@ -493,7 +507,7 @@ def get_medical_summary(student_id):
         .eq("student_id", sid)
     )
     by_year = {row["year_label"]: row for row in exams.data}
-    years = {label: by_year.get(label) for label in YEAR_LABELS}
+    years = by_year
 
     return jsonify({
         "profile": profile.data,
