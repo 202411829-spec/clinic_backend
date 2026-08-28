@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone, date as date_type
 from database import supabase
 from routers.helpers import (
     execute_with_retry,
@@ -10,6 +11,54 @@ from routers.helpers import (
     get_latest_status_for_appointments
 )
 from routers.auth_guard import require_auth, require_admin, resolve_student_id
+
+
+def _get_manila_tz():
+    """Return Asia/Manila timezone (UTC+8). Falls back to fixed UTC+8 if zoneinfo unavailable."""
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("Asia/Manila")
+    except Exception:
+        return timezone(timedelta(hours=8))
+
+
+def _get_tomorrow_date():
+    """Compute tomorrow's date in Manila time (server time UTC+8)."""
+    tz = _get_manila_tz()
+    today_manila = datetime.now(tz).date()
+    return today_manila + timedelta(days=1)
+
+
+def _is_tomorrow_date(date_str):
+    """Return True iff date_str (YYYY-MM-DD) equals tomorrow in Manila time."""
+    try:
+        parsed = datetime.strptime(str(date_str)[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return parsed == _get_tomorrow_date()
+
+
+def _caller_is_admin():
+    """Check whether the current caller (g.user) is an admin via app_accounts. Returns False for students/unknown."""
+    user = getattr(g, "user", None) or {}
+    auth_user_id = user.get("id")
+    email = (user.get("email") or "").strip().lower()
+    try:
+        if auth_user_id:
+            resp = execute_with_retry(
+                supabase.table("app_accounts").select("admin_id").eq("auth_user_id", auth_user_id).eq("account_type", "admin").limit(1)
+            )
+            if resp.data and resp.data[0].get("admin_id"):
+                return True
+        if email:
+            resp = execute_with_retry(
+                supabase.table("app_accounts").select("admin_id").eq("email", email).eq("account_type", "admin").limit(1)
+            )
+            if resp.data and resp.data[0].get("admin_id"):
+                return True
+    except Exception:
+        pass
+    return False
 
 
 appointment_bp = Blueprint("appointment", __name__)
@@ -509,6 +558,20 @@ def get_time_slots():
 
         schedule_id = request.args.get("schedule_id")
         requested_date = request.args.get("date")
+
+        # ----------------------------------------------------
+        # Booking window defense-in-depth: students may only query
+        # slots for tomorrow. Admins are unrestricted so the admin
+        # AppointmentsPanel can inspect any date. Direct API calls
+        # with a non-tomorrow date are rejected with the same 400
+        # message as the booking endpoint.
+        # ----------------------------------------------------
+        if requested_date and not _caller_is_admin():
+            if not _is_tomorrow_date(requested_date):
+                return jsonify({
+                    "success": False,
+                    "error": "Booking is allowed for tomorrow only."
+                }), 400
 
         # ----------------------------------------------------
         # Date-filtered handling: dedup by filtering to
@@ -1206,6 +1269,20 @@ def create_appointment():
         # capacity. The window is tiny and acceptable for this app;
         # a DB-level constraint/exclusion would be the real fix.
         # ----------------------------------------------------
+
+        # ----------------------------------------------------
+        # Server-side booking window (Manila/UTC+8): student can only
+        # book for tomorrow. Today, past, and dates beyond tomorrow
+        # are all rejected with the same message. Admins bypass this
+        # check (admin has separate walk-in path via /logbook/walk-in
+        # for today; student booking endpoint must remain strict).
+        # ----------------------------------------------------
+        if not _caller_is_admin():
+            if not _is_tomorrow_date(appointment_date):
+                return jsonify({
+                    "success": False,
+                    "error": "Booking is allowed for tomorrow only."
+                }), 400
 
         if is_slot_closed_for_date(appointment_date):
             return jsonify({

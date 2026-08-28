@@ -1,11 +1,12 @@
 // src/components/admin/SelectDateCalendar.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import NavIcon from "./NavIcon";
 import {
   getMonthMatrix,
   isSameDate,
   formatMDY,
   WEEKDAY_LABELS,
+  startOfDay,
 } from "../../lib/calendar";
 
 /**
@@ -30,12 +31,52 @@ export default function SelectDateCalendar({
   onSelectDate,
   onNavigate,
   navigationMode = "day",
+  minDate,
+  maxDate,
 }) {
   const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
 
+  // Keep view in sync if selectedDate prop changes externally (e.g. Book.jsx defaulting to tomorrow)
+  useEffect(() => {
+    setViewYear(selectedDate.getFullYear());
+    setViewMonth(selectedDate.getMonth());
+  }, [selectedDate]);
+
   const weeks = getMonthMatrix(viewYear, viewMonth);
   const isMonthMode = navigationMode === "month";
+
+  const minDay = minDate ? startOfDay(minDate) : null;
+  const maxDay = maxDate ? startOfDay(maxDate) : null;
+
+  function isDisabled(date) {
+    if (!date) return false;
+    const d = startOfDay(date);
+    if (minDay && d < minDay) return true;
+    if (maxDay && d > maxDay) return true;
+    return false;
+  }
+
+  const viewMonthStart = new Date(viewYear, viewMonth, 1);
+  const minMonthKey = minDay ? minDay.getFullYear() * 12 + minDay.getMonth() : null;
+  const maxMonthKey = maxDay ? maxDay.getFullYear() * 12 + maxDay.getMonth() : null;
+  const viewMonthKey = viewYear * 12 + viewMonth;
+  const canGoPrev = minMonthKey == null || viewMonthKey > minMonthKey;
+  const canGoNext = maxMonthKey == null || viewMonthKey < maxMonthKey;
+
+  // Day-mode arrow targets (shift selected date by 1 day)
+  const prevDayTarget = (() => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    return d;
+  })();
+  const nextDayTarget = (() => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    return d;
+  })();
+  const canShiftPrevDay = !isDisabled(prevDayTarget);
+  const canShiftNextDay = !isDisabled(nextDayTarget);
 
   function shiftDay(delta) {
     const next = new Date(selectedDate);
@@ -60,16 +101,30 @@ export default function SelectDateCalendar({
   }
 
   function goPrev() {
-    isMonthMode ? shiftMonth(-1) : shiftDay(-1);
+    if (isMonthMode) {
+      if (!canGoPrev) return;
+      shiftMonth(-1);
+    } else {
+      if (!canShiftPrevDay) return;
+      shiftDay(-1);
+    }
   }
 
   function goNext() {
-    isMonthMode ? shiftMonth(1) : shiftDay(1);
+    if (isMonthMode) {
+      if (!canGoNext) return;
+      shiftMonth(1);
+    } else {
+      if (!canShiftNextDay) return;
+      shiftDay(1);
+    }
   }
 
   function pickDay(day) {
     if (!day) return;
-    onSelectDate(new Date(viewYear, viewMonth, day));
+    const d = new Date(viewYear, viewMonth, day);
+    if (isDisabled(d)) return;
+    onSelectDate(d);
   }
 
   // In month mode, the date box should reflect whatever month is currently
@@ -90,8 +145,13 @@ export default function SelectDateCalendar({
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={goPrev}
+          disabled={isMonthMode ? !canGoPrev : !canShiftPrevDay}
           aria-label={isMonthMode ? "Previous month" : "Previous day"}
-          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+          className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors ${
+            (isMonthMode ? !canGoPrev : !canShiftPrevDay)
+              ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+          }`}
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
         </button>
@@ -103,8 +163,13 @@ export default function SelectDateCalendar({
 
         <button
           onClick={goNext}
+          disabled={isMonthMode ? !canGoNext : !canShiftNextDay}
           aria-label={isMonthMode ? "Next month" : "Next day"}
-          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+          className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors ${
+            (isMonthMode ? !canGoNext : !canShiftNextDay)
+              ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+          }`}
         >
           <NavIcon name="chevron-right" className="w-4 h-4" />
         </button>
@@ -123,15 +188,19 @@ export default function SelectDateCalendar({
         {weeks.flat().map((day, i) => {
           const date = day ? new Date(viewYear, viewMonth, day) : null;
           const selected = date && isSameDate(date, selectedDate);
+          const disabled = date ? isDisabled(date) : false;
           return (
             <div key={i} className="flex items-center justify-center py-0.5">
               {day ? (
                 <button
                   onClick={() => pickDay(day)}
+                  disabled={disabled}
                   className={`w-8 h-8 rounded-full text-sm font-semibold transition-colors ${
-                    selected
-                      ? "bg-gc-accent text-white shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100"
+                    disabled
+                      ? "text-gray-300 bg-gray-50 cursor-not-allowed opacity-60"
+                      : selected
+                        ? "bg-gc-accent text-white shadow-sm"
+                        : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {day}

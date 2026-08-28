@@ -9,6 +9,11 @@ import BookingStepIndicator from "../../components/student/BookingStepIndicator"
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext";
 import { useAuth } from "../../context/AuthContext";
+import { addDays, startOfDay } from "../../lib/calendar.js";
+
+function getTomorrow() {
+  return addDays(startOfDay(new Date()), 1);
+}
 
 function toYMD(date) {
   const y = date.getFullYear();
@@ -65,8 +70,9 @@ export default function Book() {
   const isReschedule = Boolean(location.state?.reschedule && appointment);
 
   const [step, setStep] = useState(1);
+  const tomorrow = getTomorrow();
   const [selectedDate, setSelectedDate] = useState(
-    isReschedule ? appointment.date : new Date()
+    isReschedule ? appointment.date : getTomorrow()
   );
   const [selectedTime, setSelectedTime] = useState(
     isReschedule ? appointment.time : null
@@ -184,7 +190,10 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
               selectedDate={selectedDate}
               onSelectDate={handleSelectDate}
               navigationMode="month"
+              minDate={tomorrow}
+              maxDate={tomorrow}
             />
+            <p className="text-xs text-gray-500 text-center">Booking is open for tomorrow only</p>
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -253,11 +262,16 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
 
       {/* ---------- Desktop: all panels visible at once ---------- */}
       <div className="hidden md:grid md:grid-cols-[1fr_1fr_1fr_1fr] md:gap-5 md:items-start">
-        <SelectDateCalendar
-          selectedDate={selectedDate}
-          onSelectDate={handleSelectDate}
-          navigationMode="month"
-        />
+        <div>
+          <SelectDateCalendar
+            selectedDate={selectedDate}
+            onSelectDate={handleSelectDate}
+            navigationMode="month"
+            minDate={tomorrow}
+            maxDate={tomorrow}
+          />
+          <p className="text-xs text-gray-500 text-center mt-2">Booking is open for tomorrow only</p>
+        </div>
         <SelectTimeSlots
           slots={slots}
           selectedTime={selectedTime}
