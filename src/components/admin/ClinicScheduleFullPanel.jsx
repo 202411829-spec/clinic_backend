@@ -44,7 +44,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5">
         <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
           {block.time}
         </span>
@@ -59,14 +59,20 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label={`Actions for ${block.time}`}
-              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
             >
-              <NavIcon name="dots" className="w-4 h-4" />
+              &#8942;
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              >
                 <button
+                  role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
                     onToggleEdit(block.id);
@@ -76,6 +82,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
                   Edit
                 </button>
                 <button
+                  role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
                     onDelete(block.id);
