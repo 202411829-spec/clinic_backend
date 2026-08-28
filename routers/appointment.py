@@ -690,13 +690,50 @@ def get_time_slots():
 
         # ----------------------------------------------------
         # Group appointments (as bookings) by time_slot_id
+        # Legacy NULL time_slot_id fallback: appointments with
+        # time_slot_id=None (pre-materialize / walk-in) are
+        # resolved by appointment_time -> slot_start matching
+        # so they appear under the correct slot in the admin panel.
         # ----------------------------------------------------
+
+        # Build time -> slot_id lookup for NULL resolution (schedule-aware)
+        _resolved_override = None
+        _resolved_schedule_id = None
+        if requested_date:
+            try:
+                from routers.clinic_schedule import get_schedule_for_date as _gs2
+                _resolved_override = _gs2(requested_date)
+                if _resolved_override:
+                    _resolved_schedule_id = _resolved_override.get("schedule_id")
+            except Exception:
+                pass
+        _slot_time_to_id = {}
+        for _s in slots:
+            if _resolved_schedule_id is not None and _s.get("schedule_id") != _resolved_schedule_id:
+                continue
+            _tk = str(_s.get("slot_start") or "")[:5]
+            if _tk and _tk not in _slot_time_to_id:
+                _slot_time_to_id[_tk] = _s.get("slot_id")
 
         bookings_by_slot = {}
 
         for appointment in appointments:
 
             slot_id = appointment.get("time_slot_id")
+            # Resolve NULL slot_id via appointment_time when date matches requested_date
+            if slot_id is None and requested_date:
+                _app_date = str(appointment.get("appointment_date") or "")[:10]
+                if _app_date == str(requested_date)[:10]:
+                    _appt_time_key = str(appointment.get("appointment_time") or "")[:5]
+                    _resolved = _slot_time_to_id.get(_appt_time_key)
+                    if _resolved is not None:
+                        slot_id = _resolved
+                    else:
+                        print(
+                            f"get_time_slots: no matching slot for null time_slot_id "
+                            f"appointment {appointment.get('appointment_id')} "
+                            f"time {_appt_time_key} date {_app_date}"
+                        )
 
             # build_student_lookup() keys students by
             # normalize_student_id(), so normalize the raw id here too.
