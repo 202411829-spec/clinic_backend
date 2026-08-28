@@ -1184,44 +1184,7 @@ export default function StudentRecordPanel({ student }) {
           </label>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-gray-200">
-          <GroupBar>General Physical Examination Summary</GroupBar>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <TextInput
-              label="General Physical Examination Remarks"
-              value={rec.generalRemarks}
-              onChange={(e) => updateRecord({ generalRemarks: e.target.value })}
-            />
-            <TextInput
-              label="Final Assessment"
-              value={rec.finalAssessment}
-              onChange={(e) => updateRecord({ finalAssessment: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-            <TextInput
-              label="Examined By"
-              value={rec.physicalExaminedBy}
-              onChange={(e) => updateRecord({ physicalExaminedBy: e.target.value })}
-            />
-            <TextInput
-              label="License No."
-              value={rec.physicalLicenseNo}
-              onChange={(e) => updateRecord({ physicalLicenseNo: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={rec.normalFindingsChecked}
-              onChange={(e) => updateRecord({ normalFindingsChecked: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300 text-gc-green focus:ring-gc-accent"
-            />
-            Essentially normal physical findings at the time of evaluation
-          </label>
+        <div className="mt-4 flex justify-end">
           <SaveButton
             onClick={handleSaveDiagnosis}
             saved={savedSection === "diagnosis"}
