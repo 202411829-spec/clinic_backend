@@ -4,8 +4,26 @@ import StudentRecordPanel from "../../components/student/StudentRecordPanel";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";
 
-// Adapt the backend shapes (student_masterlist row + /api/records/<id>/
-// medical-summary payload) into the shape StudentRecordPanel renders.
+function formatDate(value) {
+  if (!value) return "-";
+  try {
+    const d = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+    return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(
+      d.getDate()
+    ).padStart(2, "0")}/${d.getFullYear()}`;
+  } catch {
+    return String(value);
+  }
+}
+
+const CONDITION_FIELDS = [
+  "has_asthma", "has_chicken_pox", "has_diabetes", "has_dysmenorrhea",
+  "has_epilepsy_seizure", "has_heart_disorder", "has_hepatitis",
+  "has_hypertension", "has_measles", "has_mumps", "has_anxiety_disorder",
+  "has_panic_attack", "has_pneumonia", "has_tb_primary_complex",
+  "has_typhoid_fever", "has_covid19", "has_urinary_tract_infection",
+];
+
 function adaptStudent(profile, medSummary) {
   if (!profile) return null;
   const middle = profile.middle_initial ? ` ${profile.middle_initial}.` : "";
@@ -24,14 +42,13 @@ function adaptStudent(profile, medSummary) {
     emergencyContact: {
       name: ec.contact_name ?? ec.name ?? "-",
       relationship: ec.relationship ?? "-",
-      contactNumber: ec.contact_number ?? ec.phone ?? "-",
+      contactNumber: ec.contact_number ?? ec.phone_number ?? ec.phone ?? "-",
     },
-    medicalConditions: Array.isArray(history.conditions)
-      ? history.conditions
-      : history.conditions
-      ? [String(history.conditions)]
-      : [],
-    previousOperation: history.previous_operation ?? "-",
+    medicalConditions: CONDITION_FIELDS.filter((k) => history[k]),
+    previousOperation: {
+      date: formatDate(history.operation_date),
+      procedure: history.operation_procedure ?? "-",
+    },
   };
 }
 
