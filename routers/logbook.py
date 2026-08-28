@@ -59,7 +59,7 @@ def format_appointment_date_time(appointment):
 def format_log_entry(log, appointments_by_id, students_by_id,
                       reasons_by_id, log_medicine_rows, medicines_by_id):
     """
-    Take a raw appointment_log row and return the fully joined
+    Take a raw visit_logs row and return the fully joined
     shape the frontend (LogbookPanel.jsx) expects.
     """
 
@@ -97,7 +97,7 @@ def format_log_entry(log, appointments_by_id, students_by_id,
                 date_time = created_at
 
     medicine_string = get_medicines_for_log(
-        log.get("log_id"),
+        log.get("visit_log_id"),
         log_medicine_rows,
         medicines_by_id
     )
@@ -110,28 +110,52 @@ def format_log_entry(log, appointments_by_id, students_by_id,
     if display_age is None:
         display_age = log.get("walk_in_age")
     display_age = display_age if display_age is not None else "-"
-    display_dept_course = (
-        student.get("deptCourse")
-        or log.get("walk_in_dept_course")
-        or "-"
-    )
+
+    # Separate dept and course (student lookup provides both;
+    # walk-in form stores combined "Course - Department")
+    if is_registered:
+        display_dept = student.get("dept") or "-"
+        # student lookup has deptCourse as "Course - Department"
+        # extract course from it - handle different dash types
+        dept_course = student.get("deptCourse") or "-"
+        # Try multiple separators: " - ", " — ", " -", "- "
+        display_course = dept_course
+        for sep in [" - ", " — ", " – ", " -", "- "]:
+            if sep in dept_course:
+                parts = dept_course.split(sep)
+                display_course = parts[0].strip()
+                display_dept = parts[1].strip() if len(parts) > 1 else display_dept
+                break
+    else:
+        # walk-in: walk_in_department_course is "Course - Department"
+        walk_in_department_course = log.get("walk_in_department_course") or "-"
+        display_course = walk_in_department_course
+        display_dept = "-"
+        for sep in [" - ", " — ", " – ", " -", "- "]:
+            if sep in walk_in_department_course:
+                parts = walk_in_department_course.split(sep)
+                display_course = parts[0].strip()
+                display_dept = parts[1].strip() if len(parts) > 1 else "-"
+                break
+
     display_sex = student.get("sex") or log.get("walk_in_sex") or "-"
 
     return {
-        "id": log.get("log_id"),
-        "log_id": log.get("log_id"),
+        "id": log.get("visit_log_id"),
+        "log_id": log.get("visit_log_id"),
         "appointment_id": appointment_id,
         "student_id": student_id,
         "dateTime": date_time,
         "name": display_name,
         "age": display_age,
-        "deptCourse": display_dept_course,
+        "dept": display_dept,
+        "course": display_course,
+        "deptCourse": f"{display_course} - {display_dept}" if display_course != "-" and display_dept != "-" else (display_course if display_course != "-" else display_dept),
         "sex": display_sex,
         "reason": reason_text,
         "complaint": log.get("complaint") or "-",
         "medicine": medicine_string,
-        "status_id": log.get("status_id"),
-        "admin_id": log.get("admin_id"),
+        "admin_id": log.get("attending_admin_id"),
         "is_registered": is_registered
     }
 
@@ -144,7 +168,7 @@ def get_all_reference_data():
 
     appointments_response = execute_with_retry(
         supabase
-        .table("appointment")
+        .table("appointments")
         .select("*")
     )
 
@@ -159,7 +183,7 @@ def get_all_reference_data():
 
     log_medicine_response = execute_with_retry(
         supabase
-        .table("appointment_log_medicine")
+        .table("visit_log_medicines")
         .select("*")
     )
 
@@ -179,16 +203,33 @@ def get_all_reference_data():
 #
 # GET /logbook
 # ============================================================
+#
+# Query params:
+#   search          - text search across name, student_id, dept, course, complaint, medicine
+#   date_from       - filter logs on/after this date (YYYY-MM-DD)
+#   date_to         - filter logs on/before this date (YYYY-MM-DD)
+#   reason_id       - filter by reason ID
+#   page            - page number (default 1)
+#   page_size       - items per page (default 20, max 100)
+# ============================================================
 
 @logbook_bp.route("/logbook", methods=["GET"])
 @require_auth
 def get_logbook():
 
     try:
+        # --- Parse query params ---
+        search = request.args.get("search", "").strip()
+        date_from = request.args.get("date_from")
+        date_to = request.args.get("date_to")
+        reason_id = request.args.get("reason_id", type=int)
+        page = max(1, request.args.get("page", default=1, type=int))
+        page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
 
+        # --- Fetch all logs first (we filter in Python after joining) ---
         response = execute_with_retry(
             supabase
-            .table("appointment_log")
+            .table("visit_logs")
             .select("*")
             .order("created_at", desc=True)
         )
@@ -203,6 +244,7 @@ def get_logbook():
             medicines_by_id
         ) = get_all_reference_data()
 
+        # --- Format all logs first ---
         formatted = [
             format_log_entry(
                 log,
@@ -215,10 +257,65 @@ def get_logbook():
             for log in logs
         ]
 
+        # --- Apply filters ---
+        def matches_search(entry):
+            if not search:
+                return True
+            s = search.lower()
+            return (
+                s in (entry.get("name") or "").lower()
+                or s in (entry.get("student_id") or "").lower()
+                or s in (entry.get("dept") or "").lower()
+                or s in (entry.get("course") or "").lower()
+                or s in (entry.get("complaint") or "").lower()
+                or s in (entry.get("medicine") or "").lower()
+            )
+
+        def matches_date(entry):
+            if not date_from and not date_to:
+                return True
+            # dateTime is in format "MM/DD/YYYY HH:MM"
+            dt_str = entry.get("dateTime") or ""
+            try:
+                if "/" in dt_str:
+                    date_part = dt_str.split(" ")[0]
+                    month, day, year = date_part.split("/")
+                    entry_date = f"{year}-{month}-{day}"
+                else:
+                    entry_date = dt_str[:10]
+            except Exception:
+                return False
+
+            if date_from and entry_date < date_from:
+                return False
+            if date_to and entry_date > date_to:
+                return False
+            return True
+
+        def matches_reason(entry):
+            if not reason_id:
+                return True
+            appt = appointments_by_id.get(entry.get("appointment_id"), {})
+            return appt.get("reason_id") == reason_id
+
+        filtered = [
+            e for e in formatted
+            if matches_search(e) and matches_date(e) and matches_reason(e)
+        ]
+
+        # --- Pagination ---
+        total = len(filtered)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = filtered[start:end]
+
         return jsonify({
             "success": True,
-            "count": len(formatted),
-            "logbook": formatted
+            "count": len(paginated),
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "logbook": paginated
         })
 
     except Exception as e:
@@ -248,7 +345,7 @@ def get_logbook_by_student(student_id):
 
         appointment_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("appointment_id")
             .eq("student_id", student_id)
         )
@@ -271,7 +368,7 @@ def get_logbook_by_student(student_id):
 
         logs_response = execute_with_retry(
             supabase
-            .table("appointment_log")
+            .table("visit_logs")
             .select("*")
             .in_("appointment_id", appointment_ids)
             .order("created_at", desc=True)
@@ -333,9 +430,9 @@ def get_logbook_entry(log_id):
 
         response = execute_with_retry(
             supabase
-            .table("appointment_log")
+            .table("visit_logs")
             .select("*")
-            .eq("log_id", log_id)
+            .eq("visit_log_id", log_id)
         )
 
         logs = response.data or []
@@ -386,15 +483,18 @@ def get_logbook_entry(log_id):
 #
 # Body:
 # {
-#     "student_id": "TEST001",
-#     "slot_id": 1,
+#     "student_id": "TEST001",       # optional (walk-ins may omit it)
+#     "slot_id": 1,                  # optional
 #     "appointment_date": "2026-08-17",
 #     "appointment_time": "09:30:00",
 #     "reason_id": 2,
 #     "purpose": "Walk-in checkup",
 #     "complaint": "Headache",
 #     "admin_id": 1,
-#     "status_id": 1,
+#     "walk_in_name": "...",         # for unregistered walk-ins
+#     "walk_in_age": 18,
+#     "walk_in_sex": "M",
+#     "walk_in_department_course": "Course - Department",
 #     "medicines": [
 #         {"medicine_id": 1, "quantity": 2}
 #     ]
@@ -402,7 +502,7 @@ def get_logbook_entry(log_id):
 #
 # A walk-in has no pre-existing appointment, so this endpoint
 # first creates the appointment record, then the matching
-# appointment_log record, then any medicine rows given.
+# visit_logs record, then any visit_log_medicines rows given.
 # ============================================================
 
 @logbook_bp.route(
@@ -432,10 +532,12 @@ def create_walk_in():
         # slot_id, and we use it; otherwise we log the visit without one.
         slot_id = data.get("slot_id")
 
+        # student_id is OPTIONAL for walk-ins — an unregistered patient
+        # may provide only walk_in_* fields (Decision D). appointment_date
+        # and appointment_time remain required (Decision E).
         missing = [
             field
             for field, value in [
-                ("student_id", student_id),
                 ("appointment_date", appointment_date),
                 ("appointment_time", appointment_time)
             ]
@@ -455,16 +557,17 @@ def create_walk_in():
 
         appointment_data = {
             "student_id": student_id,
-            "slot_id": slot_id,
+            "time_slot_id": slot_id,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
             "reason_id": data.get("reason_id"),
-            "purpose": data.get("purpose")
+            "appointment_purpose": data.get("purpose"),
+            "is_walk_in": True
         }
 
         appointment_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .insert(appointment_data)
         )
 
@@ -484,23 +587,24 @@ def create_walk_in():
 
         log_data = {
             "appointment_id": new_appointment_id,
-            "status_id": data.get("status_id"),
             "complaint": data.get("complaint"),
-            "admin_id": data.get("admin_id"),
+            "attending_admin_id": data.get("admin_id"),
+            "is_walk_in": True,
             # Manual fallback fields — only meaningful when the typed
-            # student_id has no matching personal_information record.
+            # student_id has no matching student_masterlist record.
             # Left as None for registered students; the frontend can
             # send them regardless and this just won't be used for
             # display when a real profile match exists.
             "walk_in_name": data.get("walk_in_name") or None,
             "walk_in_age": data.get("walk_in_age") or None,
             "walk_in_sex": data.get("walk_in_sex") or None,
-            "walk_in_dept_course": data.get("walk_in_dept_course") or None,
+            "walk_in_department_course": data.get("walk_in_department_course") or None,
+            "walk_in_contact": data.get("walk_in_contact") or None,
         }
 
         log_response = execute_with_retry(
             supabase
-            .table("appointment_log")
+            .table("visit_logs")
             .insert(log_data)
         )
 
@@ -513,11 +617,16 @@ def create_walk_in():
             }), 500
 
         new_log = log_response.data[0]
-        new_log_id = new_log.get("log_id")
+        new_log_id = new_log.get("visit_log_id")
 
         # ----------------------------------------------------
         # Step 3: Create medicine rows, if any were given
         # ----------------------------------------------------
+
+        # Look up medicine names so each row stores its own
+        # medicine_name SNAPSHOT (Decision F / Blockers L) —
+        # historical prescriptions survive later medicines edits.
+        medicines_by_id = build_medicine_lookup()
 
         medicines = data.get("medicines") or []
         created_medicines = []
@@ -530,13 +639,16 @@ def create_walk_in():
             if not medicine_id:
                 continue
 
+            medicine = medicines_by_id.get(medicine_id, {})
+
             medicine_row = execute_with_retry(
                 supabase
-                .table("appointment_log_medicine")
+                .table("visit_log_medicines")
                 .insert({
-                    "log_id": new_log_id,
+                    "visit_log_id": new_log_id,
                     "medicine_id": medicine_id,
-                    "quantity": quantity
+                    "medicine_name": medicine.get("medicine_name") or "Unknown",
+                    "quantity_dispensed": quantity
                 })
             )
 
@@ -611,9 +723,9 @@ def add_medicine_to_log(log_id):
         # so we don't silently create orphaned medicine rows.
         log_response = execute_with_retry(
             supabase
-            .table("appointment_log")
-            .select("log_id")
-            .eq("log_id", log_id)
+            .table("visit_logs")
+            .select("visit_log_id")
+            .eq("visit_log_id", log_id)
         )
 
         if not log_response.data:
@@ -622,6 +734,10 @@ def add_medicine_to_log(log_id):
                 "success": False,
                 "error": "Logbook entry not found"
             }), 404
+
+        # Look up medicine names so each row stores its own
+        # medicine_name SNAPSHOT (Decision F / Blockers L).
+        medicines_by_id = build_medicine_lookup()
 
         created_medicines = []
 
@@ -633,13 +749,16 @@ def add_medicine_to_log(log_id):
             if not medicine_id:
                 continue
 
+            medicine = medicines_by_id.get(medicine_id, {})
+
             medicine_row = execute_with_retry(
                 supabase
-                .table("appointment_log_medicine")
+                .table("visit_log_medicines")
                 .insert({
-                    "log_id": log_id,
+                    "visit_log_id": log_id,
                     "medicine_id": medicine_id,
-                    "quantity": quantity
+                    "medicine_name": medicine.get("medicine_name") or "Unknown",
+                    "quantity_dispensed": quantity
                 })
             )
 
