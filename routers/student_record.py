@@ -58,10 +58,17 @@ def _get_physical_exam_or_409(annual_exam_id):
 
 
 def _compute_bmi(weight_kg, height_cm):
-    if not weight_kg or not height_cm:
+    try:
+        w = float(weight_kg) if weight_kg not in (None, "") else None
+        h = float(height_cm) if height_cm not in (None, "") else None
+        if not w or not h:
+            return None
+        height_m = h / 100
+        if height_m <= 0:
+            return None
+        return round(w / (height_m ** 2), 1)
+    except (TypeError, ValueError, ZeroDivisionError):
         return None
-    height_m = height_cm / 100
-    return round(weight_kg / (height_m ** 2), 1)
 
 
 def _iso_or_none(value):
