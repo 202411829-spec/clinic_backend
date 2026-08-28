@@ -253,6 +253,12 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
     });
   }, [slots, search, department, reasonFilter]);
 
+  const totalBookings = useMemo(
+    () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
+    [filteredSlots]
+  );
+  const hasAppointments = totalBookings > 0;
+
   function handleStatusChange(slotId, bookingId, newStatus) {
     setSlots((prev) =>
       prev.map((slot) =>
@@ -338,23 +344,23 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
         />
       </div>
 
-      {slots.length === 0 && (
-        <div className="py-6 text-center text-sm text-gray-400">
-          No time blocks for today.
+      {!hasAppointments ? (
+        <div className="py-12 text-center text-gray-500 text-sm">
+          No appointment today.
         </div>
+      ) : (
+        filteredSlots.map((slot) => (
+          <SlotGroup
+            key={slot.id}
+            slot={slot}
+            onStatusChange={handleStatusChange}
+            editing={openEditId === slot.id}
+            onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
+            onSaveTimeBlock={handleSaveTimeBlock}
+            onDeleteTimeBlock={handleDeleteTimeBlock}
+          />
+        ))
       )}
-
-      {filteredSlots.map((slot) => (
-        <SlotGroup
-          key={slot.id}
-          slot={slot}
-          onStatusChange={handleStatusChange}
-          editing={openEditId === slot.id}
-          onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
-          onSaveTimeBlock={handleSaveTimeBlock}
-          onDeleteTimeBlock={handleDeleteTimeBlock}
-        />
-      ))}
     </section>
   );
 }

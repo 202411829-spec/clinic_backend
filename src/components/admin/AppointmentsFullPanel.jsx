@@ -320,6 +320,12 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     }));
   }, [slots, search, department, reasonFilter]);
 
+  const totalBookings = useMemo(
+    () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
+    [filteredSlots]
+  );
+  const hasAppointments = totalBookings > 0;
+
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
@@ -360,25 +366,26 @@ export default function AppointmentsFullPanel({ selectedDate }) {
       {!loading && error && (
         <div className="py-8 text-center text-sm text-red-500">{error}</div>
       )}
-      {!loading && !error && filteredSlots.length === 0 && (
-        <div className="py-8 text-center text-sm text-gray-400">
-          No time blocks for this date.
+      {!loading && !error && !hasAppointments && (
+        <div className="py-12 text-center text-gray-500 text-sm">
+          No appointment today.
         </div>
       )}
 
-      {filteredSlots.map((slot) => (
-        <SlotGroup
-          key={slot.id}
-          slot={slot}
-          onStatusChange={handleStatusChange}
-          editing={openEditId === slot.id}
-          onToggleEdit={(id) =>
-            setOpenEditId((cur) => (cur === id ? null : id))
-          }
-          onSaveTimeBlock={handleSaveTimeBlock}
-          onDeleteTimeBlock={handleDeleteTimeBlock}
-        />
-      ))}
+      {!loading && !error && hasAppointments &&
+        filteredSlots.map((slot) => (
+          <SlotGroup
+            key={slot.id}
+            slot={slot}
+            onStatusChange={handleStatusChange}
+            editing={openEditId === slot.id}
+            onToggleEdit={(id) =>
+              setOpenEditId((cur) => (cur === id ? null : id))
+            }
+            onSaveTimeBlock={handleSaveTimeBlock}
+            onDeleteTimeBlock={handleDeleteTimeBlock}
+          />
+        ))}
     </section>
   );
 }
