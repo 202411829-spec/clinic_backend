@@ -148,7 +148,7 @@ function resolveDeptCourseName(departments, courses, deptId, courseId, fallbackD
   return { deptName, courseName };
 }
 
-function buildStudentFromForm(student, form, photoDataUrl, departments, courses) {
+function buildStudentFromForm(student, form, photoDataUrl, departments = [], courses = []) {
   const name = `${form.lastName}, ${[form.firstName, form.middleName].filter(Boolean).join(" ")}`.trim();
   const conditions = form.conditions.map((c) =>
     c === "Allergy" ? (form.allergySpecify ? `Allergy: ${form.allergySpecify}` : "Allergy") : c
@@ -206,8 +206,8 @@ const CONDITION_TO_COLUMN = {
   "Urinary Tract Infection (UTI)": "has_urinary_tract_infection",
 };
 
-function mapToBackendPayload(student, form, photoDataUrl) {
-  const updated = buildStudentFromForm(student, form, photoDataUrl);
+function mapToBackendPayload(student, form, photoDataUrl, departments = [], courses = []) {
+  const updated = buildStudentFromForm(student, form, photoDataUrl, departments, courses);
   const { lastName, firstName, middleName } = splitName(updated.name);
 
   const hasAllergy = updated.medicalConditions.some((c) => /^allergy/i.test(c));
@@ -931,7 +931,7 @@ export default function EditStudentInfoModal({
   async function handleSubmit() {
     if (!form.consent || isSaving) return;
     const updatedStudent = buildStudentFromForm(student, form, photoPreview, departments, courses);
-    const payload = mapToBackendPayload(student, form, photoPreview);
+    const payload = mapToBackendPayload(student, form, photoPreview, departments, courses);
     await onSave?.(payload, updatedStudent);
   }
 
