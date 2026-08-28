@@ -15,7 +15,8 @@
 --     (CAHS, CBA, CCS, CEAS, CHTM, IGS), full names.
 --   - courses: the official Gordon College program list (30 rows),
 --     majors expanded into discrete course rows per department.
---   - appointment_reasons: 6 legacy reason descriptions, is_active=TRUE.
+--   - appointment_reasons: exactly 2 canonical reasons
+--     ('Medical Certificate', 'Consultation'), is_active=TRUE.
 --   - medicines: 3 legacy medicines; legacy quantity -> stock_quantity.
 --   - clinic_appointment_settings: ONE row mirroring legacy values
 --     including max_students_per_slot = 8.
@@ -103,14 +104,10 @@ JOIN (VALUES
 ) AS c("department_name", "course_name")
 ON c."department_name" = d."department_name";
 
--- 1.3 appointment_reasons (legacy `reason`, 6 preserved rows)
+-- 1.3 appointment_reasons (canonical, exactly 2 reasons)
 INSERT INTO "appointment_reasons" ("description", "is_active") VALUES
-  ('Medical Consultation',        TRUE),
-  ('Annual Medical Examination',  TRUE),
-  ('Dental Examination',          TRUE),
-  ('Free Medicine',               TRUE),
-  ('Wound Cleaning',              TRUE),
-  ('Emergency',                   TRUE);
+  ('Medical Certificate',  TRUE),
+  ('Consultation',         TRUE);
 
 -- 1.4 medicines (legacy `medicines`, 3 preserved rows;
 --     legacy quantity -> stock_quantity)

@@ -9,7 +9,7 @@ export const recentLogbookEntries = [
     dateTime: "06/07/2026 10:00 AM",
     name: "Ramos, Joseph Daniel B.",
     age: 22,
-    deptCourse: "CCS / BS Computer Science",
+    deptCourse: "College of Computer Studies (CCS) / Bachelor of Science in Computer Science (BSCS)",
     sex: "Male",
     reason: "Medical Certificate",
     complaint: "-",
@@ -20,7 +20,7 @@ export const recentLogbookEntries = [
     dateTime: "06/07/2026 10:00 AM",
     name: "Ramos, Joseph Daniel B.",
     age: 22,
-    deptCourse: "CCS / BS Computer Science",
+    deptCourse: "College of Computer Studies (CCS) / Bachelor of Science in Computer Science (BSCS)",
     sex: "Male",
     reason: "Consultation",
     complaint: "Headache",
@@ -31,7 +31,7 @@ export const recentLogbookEntries = [
     dateTime: "06/07/2026 10:00 AM",
     name: "Ramos, Joseph Daniel B.",
     age: 22,
-    deptCourse: "CCS / BS Computer Science",
+    deptCourse: "College of Computer Studies (CCS) / Bachelor of Science in Computer Science (BSCS)",
     sex: "Male",
     reason: "Medical Certificate",
     complaint: "-",
@@ -57,12 +57,12 @@ const logbookPattern = [
 ];
 
 const logbookPeople = [
-  { name: "Ramos, Joseph Daniel B.", age: 22, dept: "CCS", course: "BS Computer Science", sex: "Male" },
-  { name: "Alfonso, Mark Joshua", age: 21, dept: "CAHS", course: "BS Nursing", sex: "Male" },
-  { name: "Ladiero, Christopher", age: 23, dept: "CHTM", course: "BS Tourism Management", sex: "Male" },
-  { name: "Santos, Maria Clara D.", age: 20, dept: "CBA", course: "BS Accountancy", sex: "Female" },
-  { name: "Dela Cruz, Anna Rosario", age: 22, dept: "CCS", course: "BS Information Technology", sex: "Female" },
-  { name: "Reyes, John Michael", age: 19, dept: "CTE", course: "BSED English", sex: "Male" },
+  { name: "Ramos, Joseph Daniel B.", age: 22, dept: "College of Computer Studies (CCS)", course: "Bachelor of Science in Computer Science (BSCS)", sex: "Male" },
+  { name: "Alfonso, Mark Joshua", age: 21, dept: "College of Allied Health Studies (CAHS)", course: "Bachelor of Science in Nursing (BSN)", sex: "Male" },
+  { name: "Ladiero, Christopher", age: 23, dept: "College of Hospitality and Tourism Management (CHTM)", course: "Bachelor of Science in Tourism Management (BSTM)", sex: "Male" },
+  { name: "Santos, Maria Clara D.", age: 20, dept: "College of Business and Accountancy (CBA)", course: "Bachelor of Science in Accountancy (BSA)", sex: "Female" },
+  { name: "Dela Cruz, Anna Rosario", age: 22, dept: "College of Computer Studies (CCS)", course: "Bachelor of Science in Information Technology (BSIT)", sex: "Female" },
+  { name: "Reyes, John Michael", age: 19, dept: "College of Education, Arts and Sciences (CEAS)", course: "Bachelor of Secondary Education Major in English", sex: "Male" },
 ];
 
 export const logbookEntries = Array.from({ length: 14 }, (_, i) => {
@@ -99,7 +99,7 @@ export const appointmentSlots = [
         id: "b1",
         name: "Joseph Daniel B. Ramos",
         age: 22,
-        dept: "CCS",
+        dept: "College of Computer Studies (CCS)",
         sex: "M",
         reason: "Medical Certificate",
         status: "Completed",
@@ -108,7 +108,7 @@ export const appointmentSlots = [
         id: "b2",
         name: "Mark Joshua Alfonso",
         age: 22,
-        dept: "CAHS",
+        dept: "College of Allied Health Studies (CAHS)",
         sex: "M",
         reason: "Medical Certificate",
         status: "Pending",
@@ -117,7 +117,7 @@ export const appointmentSlots = [
         id: "b3",
         name: "Christopher Ladiero",
         age: 22,
-        dept: "CHTM",
+        dept: "College of Hospitality and Tourism Management (CHTM)",
         sex: "M",
         reason: "Medical Certificate",
         status: "No-show",
@@ -144,12 +144,10 @@ export const appointmentSlots = [
   },
 ];
 
+// Mirrors the canonical appointment_reasons seed (exactly 2 values).
 export const reasonOptions = [
   "Medical Certificate",
   "Consultation",
-  "Follow-up",
-  "Vaccination",
-  "Other",
 ];
 
 export const statusOptions = ["Completed", "Pending", "No-show", "Cancelled"];

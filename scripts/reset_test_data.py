@@ -238,6 +238,24 @@ def _insert(table, payload, what):
     return rows[0]
 
 
+def _resolve_reason_id(description):
+    """
+    Look up the appointment_reasons row by its canonical description so the
+    seed never hardcodes reason_ids (the canonical set is exactly 2:
+    'Medical Certificate' and 'Consultation').
+    """
+    resp = supabase.table("appointment_reasons").select("reason_id,description").execute()
+    rows = resp.data or []
+    by_description = {r.get("description"): r.get("reason_id") for r in rows}
+    reason_id = by_description.get(description)
+    if reason_id is None:
+        fail(
+            f"appointment_reasons has no '{description}' row; expected the "
+            "canonical seed (Medical Certificate / Consultation)"
+        )
+    return reason_id
+
+
 def seed(dry_run=False):
     print("== SEED ==")
     working_date, schedule, booking_slot, walk_in_slot = _resolve_seed_date_and_slot()
@@ -249,12 +267,13 @@ def seed(dry_run=False):
         return
 
     # --- a. Student appointment booking (TEST001, pending) --------------
+    consultation_reason_id = _resolve_reason_id("Consultation")
     booking_data = {
         "student_id": "TEST001",
         "time_slot_id": booking_slot["slot_id"],
         "appointment_date": working_date,
         "appointment_time": str(booking_slot["slot_start"])[:8],
-        "reason_id": 1,  # Medical Consultation
+        "reason_id": consultation_reason_id,  # Consultation
         "appointment_purpose": f"{SEED_MARKER} student booking",
     }
     booking = _insert("appointments", booking_data, "student appointment booking (TEST001)")
@@ -293,7 +312,7 @@ def seed(dry_run=False):
             "time_slot_id": walk_in_slot["slot_id"],
             "appointment_date": working_date,
             "appointment_time": str(walk_in_slot["slot_start"])[:8],
-            "reason_id": 2,  # Annual Medical Examination
+            "reason_id": consultation_reason_id,  # Consultation
             "appointment_purpose": f"{SEED_MARKER} walk-in",
             "is_walk_in": True,
         },

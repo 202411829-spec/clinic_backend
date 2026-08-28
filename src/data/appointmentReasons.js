@@ -1,14 +1,9 @@
 // src/data/appointmentReasons.js
-// Options for the "Select Reason" dropdown on the Student Book page.
-// Swap for a Supabase-driven list later if the clinic wants to manage these.
+// Static fallback for the "Select Reason" dropdown on the Student Book page.
+// LIVE data comes from GET /reasons (appointment_reasons table); this file
+// mirrors the canonical seed (migrations/2026-08-28_clean_seed.sql) exactly.
 
 export const appointmentReasons = [
   "Medical Certificate",
-  "General Consultation",
-  "Follow-up Checkup",
-  "Vaccination",
-  "Physical Examination",
-  "Dental Concern",
-  "Mental Health Consultation",
-  "Other",
+  "Consultation",
 ];
