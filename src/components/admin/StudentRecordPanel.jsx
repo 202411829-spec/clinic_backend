@@ -780,28 +780,20 @@ export default function StudentRecordPanel({ student }) {
       </div>
 
       {/* ---------- year tabs ---------- */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
-          {academicYears.map((y) => (
-            <button
-              key={y.key}
-              onClick={() => setActiveYear(y.key)}
-              className={`shrink-0 whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
-                activeYear === y.key
-                  ? "border-gc-green text-gc-green bg-white"
-                  : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
-              }`}
-            >
-              {y.label}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => physicalExamRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          className="w-full md:w-auto text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-lg hover:opacity-90"
-        >
-          View Full Record
-        </button>
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
+        {academicYears.map((y) => (
+          <button
+            key={y.key}
+            onClick={() => setActiveYear(y.key)}
+            className={`shrink-0 whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
+              activeYear === y.key
+                ? "border-gc-green text-gc-green bg-white"
+                : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"
+            }`}
+          >
+            {y.label}
+          </button>
+        ))}
       </div>
 
       {saveError && (
