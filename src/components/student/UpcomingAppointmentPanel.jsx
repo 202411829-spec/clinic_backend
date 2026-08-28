@@ -60,7 +60,7 @@ export default function UpcomingAppointmentPanel() {
         const mine = (res?.appointments || [])
           .filter(
             (a) =>
-              String(a.student_id) === String(studentId) &&
+              String(a.student_id).toUpperCase().trim() === String(studentId).toUpperCase().trim() &&
               String(a.appointment_date).slice(0, 10) >= today
           )
           .sort((a, b) =>
