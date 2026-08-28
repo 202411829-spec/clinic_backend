@@ -8,7 +8,7 @@ from routers.helpers import (
     format_date_time,
     get_latest_status_for_appointments
 )
-from routers.auth_guard import require_auth, require_admin
+from routers.auth_guard import require_auth, require_admin, resolve_student_id
 
 
 appointment_bp = Blueprint("appointment", __name__)
@@ -17,6 +17,55 @@ appointment_bp = Blueprint("appointment", __name__)
 # ============================================================
 # HELPERS
 # ============================================================
+
+# Appointment status enum values (clean schema, Decision B). There is no
+# "Confirmed" and no title-case — the enum is exactly these four lowercase
+# values.
+_VALID_STATUSES = {"pending", "completed", "no_show", "cancelled"}
+
+# Legacy/UI title-case spellings -> canonical lowercase enum value. Used to
+# coerce client input defensively. "Confirmed" is a legacy value remapped to
+# "completed" and is never stored as-is.
+_TITLE_CASE_TO_ENUM = {
+    "Pending": "pending",
+    "Completed": "completed",
+    "No Show": "no_show",
+    "No-Show": "no_show",
+    "Cancelled": "cancelled",
+    "Canceled": "cancelled",
+    "Confirmed": "completed",
+}
+
+# Canonical enum value -> display label (mirrors notifications.py).
+_STATUS_LABELS = {
+    "pending": "Pending",
+    "completed": "Completed",
+    "no_show": "No Show",
+    "cancelled": "Cancelled",
+}
+
+
+def _normalize_status(status):
+    """
+    Coerce a client-supplied status to the canonical lowercase enum value.
+
+    Accepts the four valid values in any case plus the legacy title-case
+    spellings. Returns None (rejected) when the value is not a valid
+    appointment status, so callers never write an invalid value into the
+    enum column.
+    """
+    if status is None:
+        return None
+    raw = str(status).strip()
+    if not raw:
+        return None
+    if raw in _VALID_STATUSES:
+        return raw
+    lowered = raw.lower()
+    if lowered in _VALID_STATUSES:
+        return lowered
+    return _TITLE_CASE_TO_ENUM.get(raw) or _TITLE_CASE_TO_ENUM.get(lowered)
+
 
 def resolve_slot_for_booking(slot_id, appointment_time):
     """
@@ -32,7 +81,7 @@ def resolve_slot_for_booking(slot_id, appointment_time):
 
         response = execute_with_retry(
             supabase
-            .table("time_slot")
+            .table("time_slots")
             .select("*")
             .eq("slot_id", slot_id)
         )
@@ -48,7 +97,7 @@ def resolve_slot_for_booking(slot_id, appointment_time):
 
     response = execute_with_retry(
         supabase
-        .table("time_slot")
+        .table("time_slots")
         .select("*")
         .order("slot_start", desc=False)
     )
@@ -67,8 +116,8 @@ def is_slot_closed_for_date(appointment_date):
     """
     response = execute_with_retry(
         supabase
-        .table("clinic_schedule")
-        .select("is_enabled, reason")
+        .table("clinic_schedules")
+        .select("is_enabled, closure_reason")
         .eq("working_date", appointment_date)
         .limit(1)
     )
@@ -84,25 +133,89 @@ def is_slot_closed_for_date(appointment_date):
 def get_max_students_per_slot():
     """
     Capacity per slot comes from the global clinic_appointment_settings
-    row's max_student_per_slot; falls back to 10 — the value the rest
+    row's max_students_per_slot; falls back to 10 — the value the rest
     of the codebase (clinic_schedule.py's preview endpoint) has always
     hardcoded as the default.
     """
     response = execute_with_retry(
         supabase
         .table("clinic_appointment_settings")
-        .select("max_student_per_slot")
+        .select("max_students_per_slot")
         .limit(1)
     )
 
     rows = response.data or []
 
     try:
-        configured = int(rows[0].get("max_student_per_slot"))
+        configured = int(rows[0].get("max_students_per_slot"))
     except (TypeError, ValueError, IndexError):
         configured = 10
 
     return max(configured, 0) or 10
+
+
+def resolve_changed_by_admin_id(user):
+    """
+    Resolve the admin_id to record on a status change from the
+    authenticated user (g.user). Tries, in order:
+      1. exact email match against admin.email
+      2. username match (local part of the email)
+      3. any admin row (system-level fallback)
+    Returns None when no admin can be resolved.
+
+    Mirrors the changed_by auto-resolution in
+    update_appointment_status, plus an "any admin" fallback for
+    self-service actions like student cancellations where the
+    caller is not an admin.
+    """
+    email = (user or {}).get("email")
+
+    if not email:
+        return None
+
+    email = str(email).strip().lower()
+
+    # 1. Try to find admin by email
+    admin_response = execute_with_retry(
+        supabase
+        .table("admin_accounts")
+        .select("admin_id")
+        .eq("email", email)
+        .limit(1)
+    )
+
+    rows = admin_response.data or []
+
+    if rows:
+        return rows[0].get("admin_id")
+
+    # 2. Fallback: match by username (local part of email)
+    local_part = email.split("@")[0] if "@" in email else email
+
+    admin_response = execute_with_retry(
+        supabase
+        .table("admin_accounts")
+        .select("admin_id")
+        .eq("username", local_part)
+        .limit(1)
+    )
+
+    rows = admin_response.data or []
+
+    if rows:
+        return rows[0].get("admin_id")
+
+    # 3. Fallback: any admin row
+    admin_response = execute_with_retry(
+        supabase
+        .table("admin_accounts")
+        .select("admin_id")
+        .limit(1)
+    )
+
+    rows = admin_response.data or []
+
+    return rows[0].get("admin_id") if rows else None
 
 
 # ============================================================
@@ -123,7 +236,7 @@ def get_appointments():
 
         query = (
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("*")
         )
 
@@ -182,7 +295,7 @@ def get_appointment(appointment_id):
 
         response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("*")
             .eq(
                 "appointment_id",
@@ -246,7 +359,7 @@ def get_time_slots():
 
         slot_query = (
             supabase
-            .table("time_slot")
+            .table("time_slots")
             .select("*")
         )
 
@@ -270,7 +383,7 @@ def get_time_slots():
 
         appointment_query = (
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("*")
         )
 
@@ -301,14 +414,14 @@ def get_time_slots():
         )
 
         # ----------------------------------------------------
-        # Group appointments (as bookings) by slot_id
+        # Group appointments (as bookings) by time_slot_id
         # ----------------------------------------------------
 
         bookings_by_slot = {}
 
         for appointment in appointments:
 
-            slot_id = appointment.get("slot_id")
+            slot_id = appointment.get("time_slot_id")
 
             # build_student_lookup() keys students by
             # normalize_student_id(), so normalize the raw id here too.
@@ -337,7 +450,11 @@ def get_time_slots():
                 "dept": student.get("dept", "-"),
                 "sex": student.get("sex", "-"),
                 "reason": reason_row.get("description") or "-",
-                "status": status_row.get("new_status") or "Pending",
+                # Display label from the lowercase enum ("pending" -> "Pending").
+                # "Pending" here is a display-only default — it is never written
+                # to the DB (the enum stores lowercase "pending").
+                "status": (_STATUS_LABELS.get(status_row.get("new_status"))
+                           or "Pending"),
                 "bookedAt": format_date_time(
                     appointment.get("booked_at")
                 )
@@ -411,7 +528,7 @@ def get_appointment_status(appointment_id):
 
         response = execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .select("*")
             .eq(
                 "appointment_id",
@@ -436,10 +553,14 @@ def get_appointment_status(appointment_id):
 
         latest = statuses[0]
 
+        # Canonicalize the stored enum value to lowercase (pending/completed/
+        # no_show/cancelled) for the response contract.
+        canonical_status = _normalize_status(latest.get("new_status"))
+
         return jsonify({
             "success": True,
             "appointment_id": appointment_id,
-            "status": latest.get("new_status"),
+            "status": canonical_status,
             "status_record": latest
         })
 
@@ -460,8 +581,8 @@ def get_appointment_status(appointment_id):
 #
 # Body:
 # {
-#     "new_status": "Confirmed",
-#     "remarks": "Appointment confirmed",
+#     "new_status": "completed",
+#     "remarks": "Appointment completed",
 #     "changed_by": 1
 # }
 # ============================================================
@@ -494,6 +615,17 @@ def update_appointment_status(appointment_id):
                 "error": "new_status is required"
             }), 400
 
+        # Validate/coerce the status against the 4-value enum. Never let an
+        # invalid value (e.g. the removed "Confirmed") reach the enum column,
+        # which would surface as a PGRST 500.
+        new_status = _normalize_status(new_status)
+        if new_status not in _VALID_STATUSES:
+            return jsonify({
+                "success": False,
+                "error": f"Invalid status '{data.get('new_status') or ''}'. "
+                         f"Must be one of: {', '.join(sorted(_VALID_STATUSES))}"
+            }), 400
+
         # Auto-resolve changed_by from authenticated admin user
         # g.user.email is set by require_admin (via require_auth)
         changed_by = None
@@ -502,7 +634,7 @@ def update_appointment_status(appointment_id):
             # Try to find admin by email
             admin_response = execute_with_retry(
                 supabase
-                .table("admin")
+                .table("admin_accounts")
                 .select("admin_id")
                 .eq("email", admin_email)
                 .maybe_single()
@@ -514,7 +646,7 @@ def update_appointment_status(appointment_id):
                 local_part = admin_email.split("@")[0] if "@" in admin_email else admin_email
                 admin_response = execute_with_retry(
                     supabase
-                    .table("admin")
+                    .table("admin_accounts")
                     .select("admin_id")
                     .eq("username", local_part)
                     .maybe_single()
@@ -534,7 +666,7 @@ def update_appointment_status(appointment_id):
 
         appointment_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("appointment_id")
             .eq(
                 "appointment_id",
@@ -551,7 +683,7 @@ def update_appointment_status(appointment_id):
 
         previous_response = execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .select("new_status")
             .eq(
                 "appointment_id",
@@ -575,15 +707,15 @@ def update_appointment_status(appointment_id):
 
         status_data = {
             "appointment_id": appointment_id,
-            "old_status": previous_status,
+            "previous_status": previous_status,
             "new_status": new_status,
             "remarks": remarks,
-            "changed_by": changed_by
+            "changed_by_admin_id": changed_by
         }
 
         response = execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .insert(status_data)
         )
 
@@ -621,7 +753,7 @@ def update_appointment_status(appointment_id):
 # }
 #
 # Creates the appointment row and seeds an initial
-# "Pending" status entry so the admin panel sees it.
+# "pending" status entry so the admin panel sees it.
 #
 # Server-side validations (all return the standard
 # {"success": false, "error": ...} envelope):
@@ -630,7 +762,7 @@ def update_appointment_status(appointment_id):
 #   - 400 when a clinic_schedule override marks the date
 #     closed (is_enabled = false)
 #   - 409 when the slot is at capacity
-#     (clinic_appointment_settings.max_student_per_slot)
+#     (clinic_appointment_settings.max_students_per_slot)
 #   - 409 when the same student already holds an ACTIVE
 #     appointment in that same slot/date
 # ============================================================
@@ -679,7 +811,7 @@ def create_appointment():
         #   1. slot exists (by slot_id, or matched by time)
         #   2. date isn't closed via a clinic_schedule override
         #   3. slot not at capacity (clinic_appointment_settings
-        #      .max_student_per_slot)
+        #      .max_students_per_slot)
         #   4. no duplicate active booking for this student+slot
         #
         # NOTE: Supabase gives us no transaction here, so the
@@ -710,9 +842,9 @@ def create_appointment():
 
         existing_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("appointment_id, student_id")
-            .eq("slot_id", slot_id)
+            .eq("time_slot_id", slot_id)
             .eq("appointment_date", appointment_date)
         )
 
@@ -764,16 +896,16 @@ def create_appointment():
         normalized_student_id = normalize_student_id(student_id)
         appointment_data = {
             "student_id": normalized_student_id,
-            "slot_id": slot_id,
+            "time_slot_id": slot_id,
             "appointment_date": appointment_date,
             "appointment_time": appointment_time,
             "reason_id": data.get("reason_id"),
-            "purpose": data.get("purpose")
+            "appointment_purpose": data.get("purpose")
         }
 
         response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .insert(appointment_data)
         )
 
@@ -786,16 +918,17 @@ def create_appointment():
 
         new_appointment = response.data[0]
 
-        # Seed the initial status so it shows up as "Pending" for staff.
+        # Seed the initial status so it shows up for staff. The db stores the
+        # lowercase enum value "pending" — never title-case "Pending".
         execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .insert({
                 "appointment_id": new_appointment.get("appointment_id"),
-                "old_status": None,
-                "new_status": "Pending",
+                "previous_status": None,  # NULL on first insert
+                "new_status": "pending",
                 "remarks": "Booked by student",
-                "changed_by": data.get("changed_by")
+                "changed_by_admin_id": data.get("changed_by")
             })
         )
 
@@ -823,7 +956,7 @@ def create_appointment():
 # Allows a student to cancel their own appointment.
 # Requires authentication; the student can only cancel
 # their own appointments (verified by student_id match).
-# Updates the status to "Cancelled" with a remark.
+# Updates the status to "cancelled" with a remark.
 # ============================================================
 
 @appointment_bp.route(
@@ -838,7 +971,7 @@ def cancel_appointment(appointment_id):
         # Get the appointment to check ownership
         appointment_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("appointment_id, student_id")
             .eq("appointment_id", appointment_id)
             .maybe_single()
@@ -852,8 +985,10 @@ def cancel_appointment(appointment_id):
 
         appointment = appointment_response.data
 
-        # Verify ownership: normalize both IDs for comparison
-        # g.user.email is set by require_auth; student_id comes from email local-part
+        # Verify ownership: normalize both IDs for comparison.
+        # Resolve the caller's student_id authoritatively from `app_accounts`
+        # (via the verified g.user). Fall back to the email local-part guess
+        # only if resolution failed (Blockers C).
         student_email = g.user.get("email")
         if not student_email:
             return jsonify({
@@ -861,9 +996,11 @@ def cancel_appointment(appointment_id):
                 "error": "Unable to verify student identity"
             }), 403
 
-        # Extract student_id from email (local part before @)
-        token_student_id = student_email.split("@")[0] if "@" in student_email else student_email
-        appointment_student_id = appointment.get("student_id")
+        # Primary: authoritative student_id from app_accounts.
+        token_student_id = resolve_student_id(g.user)
+        # Last-resort fallback: email local part.
+        if not token_student_id and "@" in student_email:
+            token_student_id = student_email.split("@")[0]
 
         if normalize_student_id(token_student_id) != normalize_student_id(appointment.get("student_id")):
             return jsonify({
@@ -874,7 +1011,7 @@ def cancel_appointment(appointment_id):
         # Check if already cancelled
         status_response = execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .select("new_status")
             .eq("appointment_id", appointment_id)
             .order("changed_at", desc=True)
@@ -888,18 +1025,32 @@ def cancel_appointment(appointment_id):
                 "error": "Appointment is already cancelled"
             }), 400
 
-        # Insert cancelled status
-        # Use admin_id=1 (admintest) as the system admin for student cancellations
-        # since changed_by expects a valid admin_id (bigint FK to admin table)
+        # Capture the true previous status (the latest row before this cancel),
+        # so previous_status is accurate rather than a hardcoded default.
+        previous_status = statuses[0].get("new_status") if statuses else None
+
+        # Insert cancelled status, resolving the admin who processed
+        # the cancellation from the authenticated user (email ->
+        # username -> any admin), so changed_by_admin_id is always a valid
+        # admin_id FK to admin_accounts.
+        changed_by = resolve_changed_by_admin_id(g.user)
+
+        if changed_by is None:
+            return jsonify({
+                "success": False,
+                "error": "Unable to determine admin identity (changed_by)"
+            }), 400
+
+        # The enum stores the lowercase value "cancelled" — never title-case.
         execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .insert({
                 "appointment_id": appointment_id,
-                "old_status": "Pending",  # We don't track previous status here
-                "new_status": "Cancelled",
+                "previous_status": previous_status,
+                "new_status": "cancelled",
                 "remarks": "Cancelled by student",
-                "changed_by": 1
+                "changed_by_admin_id": changed_by
             })
         )
 
