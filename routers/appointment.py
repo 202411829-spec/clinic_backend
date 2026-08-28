@@ -67,29 +67,154 @@ def _normalize_status(status):
     return _TITLE_CASE_TO_ENUM.get(raw) or _TITLE_CASE_TO_ENUM.get(lowered)
 
 
-def resolve_slot_for_booking(slot_id, appointment_time):
+def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
     """
     Resolve the target time_slot row for a booking, mirroring how
     GET /appointments/slots relates bookings to time_slot rows.
 
-    If an explicit slot_id was sent, use it directly. Otherwise
-    fall back to matching a slot whose slot_start equals the
-    requested appointment_time ("HH:MM"). Returns None when no
-    slot matches.
+    Date-aware: for dates without a clinic_schedules override the GET
+    endpoint returns VIRTUAL slots (negative slot_id). This resolver
+    auto-materializes a real schedule + time_slots for that date so
+    virtual bookings can succeed.
+
+    Logic:
+      1) If slot_id > 0, lookup by slot_id as before. If found return it
+         (don't 400 just for schedule/date mismatch).
+      2) If slot_id is negative/virtual or not found, and appointment_date
+         is provided: look up clinic_schedules for that date. If no row
+         exists, CREATE one on-demand from get_default_settings() and
+         materialize_time_slots(), then find slot by appointment_time.
+         If override exists but has no time_slots, materialize if enabled
+         else return None (clinic closed).
+      3) Fallback to matching by appointment_time across all slots.
+         Returns None when no slot matches.
     """
-    if slot_id:
+    # 1) Real slot_id path
+    if slot_id is not None:
+        try:
+            sid_int = int(slot_id)
+        except (TypeError, ValueError):
+            sid_int = None
+        if sid_int is not None and sid_int > 0:
+            response = execute_with_retry(
+                supabase
+                .table("time_slots")
+                .select("*")
+                .eq("slot_id", sid_int)
+            )
+            rows = response.data or []
+            if rows:
+                return rows[0]
+            # not found -> fall through to date-aware handling
+        elif sid_int is not None and sid_int < 0:
+            # virtual slot -> must resolve via date
+            pass
+        else:
+            # slot_id is 0 or unparseable -> treat as not provided
+            pass
+        # if sid_int is None (e.g. slot_id is string non-int) still fall through
 
-        response = execute_with_retry(
-            supabase
-            .table("time_slots")
-            .select("*")
-            .eq("slot_id", slot_id)
-        )
+    # 2) Date-aware virtual / missing slot handling
+    if appointment_date:
+        try:
+            from routers.clinic_schedule import (
+                get_schedule_for_date,
+                get_default_settings,
+                materialize_time_slots,
+            )
+        except Exception:
+            get_schedule_for_date = None  # type: ignore
+            get_default_settings = None  # type: ignore
+            materialize_time_slots = None  # type: ignore
 
-        rows = response.data or []
+        if get_schedule_for_date is not None:
+            override = get_schedule_for_date(appointment_date)
 
-        return rows[0] if rows else None
+            # Clinic explicitly closed -> let caller surface "Clinic is closed"
+            if override and override.get("is_enabled") is False:
+                return None
 
+            requested_start = str(appointment_time or "")[:5] if appointment_time else None
+
+            if override:
+                schedule_id = override.get("schedule_id")
+                # Try to find matching slot in this schedule
+                if requested_start:
+                    resp = execute_with_retry(
+                        supabase
+                        .table("time_slots")
+                        .select("*")
+                        .eq("schedule_id", schedule_id)
+                    )
+                    rows = resp.data or []
+                    for slot in rows:
+                        if str(slot.get("slot_start") or "")[:5] == requested_start:
+                            return slot
+                    # No match but schedule exists and is enabled -> maybe
+                    # materialization missing (legacy row with zero children)
+                    if not rows and materialize_time_slots is not None:
+                        try:
+                            materialize_time_slots(override)
+                        except Exception:
+                            pass
+                        resp2 = execute_with_retry(
+                            supabase
+                            .table("time_slots")
+                            .select("*")
+                            .eq("schedule_id", schedule_id)
+                        )
+                        rows2 = resp2.data or []
+                        for slot in rows2:
+                            if str(slot.get("slot_start") or "")[:5] == requested_start:
+                                return slot
+                # still not found -> will fall through to generic search / None
+            else:
+                # No override -> auto-materialize a real schedule for this date
+                if get_default_settings is not None and materialize_time_slots is not None:
+                    settings = get_default_settings()
+                    if settings:
+                        new_row_data = {
+                            "working_date": appointment_date,
+                            "work_start": settings.get("work_start"),
+                            "work_end": settings.get("work_end"),
+                            "break_start": settings.get("break_start"),
+                            "break_end": settings.get("break_end"),
+                            "is_enabled": True,
+                        }
+                        try:
+                            insert_resp = execute_with_retry(
+                                supabase
+                                .table("clinic_schedules")
+                                .insert(new_row_data)
+                            )
+                            new_rows = insert_resp.data or []
+                        except Exception:
+                            new_rows = []
+                        # Race: another request may have created it concurrently
+                        if not new_rows:
+                            override_retry = get_schedule_for_date(appointment_date)
+                            if override_retry:
+                                new_rows = [override_retry]
+                        if new_rows:
+                            new_schedule = new_rows[0]
+                            try:
+                                materialize_time_slots(new_schedule)
+                            except Exception:
+                                pass
+                            schedule_id = new_schedule.get("schedule_id")
+                            if requested_start and schedule_id:
+                                resp = execute_with_retry(
+                                    supabase
+                                    .table("time_slots")
+                                    .select("*")
+                                    .eq("schedule_id", schedule_id)
+                                )
+                                for slot in (resp.data or []):
+                                    if str(slot.get("slot_start") or "")[:5] == requested_start:
+                                        return slot
+                # if settings missing, cannot materialize -> fall through
+
+    # 3) Fallback: match by appointment_time across all slots (legacy behavior)
     if not appointment_time:
         return None
 
@@ -966,21 +1091,22 @@ def create_appointment():
         # a DB-level constraint/exclusion would be the real fix.
         # ----------------------------------------------------
 
+        if is_slot_closed_for_date(appointment_date):
+            return jsonify({
+                "success": False,
+                "error": "Clinic is closed on the requested date"
+            }), 400
+
         slot = resolve_slot_for_booking(
             data.get("slot_id"),
-            appointment_time
+            appointment_time,
+            appointment_date
         )
 
         if not slot:
             return jsonify({
                 "success": False,
                 "error": "Time slot not found for the requested date/time"
-            }), 400
-
-        if is_slot_closed_for_date(appointment_date):
-            return jsonify({
-                "success": False,
-                "error": "Clinic is closed on the requested date"
             }), 400
 
         slot_id = slot.get("slot_id")
