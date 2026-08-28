@@ -5,7 +5,7 @@ import NavIcon from "./NavIcon.jsx";
 import {
   recentLogbookEntries as sampleEntries,
 } from "../../data/dashboardSample.js";
-import { logbookApi, referenceApi } from "../../lib/api.js";
+import { logbookApi } from "../../lib/api.js";
 
 function mapEntry(r) {
   return {
@@ -21,36 +21,24 @@ function mapEntry(r) {
   };
 }
 
-export default function LogbookPanel() {
+export default function LogbookPanel({
+  reasonRecords = [],
+  medicineRecords = [],
+}) {
   const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
-  const [reasonRecords, setReasonRecords] = useState([]);
-  const [medicineRecords, setMedicineRecords] = useState([]);
 
   // Derived for dropdowns
   const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
   const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
 
-  // Recent visits for the dashboard widget + real reason dropdown.
+  // Recent visits for the dashboard widget. Reasons/medicines are provided
+  // by the parent Dashboard via props (fetched once, shared).
   useEffect(() => {
     logbookApi
       .list()
       .then((res) => setEntries((res?.logbook || []).slice(0, 5).map(mapEntry)))
       .catch((err) => console.error("Failed to load logbook:", err));
-    referenceApi
-      .reasons()
-      .then((res) => {
-        const list = (res?.reasons || []).filter((r) => r.description && r.description !== "-");
-        if (list.length) setReasonRecords(list);
-      })
-      .catch(() => {});
-    referenceApi
-      .medicines()
-      .then((res) => {
-        const list = (res?.medicines || []).filter((m) => m.medicine_name);
-        if (list.length) setMedicineRecords(list);
-      })
-      .catch(() => {});
   }, []);
 
   // walk-in form visibility — hidden by default, opened by the

@@ -1,9 +1,9 @@
 // src/components/admin/AppointmentsPanel.jsx
-import { useEffect, useRef, useState } from "react";
-import NavIcon from "./NavIcon";
-import StatusBadge from "./StatusBadge";
-import StatusMenu from "./StatusMenu";
-import TimeBlockEditPopover from "./TimeBlockEditPopover";
+import { useEffect, useRef, useState, useMemo } from "react";
+import NavIcon from "./NavIcon.jsx";
+import StatusBadge from "./StatusBadge.jsx";
+import StatusMenu from "./StatusMenu.jsx";
+import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { appointmentsApi } from "../../lib/api.js";
 
 function todayYMD() {
@@ -181,31 +181,66 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
           </table>
         </div>
       )}
+
+      {expanded && slot.bookings.length === 0 && (
+        <div className="border-t border-gray-100 px-4 py-6 text-center text-sm text-gray-400">
+          No bookings match the current filters.
+        </div>
+      )}
     </div>
   );
 }
 
-export default function AppointmentsPanel() {
+export default function AppointmentsPanel({ reasonRecords = [] }) {
   const [slots, setSlots] = useState([]);
   const [dateLabel, setDateLabel] = useState("");
   const [openEditId, setOpenEditId] = useState(null);
 
-  // Today's real slots for the dashboard widget.
+  // Search and filter state
+  const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("All Department");
+  const [reasonFilter, setReasonFilter] = useState("All Reason");
+
+  // Recent slots for the dashboard widget. Reasons are provided by the parent
+  // Dashboard via props (fetched once, shared).
   useEffect(() => {
     appointmentsApi
       .slots(todayYMD())
-      .then((res) => {
-        setSlots(res?.slots || []);
-        setDateLabel(
-          new Date().toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })
-        );
-      })
-      .catch((err) => console.error("Failed to load today's slots:", err));
+      .then((res) => setSlots(res?.slots || []))
+      .catch((err) => console.error("Failed to load slots:", err));
   }, []);
+
+  // Derive departments and reasons from loaded slots
+  const departments = useMemo(() => {
+    const set = new Set(slots.flatMap((s) => s.bookings.map((b) => b.dept)));
+    return ["All Department", ...Array.from(set)];
+  }, [slots]);
+
+  const reasons = useMemo(() => {
+    const set = new Set(slots.flatMap((s) => s.bookings.map((b) => b.reason)));
+    return ["All Reason", ...Array.from(set)];
+  }, [slots]);
+
+  // Derive real reason records for the dropdown (with reason_id)
+  const reasonRecordsForDropdown = useMemo(() => {
+    return reasonRecords.map((r) => ({ value: r.reason_id, label: r.description }));
+  }, [reasonRecords]);
+
+  const filteredSlots = useMemo(() => {
+    return slots.map((slot) => {
+      const filteredBookings = slot.bookings.filter((b) => {
+        const q = search.trim().toLowerCase();
+        const matchesSearch =
+          !q ||
+          b.name.toLowerCase().includes(q) ||
+          b.dept.toLowerCase().includes(q);
+        const matchesDept = department === "All Department" || b.dept === department;
+        const matchesReason = reasonFilter === "All Reason" || b.reason === reasonFilter;
+        return matchesSearch && matchesDept && matchesReason;
+      });
+      return { ...slot, bookings: filteredBookings };
+    });
+  }, [slots, search, department, reasonFilter]);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     setSlots((prev) =>
@@ -254,31 +289,54 @@ export default function AppointmentsPanel() {
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
             <NavIcon name="calendar" className="w-4 h-4" />
           </span>
-          <h2 className="font-bold text-gray-800 text-sm md:text-base">
-            Appointments
-          </h2>
+          <div>
+            <h2 className="font-bold text-gray-800 text-sm md:text-base leading-tight">
+              Appointments
+            </h2>
+            <p className="text-xs text-gray-400 leading-tight">
+              Today's appointment slots
+            </p>
+          </div>
         </div>
         <span className="text-xs font-semibold text-gray-500">
           {dateLabel || "Today"}
         </span>
       </div>
 
+      {/* search + filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
           <NavIcon name="user" className="w-4 h-4 shrink-0" />
           <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by surname, name, student ID, or course..."
             className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Department</option>
+        <select
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
+        >
+          {departments.map((d) => (
+            <option key={d}>{d}</option>
+          ))}
         </select>
         <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
           <option>All Courses</option>
         </select>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Reason</option>
+        <select
+          value={reasonFilter}
+          onChange={(e) => setReasonFilter(e.target.value)}
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
+        >
+          <option value="All Reason">All Reason</option>
+          {reasonRecordsForDropdown.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -288,15 +346,13 @@ export default function AppointmentsPanel() {
         </div>
       )}
 
-      {slots.map((slot) => (
+      {filteredSlots.map((slot) => (
         <SlotGroup
           key={slot.id}
           slot={slot}
           onStatusChange={handleStatusChange}
           editing={openEditId === slot.id}
-          onToggleEdit={(id) =>
-            setOpenEditId((cur) => (cur === id ? null : id))
-          }
+          onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
           onSaveTimeBlock={handleSaveTimeBlock}
           onDeleteTimeBlock={handleDeleteTimeBlock}
         />
