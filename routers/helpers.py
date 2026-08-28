@@ -1,5 +1,6 @@
 import time
 import socket
+import threading
 
 from datetime import date
 from types import SimpleNamespace
@@ -15,6 +16,12 @@ except ImportError:
     PostgrestAPIError = None
 
 from database import supabase
+
+# Module-level TTL cache for reference-data lookups.
+# Keys are (function_name, *args) → (cached_value, fetched_at).
+_REFERENCE_CACHE_TTL = 60  # seconds
+_reference_cache: dict[tuple, tuple[object, float]] = {}
+_reference_cache_lock = threading.Lock()
 
 # Sentinel returned by execute_with_retry when a .maybe_single() query
 # finds no matching row.  postgrest-py returns None from .execute() in
@@ -210,6 +217,16 @@ def get_lookup(table, id_column):
     Fetch a whole table and return it as a dict keyed by its id
     column, e.g. {1: {...row...}, 2: {...row...}}
     """
+    cache_key = ("get_lookup", table, id_column)
+    now = time.time()
+
+    with _reference_cache_lock:
+        cached = _reference_cache.get(cache_key)
+        if cached is not None:
+            value, fetched_at = cached
+            if now - fetched_at < _REFERENCE_CACHE_TTL:
+                return value
+
     response = execute_with_retry(
         supabase
         .table(table)
@@ -217,8 +234,12 @@ def get_lookup(table, id_column):
     )
 
     rows = response.data or []
+    result = {row[id_column]: row for row in rows}
 
-    return {row[id_column]: row for row in rows}
+    with _reference_cache_lock:
+        _reference_cache[cache_key] = (result, time.time())
+
+    return result
 
 
 def build_student_lookup():
@@ -237,6 +258,15 @@ def build_student_lookup():
     The raw (unmodified) student_id is still preserved in each
     row's "student_id" field for display/response purposes.
     """
+    cache_key = ("build_student_lookup",)
+    now = time.time()
+
+    with _reference_cache_lock:
+        cached = _reference_cache.get(cache_key)
+        if cached is not None:
+            value, fetched_at = cached
+            if now - fetched_at < _REFERENCE_CACHE_TTL:
+                return value
 
     response = execute_with_retry(
         supabase
@@ -274,6 +304,9 @@ def build_student_lookup():
             "deptCourse": dept_course,
             "year_level": row.get("year_level"),
         }
+
+    with _reference_cache_lock:
+        _reference_cache[cache_key] = (students, time.time())
 
     return students
 

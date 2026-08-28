@@ -359,10 +359,29 @@ def get_appointments():
     try:
         requested_date = request.args.get("date")
 
+        # Optional pagination. When omitted, preserve the existing
+        # behaviour of returning every matching row (the student
+        # UpcomingAppointmentPanel depends on fetching all of a
+        # student's future appointments across dates to find the
+        # nearest one).
+        try:
+            limit = int(request.args.get("limit", 0))
+        except (TypeError, ValueError):
+            limit = 0
+        if limit < 0:
+            limit = 0
+
+        try:
+            page = int(request.args.get("page", 1))
+        except (TypeError, ValueError):
+            page = 1
+        if page < 1:
+            page = 1
+
         query = (
             supabase
             .table("appointments")
-            .select("*")
+            .select("*", count="exact")
         )
 
         if requested_date:
@@ -371,13 +390,20 @@ def get_appointments():
                 requested_date
             )
 
-        response = execute_with_retry(
+        query = (
             query
             .order("appointment_date", desc=False)
             .order("appointment_time", desc=False)
         )
 
+        if limit:
+            start = (page - 1) * limit
+            query = query.range(start, start + limit - 1)
+
+        response = execute_with_retry(query)
+
         appointments = response.data or []
+        total = response.count if limit else len(appointments)
 
         # Join latest status for each appointment
         appointment_ids = [a["appointment_id"] for a in appointments]
@@ -387,11 +413,15 @@ def get_appointments():
             status_row = latest_status_map.get(appt["appointment_id"])
             appt["current_status"] = status_row.get("new_status") if status_row else None
 
-        return jsonify({
+        payload = {
             "success": True,
             "count": len(appointments),
             "appointments": appointments
-        })
+        }
+        if limit:
+            payload["total"] = total
+
+        return jsonify(payload)
 
     except Exception as e:
 

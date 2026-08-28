@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 
+from postgrest import APIError as PostgrestAPIError
+
 from database import supabase
 # Shared helpers live in routers/helpers.py — this module used to
 # carry its own near-identical copies of the retry wrapper and
@@ -199,6 +201,180 @@ def get_all_reference_data():
 
 
 # ============================================================
+# LOGBOOK LIST — SQL-SCOPED FILTERING + PAGINATION
+#
+# The list endpoint used to pull the ENTIRE `visit_logs` table
+# into Python, then join/filter/paginate in memory. That made the
+# default "show the latest page" request read every row ever
+# logged. Filtering and pagination now happen in Postgres:
+#
+#   * date_from/date_to  -> gte/lte on appointments.appointment_date
+#   * reason_id          -> eq on appointments.reason_id
+#   * search             -> ilike across student/master/medicine fields
+#   * page/page_size     -> .range() offset/limit, with count='exact'
+#
+# Only the requested page of `visit_logs` is fetched; display names
+# are then resolved from the cached lookup helpers and a per-page
+# appointments / visit_log_medicines read (never a whole-table pull).
+# ============================================================
+
+def _scope_appointment_ids(date_from, date_to, reason_id):
+    """
+    Return the list of appointment_ids that fall within the
+    requested date window and reason. Returns None when no
+    date/reason restriction is given (caller must not filter
+    by appointment_id in that case).
+    """
+    if not date_from and not date_to and not reason_id:
+        return None
+
+    query = supabase.table("appointments").select("appointment_id")
+
+    if date_from:
+        query = query.gte("appointment_date", date_from)
+    if date_to:
+        query = query.lte("appointment_date", date_to)
+    if reason_id:
+        query = query.eq("reason_id", reason_id)
+
+    response = execute_with_retry(query)
+    return [row["appointment_id"] for row in (response.data or [])]
+
+
+def _collected_ids(query):
+    response = execute_with_retry(query)
+    return [row["appointment_id"] for row in (response.data or [])]
+
+
+def _search_appointment_ids(scope, search):
+    """
+    Return the appointment_ids whose joined row matches the free-text
+    `search` term, intersected with the given date/reason `scope`
+    (list of appointment_ids or None). The search mirrors the fields
+    the UI searches: student name / student_id / dept / course,
+    log complaint, walk-in name / dept-course, and dispensed medicine.
+    Each term is pushed to Postgres as an ilike so only matching logs
+    are ever pulled.
+    """
+    like = f"%{search}%"
+    matched = set()
+
+    # a) Registered students: match the flattened masterlist view, then
+    #    map back to appointments (and any logs that carry a student_id).
+    student_response = execute_with_retry(
+        supabase
+        .table("student_masterlist")
+        .select("student_id")
+        .or_(
+            f"full_name.ilike.{like},"
+            f"student_id.ilike.{like},"
+            f"department_name.ilike.{like},"
+            f"course_name.ilike.{like}"
+        )
+    )
+    student_ids = [row["student_id"] for row in (student_response.data or [])]
+    if student_ids:
+        matched.update(
+            _collected_ids(
+                supabase.table("appointments")
+                .select("appointment_id")
+                .in_("student_id", student_ids)
+            )
+        )
+        matched.update(
+            _collected_ids(
+                supabase.table("visit_logs")
+                .select("appointment_id")
+                .in_("student_id", student_ids)
+            )
+        )
+
+    # b) Log-level text: complaint, walk-in name, walk-in dept/course.
+    matched.update(
+        _collected_ids(
+            supabase.table("visit_logs")
+            .select("appointment_id")
+            .or_(
+                f"complaint.ilike.{like},"
+                f"walk_in_name.ilike.{like},"
+                f"walk_in_department_course.ilike.{like}"
+            )
+        )
+    )
+
+    # c) Dispensed medicine (medicine_name snapshot on visit_log_medicines).
+    medicine_response = execute_with_retry(
+        supabase.table("visit_log_medicines")
+        .select("visit_log_id")
+        .ilike("medicine_name", like)
+    )
+    med_log_ids = [row["visit_log_id"] for row in (medicine_response.data or [])]
+    if med_log_ids:
+        matched.update(
+            _collected_ids(
+                supabase.table("visit_logs")
+                .select("appointment_id")
+                .in_("visit_log_id", med_log_ids)
+            )
+        )
+
+    if scope is not None:
+        scope_set = set(scope)
+        matched = {aid for aid in matched if aid in scope_set}
+
+    return list(matched)
+
+
+def _fetch_appointments_by_id(appointment_ids):
+    if not appointment_ids:
+        return {}
+    response = execute_with_retry(
+        supabase.table("appointments")
+        .select("*")
+        .in_("appointment_id", appointment_ids)
+    )
+    return {
+        row["appointment_id"]: row
+        for row in (response.data or [])
+    }
+
+
+def _fetch_log_medicines(visit_log_ids):
+    if not visit_log_ids:
+        return []
+    response = execute_with_retry(
+        supabase.table("visit_log_medicines")
+        .select("*")
+        .in_("visit_log_id", visit_log_ids)
+    )
+    return response.data or []
+
+
+def _count_scoped_logs(appointment_scope):
+    """
+    Return the exact number of visit_logs matching the given
+    appointment_id scope (None = every log). Used only to back-fill
+    the `total` for pages that fall past the end of the data (which
+    PostgREST rejects with a "range not satisfiable" error).
+    """
+    query = (
+        supabase.table("visit_logs")
+        .select("visit_log_id", count="exact")
+    )
+    if appointment_scope is not None:
+        query = query.in_("appointment_id", appointment_scope)
+
+    try:
+        # limit to 1 row; PostgREST still reports the exact total in
+        # Content-Range without us pulling every matching row.
+        response = execute_with_retry(query.range(0, 0))
+        return response.count if response.count is not None else 0
+    except PostgrestAPIError:
+        # no matching rows -> range(0,0) is unsatisfiable -> total is 0
+        return 0
+
+
+# ============================================================
 # GET ALL LOGBOOK ENTRIES (VISIT HISTORY)
 #
 # GET /logbook
@@ -218,7 +394,7 @@ def get_all_reference_data():
 def get_logbook():
 
     try:
-        # --- Parse query params ---
+        # --- Parse query params (same contract as before) ---
         search = request.args.get("search", "").strip()
         date_from = request.args.get("date_from")
         date_to = request.args.get("date_to")
@@ -226,25 +402,70 @@ def get_logbook():
         page = max(1, request.args.get("page", default=1, type=int))
         page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
 
-        # --- Fetch all logs first (we filter in Python after joining) ---
-        response = execute_with_retry(
-            supabase
-            .table("visit_logs")
-            .select("*")
+        # --- Scope candidate appointments by date/reason in SQL ---
+        appointment_scope = _scope_appointment_ids(date_from, date_to, reason_id)
+
+        # --- Free-text search also returns a scoped appointment list ---
+        if search:
+            appointment_scope = _search_appointment_ids(appointment_scope, search)
+
+        # Nothing matched the filters — short-circuit instead of querying.
+        if appointment_scope == []:
+            return jsonify({
+                "success": True,
+                "count": 0,
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "logbook": []
+            })
+
+        # --- Fetch only the requested page of logs (exact count) ---
+        start = (page - 1) * page_size
+        end = start + page_size - 1
+
+        logs_query = (
+            supabase.table("visit_logs")
+            .select("*", count="exact")
             .order("created_at", desc=True)
+            .range(start, end)
         )
+        if appointment_scope is not None:
+            logs_query = logs_query.in_("appointment_id", appointment_scope)
 
+        try:
+            response = execute_with_retry(logs_query)
+        except PostgrestAPIError as e:
+            # PostgREST rejects an out-of-range page with PGRST103
+            # ("range not satisfiable"). The old in-Python slice just
+            # returned an empty list, so replicate that here instead of
+            # surfacing a 500 — keeping the exact response contract.
+            code = getattr(e, "code", "") or ""
+            if code == "PGRST103" or "not satisfiable" in str(e):
+                total = _count_scoped_logs(appointment_scope)
+                return jsonify({
+                    "success": True,
+                    "count": 0,
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                    "logbook": []
+                })
+            raise
         logs = response.data or []
+        total = response.count if response.count is not None else len(logs)
 
-        (
-            appointments_by_id,
-            students_by_id,
-            reasons_by_id,
-            log_medicine_rows,
-            medicines_by_id
-        ) = get_all_reference_data()
+        # --- Resolve display names from cache + per-page reads ---
+        students_by_id = build_student_lookup()
+        reasons_by_id = build_reason_lookup()
+        medicines_by_id = build_medicine_lookup()
 
-        # --- Format all logs first ---
+        page_appointment_ids = [log.get("appointment_id") for log in logs]
+        appointments_by_id = _fetch_appointments_by_id(page_appointment_ids)
+
+        page_log_ids = [log.get("visit_log_id") for log in logs]
+        log_medicine_rows = _fetch_log_medicines(page_log_ids)
+
         formatted = [
             format_log_entry(
                 log,
@@ -257,65 +478,13 @@ def get_logbook():
             for log in logs
         ]
 
-        # --- Apply filters ---
-        def matches_search(entry):
-            if not search:
-                return True
-            s = search.lower()
-            return (
-                s in (entry.get("name") or "").lower()
-                or s in (entry.get("student_id") or "").lower()
-                or s in (entry.get("dept") or "").lower()
-                or s in (entry.get("course") or "").lower()
-                or s in (entry.get("complaint") or "").lower()
-                or s in (entry.get("medicine") or "").lower()
-            )
-
-        def matches_date(entry):
-            if not date_from and not date_to:
-                return True
-            # dateTime is in format "MM/DD/YYYY HH:MM"
-            dt_str = entry.get("dateTime") or ""
-            try:
-                if "/" in dt_str:
-                    date_part = dt_str.split(" ")[0]
-                    month, day, year = date_part.split("/")
-                    entry_date = f"{year}-{month}-{day}"
-                else:
-                    entry_date = dt_str[:10]
-            except Exception:
-                return False
-
-            if date_from and entry_date < date_from:
-                return False
-            if date_to and entry_date > date_to:
-                return False
-            return True
-
-        def matches_reason(entry):
-            if not reason_id:
-                return True
-            appt = appointments_by_id.get(entry.get("appointment_id"), {})
-            return appt.get("reason_id") == reason_id
-
-        filtered = [
-            e for e in formatted
-            if matches_search(e) and matches_date(e) and matches_reason(e)
-        ]
-
-        # --- Pagination ---
-        total = len(filtered)
-        start = (page - 1) * page_size
-        end = start + page_size
-        paginated = filtered[start:end]
-
         return jsonify({
             "success": True,
-            "count": len(paginated),
+            "count": len(formatted),
             "total": total,
             "page": page,
             "page_size": page_size,
-            "logbook": paginated
+            "logbook": formatted
         })
 
     except Exception as e:
@@ -343,11 +512,20 @@ def get_logbook_by_student(student_id):
 
     try:
 
+        sid = normalize_student_id(student_id)
+        if not sid:
+            return jsonify({
+                "success": True,
+                "student_id": student_id,
+                "count": 0,
+                "logbook": []
+            })
+
         appointment_response = execute_with_retry(
             supabase
             .table("appointments")
             .select("appointment_id")
-            .eq("student_id", student_id)
+            .eq("student_id", sid)
         )
 
         appointments = appointment_response.data or []
