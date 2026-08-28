@@ -9,6 +9,11 @@ try:
 except ImportError:
     httpx = None
 
+try:
+    from postgrest import APIError as PostgrestAPIError
+except ImportError:
+    PostgrestAPIError = None
+
 from database import supabase
 
 # Sentinel returned by execute_with_retry when a .maybe_single() query
@@ -126,6 +131,14 @@ def execute_with_retry(query, retries=5, delay=0.3):
             time.sleep(delay * (attempt + 1))  # small backoff
 
         except Exception as e:
+
+            # Handle postgrest APIError with code 204 ("Missing response")
+            # which is raised when .maybe_single() finds zero rows.
+            if PostgrestAPIError is not None and isinstance(e, PostgrestAPIError):
+                code = getattr(e, "code", None)
+                message = getattr(e, "message", "") or str(e)
+                if code == "204" or "Missing response" in message:
+                    return _EMPTY_RESPONSE
 
             if _looks_transient(e):
                 last_error = e

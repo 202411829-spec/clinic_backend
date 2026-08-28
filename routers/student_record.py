@@ -461,13 +461,13 @@ def get_medical_summary(student_id):
         supabase.table("emergency_contacts")
         .select("*")
         .eq("student_id", sid)
-        .maybe_single()
+        .limit(1)
     )
     medical_history = execute_with_retry(
         supabase.table("medical_histories")
         .select("*")
         .eq("student_id", sid)
-        .maybe_single()
+        .limit(1)
     )
 
     exams = execute_with_retry(
@@ -480,8 +480,8 @@ def get_medical_summary(student_id):
 
     return jsonify({
         "profile": profile.data,
-        "emergency_contact": emergency_contact.data if emergency_contact else None,
-        "medical_history": medical_history.data if medical_history else None,
+        "emergency_contact": emergency_contact.data[0] if emergency_contact.data else None,
+        "medical_history": medical_history.data[0] if medical_history.data else None,
         "years": years,
     })
 
@@ -523,7 +523,7 @@ def _upsert_by_student_id(table, student_id, payload):
         supabase.table(table)
         .select("*")
         .eq("student_id", student_id)
-        .maybe_single()
+        .limit(1)
     )
     if existing.data:
         # Find the PK column for the table.
@@ -535,7 +535,7 @@ def _upsert_by_student_id(table, student_id, payload):
         response = execute_with_retry(
             supabase.table(table)
             .update(payload)
-            .eq(pk, existing.data[pk])
+            .eq(pk, existing.data[0][pk])
         )
     else:
         payload["student_id"] = student_id
@@ -645,20 +645,20 @@ def update_student_profile(student_id):
         supabase.table("emergency_contacts")
         .select("*")
         .eq("student_id", sid)
-        .maybe_single()
+        .limit(1)
     )
     medical_history = execute_with_retry(
         supabase.table("medical_histories")
         .select("*")
         .eq("student_id", sid)
-        .maybe_single()
+        .limit(1)
     )
 
     return jsonify({
         "success": True,
         "data": {
             "profile": profile.data,
-            "emergency_contact": emergency_contact.data if emergency_contact else None,
-            "medical_history": medical_history.data if medical_history else None,
+            "emergency_contact": emergency_contact.data[0] if emergency_contact.data else None,
+            "medical_history": medical_history.data[0] if medical_history.data else None,
         },
     })
