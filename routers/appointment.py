@@ -394,6 +394,7 @@ def get_appointments():
             query
             .order("appointment_date", desc=False)
             .order("appointment_time", desc=False)
+            .order("appointment_id", desc=False)
         )
 
         if limit:

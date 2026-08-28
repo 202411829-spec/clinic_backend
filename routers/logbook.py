@@ -428,6 +428,7 @@ def get_logbook():
             supabase.table("visit_logs")
             .select("*", count="exact")
             .order("created_at", desc=True)
+            .order("visit_log_id", desc=True)
             .range(start, end)
         )
         if appointment_scope is not None:
