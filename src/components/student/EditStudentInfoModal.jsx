@@ -9,6 +9,21 @@ import { useRef, useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample";
+import { masterlistApi } from "../../lib/api.js";
+
+// Fallback (only used if the masterlist API lists fail to load) so the
+// modal still renders. IDs are the names themselves here — persistence won't
+// work in that edge case, but the real lists from the API carry real IDs.
+const fallbackDepartments = departmentOptions.map((name) => ({
+  department_id: name,
+  department_name: name,
+}));
+function fallbackCoursesForDept(deptName) {
+  return (courseOptionsByDept[deptName] || []).map((name) => ({
+    course_id: name,
+    course_name: name,
+  }));
+}
 
 const MEDICAL_CONDITIONS = [
   "Allergy",
@@ -86,18 +101,22 @@ function parseConditions(list = []) {
   return { conditions, allergySpecify };
 }
 
-function buildInitialForm(student) {
+function buildInitialForm(student, departments = [], courses = []) {
   const { lastName, firstName, middleName } = splitName(student.name);
-  const [department = "", course = ""] = (student.deptCourse || "")
-    .split("/")
-    .map((s) => s.trim());
+  const deptName = student.department || "";
+  const courseName = student.course || "";
+  const deptObj = departments.find((d) => d.department_name === deptName);
+  const courseObj = courses.find((c) => c.course_name === courseName);
   const { conditions, allergySpecify } = parseConditions(student.medicalConditions);
   const emergency = student.emergencyContact || {};
 
   return {
     studentNumber: student.studentNumber || "",
-    department,
-    course,
+    departmentId: deptObj ? deptObj.department_id : "",
+    courseId: courseObj ? courseObj.course_id : "",
+    // kept for legacy display / name resolution
+    department: deptName,
+    course: courseName,
     lastName,
     firstName,
     middleName,
@@ -121,20 +140,37 @@ function buildInitialForm(student) {
   };
 }
 
-function buildStudentFromForm(student, form, photoDataUrl) {
+function resolveDeptCourseName(departments, courses, deptId, courseId, fallbackDept, fallbackCourse) {
+  const deptObj = departments.find((d) => d.department_id === deptId);
+  const courseObj = courses.find((c) => c.course_id === courseId);
+  const deptName = deptObj ? deptObj.department_name : fallbackDept;
+  const courseName = courseObj ? courseObj.course_name : fallbackCourse;
+  return { deptName, courseName };
+}
+
+function buildStudentFromForm(student, form, photoDataUrl, departments, courses) {
   const name = `${form.lastName}, ${[form.firstName, form.middleName].filter(Boolean).join(" ")}`.trim();
   const conditions = form.conditions.map((c) =>
     c === "Allergy" ? (form.allergySpecify ? `Allergy: ${form.allergySpecify}` : "Allergy") : c
+  );
+
+  const { deptName, courseName } = resolveDeptCourseName(
+    departments,
+    courses,
+    form.departmentId,
+    form.courseId,
+    form.department,
+    form.course
   );
 
   return {
     ...student,
     name,
     studentNumber: form.studentNumber,
-    dept: form.department,
-    course: form.course,
+    dept: deptName,
+    course: courseName,
     deptCourse:
-      form.department && form.course ? `${form.department} / ${form.course}` : student.deptCourse,
+      deptName && courseName ? `${deptName} / ${courseName}` : student.deptCourse,
     birthday: fromDateInputValue(form.birthday) || student.birthday,
     sex: form.sex,
     civilStatus: form.civilStatus,
@@ -210,6 +246,8 @@ function mapToBackendPayload(student, form, photoDataUrl) {
     contact_number: updated.contactNumber,
     present_address: updated.presentAddress,
     photo: updated.photo || null,
+    department_id: form.departmentId ? Number(form.departmentId) : null,
+    course_id: form.courseId ? Number(form.courseId) : null,
     emergency_contact: {
       contact_name: ec.name,
       relationship: ec.relationship,
@@ -221,9 +259,8 @@ function mapToBackendPayload(student, form, photoDataUrl) {
 }
 
 const STEP1_REQUIRED = [
-  "studentNumber",
-  "department",
-  "course",
+  "departmentId",
+  "courseId",
   "lastName",
   "firstName",
   "birthday",
@@ -352,10 +389,9 @@ function StepIndicator({ step }) {
 
 /* ---------------------------- step 1: personal information ---------------------------- */
 
-function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto, onNext, touched }) {
+function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto, onNext, touched, departments, courses, onDepartmentChange }) {
   const age = computeAge(form.birthday);
-  const courses = form.department ? courseOptionsByDept[form.department] ?? [] : [];
-  const err = (k) => touched && String(form[k] || "").trim() === "";
+  const err = (k) => touched && String(form[k] ?? "").trim() === "";
   const errEmergency = (k) => touched && String(form.emergency[k] || "").trim() === "";
 
   return (
@@ -405,36 +441,37 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                 className={inputClass}
                 placeholder="e.g. 20230000"
                 value={form.studentNumber}
-                onChange={(e) => update({ studentNumber: e.target.value })}
+                readOnly
+                disabled
               />
             </Field>
-            <Field label="Department" required error={err("department")}>
+            <Field label="Department" required error={err("departmentId")}>
               <select
                 className={`${inputClass} bg-white`}
-                value={form.department}
-                onChange={(e) => update({ department: e.target.value, course: "" })}
+                value={form.departmentId || ""}
+                onChange={(e) => onDepartmentChange(e.target.value)}
               >
                 <option value="">Select Department</option>
-                {departmentOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
+                {departments.map((d) => (
+                  <option key={d.department_id} value={d.department_id}>
+                    {d.department_name}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Course" required error={err("course")}>
+            <Field label="Course" required error={err("courseId")}>
               <select
                 className={`${inputClass} bg-white`}
-                value={form.course}
-                onChange={(e) => update({ course: e.target.value })}
-                disabled={!form.department}
+                value={form.courseId || ""}
+                onChange={(e) => update({ courseId: e.target.value })}
+                disabled={!form.departmentId}
               >
                 <option value="">
-                  {form.department ? "Select Course" : "Select a Department first"}
+                  {form.departmentId ? "Select Course" : "Select a Department first"}
                 </option>
                 {courses.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                  <option key={c.course_id} value={c.course_id}>
+                    {c.course_name}
                   </option>
                 ))}
               </select>
@@ -814,13 +851,17 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
 
 export default function EditStudentInfoModal({
   student,
+  departments: departmentsProp = [],
+  courses: coursesProp = [],
   onClose,
   onSave,
   isSaving = false,
   saveError = null,
 }) {
+  const departments = departmentsProp.length ? departmentsProp : fallbackDepartments;
+  const [courses, setCourses] = useState(coursesProp.length ? coursesProp : []);
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(() => buildInitialForm(student));
+  const [form, setForm] = useState(() => buildInitialForm(student, departments, courses));
   const [touchedStep1, setTouchedStep1] = useState(false);
   const [touchedStep2, setTouchedStep2] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(student.photo || null);
@@ -831,6 +872,28 @@ export default function EditStudentInfoModal({
   }
   function updateEmergency(patch) {
     setForm((f) => ({ ...f, emergency: { ...f.emergency, ...patch } }));
+  }
+
+  // When the department changes, load that department's courses. Values are
+  // real IDs from the API; fall back to the static sample if lists are names.
+  async function handleDepartmentChange(deptId) {
+    update({ departmentId: deptId, courseId: "" });
+    if (!deptId) {
+      setCourses([]);
+      return;
+    }
+    try {
+      const list = await masterlistApi.listCourses(deptId);
+      if (list && list.length) {
+        setCourses(list);
+        return;
+      }
+    } catch {
+      // fall through to sample fallback below
+    }
+    const deptName =
+      departments.find((d) => d.department_id === deptId)?.department_name || "";
+    setCourses(deptName ? fallbackCoursesForDept(deptName) : []);
   }
 
   function handlePickPhoto() {
@@ -864,7 +927,7 @@ export default function EditStudentInfoModal({
 
   async function handleSubmit() {
     if (!form.consent || isSaving) return;
-    const updatedStudent = buildStudentFromForm(student, form, photoPreview);
+    const updatedStudent = buildStudentFromForm(student, form, photoPreview, departments, courses);
     const payload = mapToBackendPayload(student, form, photoPreview);
     await onSave?.(payload, updatedStudent);
   }
@@ -905,6 +968,9 @@ export default function EditStudentInfoModal({
               onPickPhoto={handlePickPhoto}
               onNext={handleStep1Next}
               touched={touchedStep1}
+              departments={departments}
+              courses={courses}
+              onDepartmentChange={handleDepartmentChange}
             />
           )}
           {step === 2 && (

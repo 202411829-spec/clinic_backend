@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import EditStudentInfoModal from "./EditStudentInfoModal";
-import { recordsApi } from "../../lib/api.js";
+import { recordsApi, masterlistApi } from "../../lib/api.js";
 
 function SectionHeader({ icon, title }) {
   return (
@@ -60,10 +60,38 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   const [saveError, setSaveError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Real department/course lists (with IDs) for the edit modal so it can
+  // persist department_id / course_id instead of plain text names.
+  const [departments, setDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
+
   // Keep local copy in sync as the async fetch fills the prop in.
   useEffect(() => {
     if (initialStudent) setStudent(initialStudent);
   }, [initialStudent]);
+
+  // Load the department + course lists once the student record is known.
+  useEffect(() => {
+    if (!student) return;
+    let active = true;
+    masterlistApi
+      .listDepartments()
+      .then((depts) => {
+        if (!active) return;
+        setDepartments(depts || []);
+        const current = (depts || []).find((d) => d.department_name === student.department);
+        if (current) {
+          masterlistApi
+            .listCourses(current.department_id)
+            .then((cs) => active && setCourses(cs || []))
+            .catch(() => active && setCourses([]));
+        }
+      })
+      .catch(() => active && setDepartments([]));
+    return () => {
+      active = false;
+    };
+  }, [student]);
 
   if (error) {
     return (
@@ -112,6 +140,8 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
     return (
       <EditStudentInfoModal
         student={student}
+        departments={departments}
+        courses={courses}
         onClose={() => setEditing(false)}
         onSave={handleSave}
         isSaving={isSaving}

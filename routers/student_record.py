@@ -548,6 +548,7 @@ _STUDENT_EDITABLE_FIELDS = {
     "first_name", "middle_initial", "last_name", "gender",
     "birth_date", "civil_status", "contact_number",
     "present_address", "photo",
+    "department_id", "course_id",
 }
 
 # Allowed boolean fields on `medical_histories`.
