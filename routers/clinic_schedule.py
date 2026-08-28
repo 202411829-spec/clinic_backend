@@ -10,7 +10,7 @@ clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
 
 
 SETTINGS_TABLE = "clinic_appointment_settings"
-SCHEDULE_TABLE = "clinic_schedule"
+SCHEDULE_TABLE = "clinic_schedules"
 
 
 # ============================================================
@@ -73,11 +73,11 @@ def resolve_day_config(override):
     """
     Decide which hours/capacity config governs a date.
 
-    When an override (clinic_schedule row) is passed, its slot hours
+    When an override (clinic_schedules row) is passed, its work hours
     and break window win; the global clinic_appointment_settings row
-    still supplies slot_interval / max_student_per_slot (defaults 30
-    minutes and 10 students). With no override, everything comes from
-    the settings row.
+    still supplies slot_interval_minutes / max_students_per_slot
+    (defaults 30 minutes and 10 students). With no override,
+    everything comes from the settings row.
 
     Returns a config dict:
         {
@@ -96,8 +96,8 @@ def resolve_day_config(override):
 
     if override:
 
-        work_start = override.get("slot_start")
-        work_end = override.get("slot_end")
+        work_start = override.get("work_start")
+        work_end = override.get("work_end")
         break_start = override.get("break_start")
         break_end = override.get("break_end")
 
@@ -113,7 +113,7 @@ def resolve_day_config(override):
 
     try:
         slot_interval = int(
-            (settings or {}).get("slot_interval", 30)
+            (settings or {}).get("slot_interval_minutes", 30)
         )
     except (TypeError, ValueError):
         slot_interval = 30
@@ -123,7 +123,7 @@ def resolve_day_config(override):
 
     try:
         max_students = int(
-            (settings or {}).get("max_student_per_slot", 10)
+            (settings or {}).get("max_students_per_slot", 10)
         )
     except (TypeError, ValueError):
         max_students = 10
@@ -141,7 +141,7 @@ def resolve_day_config(override):
 def generate_time_blocks(config):
     """
     The SINGLE CANONICAL block-math used by BOTH the preview endpoint
-    AND time_slot materialization. Walks work_start -> work_end in
+    AND time_slots materialization. Walks work_start -> work_end in
     slot_interval steps, dropping any block that overlaps the break
     window, and returns:
 
@@ -208,21 +208,21 @@ def generate_time_blocks(config):
 
 def delete_time_slot_children(schedule_id):
     """
-    Remove every time_slot child of a clinic_schedule row. Called
+    Remove every time_slots child of a clinic_schedules row. Called
     before regenerating children (so stale slots never linger) and
     before deleting/disabling an override itself.
 
-    Appointments hold an FK into time_slot (fk_appointment_slot), so
-    any appointment ever booked into one of these slots — including
+    Appointments hold an FK into time_slots (fk_appointment_time_slot),
+    so any appointment ever booked into one of these slots — including
     CANCELLED ones — would make the bulk child delete fail with a
     23503 violation (and surface as a 500). Before deleting, detach
-    those appointments by nulling appointment.slot_id; the rows keep
-    appointment_date/appointment_time, so booking history survives.
+    those appointments by nulling appointments.time_slot_id; the rows
+    keep appointment_date/appointment_time, so booking history survives.
     """
     child_rows = (
         execute_with_retry(
             supabase
-            .table("time_slot")
+            .table("time_slots")
             .select("slot_id")
             .eq("schedule_id", schedule_id)
         ).data
@@ -233,17 +233,17 @@ def delete_time_slot_children(schedule_id):
 
         execute_with_retry(
             supabase
-            .table("appointment")
-            .update({"slot_id": None})
+            .table("appointments")
+            .update({"time_slot_id": None})
             .in_(
-                "slot_id",
+                "time_slot_id",
                 [row["slot_id"] for row in child_rows]
             )
         )
 
     execute_with_retry(
         supabase
-        .table("time_slot")
+        .table("time_slots")
         .delete()
         .eq("schedule_id", schedule_id)
     )
@@ -251,19 +251,19 @@ def delete_time_slot_children(schedule_id):
 
 def materialize_time_slots(schedule_row):
     """
-    Regenerate the time_slot CHILDREN of a clinic_schedule row.
+    Regenerate the time_slots CHILDREN of a clinic_schedules row.
 
     This fixes the reported bug where POST/PUT /clinic-schedule wrote
-    a parent row with zero time_slot children, so
+    a parent row with zero time_slots children, so
     GET /appointments/slots?date=... resolved that override as
     applicable and returned [] (admin adjusts schedule -> student
     slots disappear).
 
     Semantics:
-      - ALWAYS deletes the row's existing time_slot children first so
+      - ALWAYS deletes the row's existing time_slots children first so
         stale slots (old hours, old capacity) never linger.
       - If the row is enabled, generates fresh children from the row's
-        slot_start -> slot_end using the shared block math (same as
+        work_start -> work_end using the shared block math (same as
         GET /clinic-schedule/preview), one time_slot per block with
         max_capacity from clinic_appointment_settings.
       - If the row is disabled (clinic closed), no children are
@@ -303,7 +303,7 @@ def materialize_time_slots(schedule_row):
 
     response = execute_with_retry(
         supabase
-        .table("time_slot")
+        .table("time_slots")
         .insert(payload)
     )
 
@@ -356,13 +356,13 @@ def get_clinic_settings():
 #
 # Body (any subset of):
 # {
-#     "slot_interval": 30,
-#     "max_student_per_slot": 10,
+#     "slot_interval_minutes": 30,
+#     "max_students_per_slot": 10,
 #     "work_start": "08:00",
 #     "work_end": "17:00",
 #     "break_start": "12:00",
 #     "break_end": "13:00",
-#     "update_by": 1
+#     "updated_by_admin_id": 1
 # }
 # ============================================================
 
@@ -394,13 +394,13 @@ def update_clinic_settings():
             }), 404
 
         allowed_fields = [
-            "slot_interval",
-            "max_student_per_slot",
+            "slot_interval_minutes",
+            "max_students_per_slot",
             "work_start",
             "work_end",
             "break_start",
             "break_end",
-            "update_by"
+            "updated_by_admin_id"
         ]
 
         update_data = {
@@ -544,15 +544,15 @@ def get_clinic_schedule_by_date(working_date):
 # Body:
 # {
 #     "working_date": "2026-12-25",
-#     "slot_start": "08:00",
-#     "slot_end": "17:00",
+#     "work_start": "08:00",
+#     "work_end": "17:00",
 #     "break_start": "12:00",
 #     "break_end": "13:00",
 #     "is_enabled": false,
-#     "reason": "Christmas Day - Clinic Closed"
+#     "closure_reason": "Christmas Day - Clinic Closed"
 # }
 #
-# Use is_enabled: false + reason to mark the clinic closed
+# Use is_enabled: false + closure_reason to mark the clinic closed
 # for that date (holiday, event, etc).
 # ============================================================
 
@@ -597,12 +597,12 @@ def create_clinic_schedule():
 
         schedule_data = {
             "working_date": working_date,
-            "slot_start": slot_start,
-            "slot_end": slot_end,
+            "work_start": slot_start,
+            "work_end": slot_end,
             "break_start": data.get("break_start"),
             "break_end": data.get("break_end"),
             "is_enabled": data.get("is_enabled", True),
-            "reason": data.get("reason")
+            "closure_reason": data.get("closure_reason")
         }
 
         # ----------------------------------------------------
@@ -629,20 +629,21 @@ def create_clinic_schedule():
 
             target = existing_rows[0]
 
-            response = (
+            response = execute_with_retry(
                 supabase
                 .table(SCHEDULE_TABLE)
                 .update(schedule_data)
                 .eq("schedule_id", target["schedule_id"])
-                .execute()
             )
 
             for duplicate in existing_rows[1:]:
                 delete_time_slot_children(duplicate["schedule_id"])
 
-                supabase.table(SCHEDULE_TABLE).delete().eq(
-                    "schedule_id", duplicate["schedule_id"]
-                ).execute()
+                execute_with_retry(
+                    supabase.table(SCHEDULE_TABLE).delete().eq(
+                        "schedule_id", duplicate["schedule_id"]
+                    )
+                )
 
         else:
             response = execute_with_retry(
@@ -689,12 +690,12 @@ def create_clinic_schedule():
 #
 # Body (any subset of):
 # {
-#     "slot_start": "09:00",
-#     "slot_end": "16:00",
+#     "work_start": "09:00",
+#     "work_end": "16:00",
 #     "break_start": "12:00",
 #     "break_end": "13:00",
 #     "is_enabled": true,
-#     "reason": null
+#     "closure_reason": null
 # }
 # ============================================================
 
@@ -718,12 +719,12 @@ def update_clinic_schedule(schedule_id):
 
         allowed_fields = [
             "working_date",
-            "slot_start",
-            "slot_end",
+            "work_start",
+            "work_end",
             "break_start",
             "break_end",
             "is_enabled",
-            "reason"
+            "closure_reason"
         ]
 
         update_data = {
@@ -819,7 +820,7 @@ def delete_clinic_schedule(schedule_id):
 # GET /clinic-schedule/preview?date=2026-08-17
 #
 # Generates the actual list of time blocks for a given date,
-# using that date's override (clinic_schedule) if one exists,
+# using that date's override (clinic_schedules) if one exists,
 # otherwise falling back to the global default settings.
 # ============================================================
 
@@ -853,7 +854,7 @@ def preview_time_blocks():
                 "success": True,
                 "date": requested_date,
                 "is_enabled": False,
-                "reason": override.get("reason"),
+                "reason": override.get("closure_reason"),
                 "blocks": []
             })
 
@@ -863,16 +864,16 @@ def preview_time_blocks():
 
         if override:
 
-            work_start = override.get("slot_start")
-            work_end = override.get("slot_end")
+            work_start = override.get("work_start")
+            work_end = override.get("work_end")
             break_start = override.get("break_start")
             break_end = override.get("break_end")
             settings = get_default_settings()
             slot_interval = int(
-                (settings or {}).get("slot_interval", 30)
+                (settings or {}).get("slot_interval_minutes", 30)
             )
             max_students = int(
-                (settings or {}).get("max_student_per_slot", 10)
+                (settings or {}).get("max_students_per_slot", 10)
             )
 
         else:
@@ -890,9 +891,9 @@ def preview_time_blocks():
             work_end = settings.get("work_end")
             break_start = settings.get("break_start")
             break_end = settings.get("break_end")
-            slot_interval = int(settings.get("slot_interval", 30))
+            slot_interval = int(settings.get("slot_interval_minutes", 30))
             max_students = int(
-                settings.get("max_student_per_slot", 10)
+                settings.get("max_students_per_slot", 10)
             )
 
         # ----------------------------------------------------
@@ -925,38 +926,19 @@ def preview_time_blocks():
             )
 
         # ----------------------------------------------------
-        # Generate time blocks
+        # Generate time blocks using the single canonical function
         # ----------------------------------------------------
 
-        blocks = []
+        config = {
+            "work_start": work_start,
+            "work_end": work_end,
+            "break_start": break_start,
+            "break_end": break_end,
+            "slot_interval": slot_interval,
+            "max_students": max_students,
+        }
 
-        current = start
-
-        while current < end:
-
-            block_end = current + timedelta(
-                minutes=slot_interval
-            )
-
-            if block_end > end:
-                break
-
-            is_break = (
-                break_start_dt is not None
-                and break_end_dt is not None
-                and current < break_end_dt
-                and block_end > break_start_dt
-            )
-
-            if not is_break:
-
-                blocks.append({
-                    "start": current.strftime("%H:%M"),
-                    "end": block_end.strftime("%H:%M"),
-                    "capacity": max_students
-                })
-
-            current = block_end
+        blocks = generate_time_blocks(config)
 
         return jsonify({
             "success": True,
