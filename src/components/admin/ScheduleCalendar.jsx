@@ -34,6 +34,7 @@ export default function ScheduleCalendar({
   const primary = selectedDates[0] ?? today;
   const [viewYear, setViewYear] = useState(primary.getFullYear());
   const [viewMonth, setViewMonth] = useState(primary.getMonth());
+  const [mode, setMode] = useState("specific"); // "specific" | "default"
 
   // Self-managed by default so the toggle works even when the parent
   // doesn't pass selectedWeekdays/onWeekdaysChange. If the parent does pass
@@ -111,6 +112,7 @@ export default function ScheduleCalendar({
 
   function pickDay(day, event) {
     if (!day) return;
+    if (mode === "default") return;
     const date = new Date(viewYear, viewMonth, day);
     if (!isWeekdayOpen(date)) return; // that weekday is turned off — not pickable
 
@@ -155,17 +157,33 @@ export default function ScheduleCalendar({
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <h2 className="font-bold text-gray-800 text-sm md:text-base">
-          Select Date
-        </h2>
-        <button
-          type="button"
-          onClick={resetToDefault}
-          className="text-[11px] font-semibold text-gc-accent hover:text-gc-green transition-colors"
-        >
-          Set a default
-        </button>
+      <div className="flex justify-center mb-4">
+        <div className="inline-flex rounded-full bg-gray-100 p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => setMode("specific")}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              mode === "specific"
+                ? "bg-gc-green text-white shadow-sm"
+                : "bg-white text-gray-500 hover:bg-gray-50"
+            }`}
+            aria-pressed={mode === "specific"}
+          >
+            Specific Dates
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("default")}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              mode === "default"
+                ? "bg-gc-green text-white shadow-sm"
+                : "bg-white text-gray-500 hover:bg-gray-50"
+            }`}
+            aria-pressed={mode === "default"}
+          >
+            Default Schedule
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-2">
@@ -192,8 +210,9 @@ export default function ScheduleCalendar({
       </div>
 
       <p className="text-xs text-gray-500 mb-3">
-        Choose which days of the week the clinic is open for booking by
-        default. Click a day to turn it on or off.
+        {mode === "default"
+          ? "Choose which days of the week the clinic is open for booking by default. Click a day to turn it on or off."
+          : "Select specific dates for scheduling. Click a date to pick it (Shift+click for multiple)."}
       </p>
 
       <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center">
@@ -228,7 +247,17 @@ export default function ScheduleCalendar({
         </p>
       )}
 
-      <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center">
+      {mode === "default" && (
+        <button
+          type="button"
+          onClick={resetToDefault}
+          className="block mx-auto mt-1 mb-1 text-[11px] font-semibold text-gc-accent hover:text-gc-green transition-colors"
+        >
+          Reset to default
+        </button>
+      )}
+
+      <div className={`grid grid-cols-7 gap-y-2 gap-x-1 text-center ${mode === "default" ? "opacity-40" : ""}`}>
         {weeks.flat().map((day, i) => {
           const date = day ? new Date(viewYear, viewMonth, day) : null;
           const selected = date && isSelected(date);
@@ -236,8 +265,12 @@ export default function ScheduleCalendar({
           const closed = date && isDateOff(date);
           const isTodayDate = date && isToday(date);
 
+          const isDisabled = mode === "default" || !weekdayOpen || closed;
+
           let stateClasses = "text-gray-700 hover:bg-gray-100";
-          if (!weekdayOpen) {
+          if (mode === "default") {
+            stateClasses = "text-gray-300 cursor-not-allowed";
+          } else if (!weekdayOpen) {
             stateClasses = "text-gray-300 cursor-not-allowed";
           } else if (closed) {
             stateClasses = "text-red-300 bg-red-50 line-through cursor-not-allowed";
@@ -254,8 +287,8 @@ export default function ScheduleCalendar({
               {day ? (
                 <button
                   onClick={(e) => pickDay(day, e)}
-                  disabled={!weekdayOpen}
-                  aria-disabled={!weekdayOpen}
+                  disabled={isDisabled}
+                  aria-disabled={isDisabled}
                   title={closed ? "Marked unavailable" : undefined}
                   className={`w-8 h-8 rounded-full text-sm font-semibold transition-colors ${stateClasses}`}
                 >
@@ -267,46 +300,50 @@ export default function ScheduleCalendar({
         })}
       </div>
 
-      {/* on/off switch for marking specific individual dates unavailable —
+      {mode === "specific" && (
+        <>
+          {/* on/off switch for marking specific individual dates unavailable —
           sits right below the "days open by default" summary. While on,
           tapping a date closes it (greyed + unclickable) instead of
           selecting it. */}
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5">
-        <div>
-          <span className="block text-xs font-semibold text-gray-700">
-            Mark dates as unavailable
-          </span>
-          <span className="block text-[11px] text-gray-400">
-            {offMode ? "Tap a date to close it" : "Turn on to close specific dates"}
-          </span>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={offMode}
-          aria-label="Toggle marking dates as unavailable"
-          onClick={() => setOffMode((v) => !v)}
-          className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
-            offMode ? "bg-red-500" : "bg-gray-200"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-              offMode ? "translate-x-5" : ""
-            }`}
-          />
-        </button>
-      </div>
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5">
+            <div>
+              <span className="block text-xs font-semibold text-gray-700">
+                Mark dates as unavailable
+              </span>
+              <span className="block text-[11px] text-gray-400">
+                {offMode ? "Tap a date to close it" : "Turn on to close specific dates"}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={offMode}
+              aria-label="Toggle marking dates as unavailable"
+              onClick={() => setOffMode((v) => !v)}
+              className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
+                offMode ? "bg-red-500" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  offMode ? "translate-x-5" : ""
+                }`}
+              />
+            </button>
+          </div>
 
-      {offDates.length > 0 && (
-        <p className="mt-2 text-[11px] font-semibold text-red-400">
-          {offDates.length} date{offDates.length === 1 ? "" : "s"} marked unavailable
-        </p>
+          {offDates.length > 0 && (
+            <p className="mt-2 text-[11px] font-semibold text-red-400">
+              {offDates.length} date{offDates.length === 1 ? "" : "s"} marked unavailable
+            </p>
+          )}
+
+          <p className="mt-3 text-[11px] text-gray-400">
+            Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
+          </p>
+        </>
       )}
-
-      <p className="mt-3 text-[11px] text-gray-400">
-        Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
-      </p>
     </section>
   );
 }
