@@ -156,13 +156,13 @@ def calculate_age(birth_date_value):
 
 def normalize_student_id(student_id_value):
     """
-    Normalize a student_id for matching between the appointment
-    table and personal_information table. Without this, a
-    student_id that's stored as an int in one table and a string
-    in the other (or has stray whitespace/case differences from
-    manual entry, e.g. a walk-in form) silently fails to join,
-    and the visit shows up with blank name/age/sex/course even
-    though the student IS registered.
+    Normalize a student_id for matching between raw rows (e.g.
+    appointments, visit logs) and the student_masterlist join. Without
+    this, a student_id that's stored as an int in one source and a string
+    in another (or has stray whitespace/case differences from manual
+    entry, e.g. a walk-in form) silently fails to join, and the visit
+    shows up with blank name/age/sex/course even though the student IS
+    registered.
 
     This used to live only in logbook.py; it is now the single
     canonical variant so every caller joins with the same,
@@ -196,51 +196,37 @@ def build_student_lookup():
     normalize_student_id), with fully joined student details:
     name, age, sex, department & course.
 
+    Reads the single flattened `student_masterlist` VIEW (which joins
+    students + departments + courses once and computes full_name / age),
+    replacing the legacy 4-table Python merge across personal_information,
+    student_name, department, and course_dept.
+
     NOTE: keys are normalized, so callers must pass
     normalize_student_id(raw_id) when looking a student up.
     The raw (unmodified) student_id is still preserved in each
     row's "student_id" field for display/response purposes.
     """
 
-    personal_info_response = execute_with_retry(
+    response = execute_with_retry(
         supabase
-        .table("personal_information")
+        .table("student_masterlist")
         .select("*")
     )
 
-    personal_info_rows = personal_info_response.data or []
-
-    names_by_id = get_lookup("student_name", "name_id")
-    departments_by_id = get_lookup("department", "department_id")
-    courses_by_id = get_lookup("course_dept", "course_id")
+    rows = response.data or []
 
     students = {}
 
-    for info in personal_info_rows:
+    for row in rows:
 
-        student_id = info.get("student_id")
+        student_id = row.get("student_id")
         student_id_key = normalize_student_id(student_id)
 
-        name_row = names_by_id.get(info.get("name_id"), {})
+        department_name = row.get("department_name") or ""
+        course_name = row.get("course_name") or ""
 
-        first_name = name_row.get("first_name", "")
-        middle_initial = name_row.get("middle_initial") or ""
-        last_name = name_row.get("last_name", "")
-
-        middle_part = f" {middle_initial}." if middle_initial else ""
-        full_name = f"{first_name}{middle_part} {last_name}".strip()
-
-        department_row = departments_by_id.get(
-            info.get("department_id"), {}
-        )
-
-        course_row = courses_by_id.get(
-            info.get("course_id"), {}
-        )
-
-        department_name = department_row.get("department_name", "")
-        course_name = course_row.get("course_name", "")
-
+        # Keep the " - " separator so logbook.py's dept/course parser
+        # keeps splitting on it (Blockers G).
         if department_name and course_name:
             dept_course = f"{course_name} - {department_name}"
         else:
@@ -248,47 +234,46 @@ def build_student_lookup():
 
         students[student_id_key] = {
             "student_id": student_id,
-            "name": full_name or "-",
-            "age": calculate_age(info.get("birth_date")),
-            "sex": info.get("gender") or "-",
+            "name": row.get("full_name") or "-",
+            "age": row.get("age") or calculate_age(row.get("birth_date")),
+            "sex": row.get("gender") or "-",
             # "dept" is required by appointment.py's
             # GET /appointments/slots booking join — keep it.
             "dept": department_name or "-",
             "deptCourse": dept_course,
-            "year_level": info.get("year_level"),
+            "year_level": row.get("year_level"),
         }
 
     return students
 
 
 def build_reason_lookup():
-    return get_lookup("reason", "reason_id")
+    return get_lookup("appointment_reasons", "reason_id")
 
 
 def build_medicine_lookup():
     return get_lookup("medicines", "medicine_id")
 
 
-def build_status_lookup():
-    return get_lookup("status", "status_id")
-
-
 def get_medicines_for_log(log_id, log_medicine_rows, medicines_by_id):
     """
     Return a formatted "Medicine x2, Medicine x1" style string
-    for a given log_id.
+    for a given log (visit log) id.
     """
 
     tags = []
 
     for row in log_medicine_rows:
 
-        if row.get("log_id") != log_id:
+        if row.get("visit_log_id") != log_id:
             continue
 
         medicine = medicines_by_id.get(row.get("medicine_id"), {})
-        medicine_name = medicine.get("medicine_name", "Unknown")
-        quantity = row.get("quantity", 1)
+        # Prefer the stored medicine_name SNAPSHOT (Decision F / Blockers L)
+        # so historical prescriptions render after medicines-stock edits;
+        # fall back to the live lookup, then "Unknown".
+        medicine_name = row.get("medicine_name") or medicine.get("medicine_name", "Unknown")
+        quantity = row.get("quantity_dispensed", 1)
 
         tags.append(f"{medicine_name} x{quantity}")
 
@@ -324,7 +309,7 @@ def get_latest_status_for_appointments(appointment_ids):
 
     response = execute_with_retry(
         supabase
-        .table("status")
+        .table("appointment_status_history")
         .select("*")
         .in_("appointment_id", appointment_ids)
         .order("changed_at", desc=True)

@@ -14,7 +14,9 @@ user to flask.g for downstream handlers:
     g.user = {"id": <auth uid>, "email": <verified email>}
 
 `require_admin` additionally checks the verified user is an admin by
-matching their email (or GC-username) against the `admin` table.
+consulting the single clean `app_accounts` table (account_type='admin'
+with an admin_id), which links the authenticated auth user to their
+admin identity (Blockers B/C).
 """
 
 from functools import wraps
@@ -22,6 +24,7 @@ from functools import wraps
 from flask import g, jsonify, request
 
 from database import supabase
+from routers.helpers import execute_with_retry
 
 
 # ============================================================
@@ -113,56 +116,94 @@ def _is_admin_user(user):
     """
     Check whether the verified auth user is an admin.
 
-    APPROACH CHOSEN: database email match against the `admin`
-    table. A read-only schema probe confirmed the table has an
-    `email` column (alongside admin_id, username, role, firstname,
-    last_name, license_no), so we match the VERIFIED email from
-    Supabase Auth directly — stronger than trusting JWT metadata,
-    which users could potentially influence.
-
-    Fallback within the same check: the frontend signs admins in
-    as '<username>@gordoncollege.edu.ph', so if no row matches the
-    full email we retry with the local part against the `username`
-    column (also confirmed to exist). Values here come from the
-    verified Supabase Auth user, never from raw client input, and
-    are bound via parameterized .eq() filters rather than string
-    interpolation into or_() clauses.
+    Identity is resolved through the single clean `app_accounts` table
+    (Blockers B): an admin user is one whose app_accounts row has
+    account_type='admin' AND admin_id IS NOT NULL. app_accounts has no
+    `username` column, so matching is by auth_user_id first (the verified
+    token subject — more robust than email), then by the verified email
+    (the key, `<username>@gordoncollege.edu.ph`). Values come from the
+    verified Supabase Auth user, never raw client input.
     """
+    auth_user_id = getattr(user, "id", None)
     email = (getattr(user, "email", "") or "").strip().lower()
-    username = email.split("@")[0] if "@" in email else None
-
-    if not email:
-        return False
 
     try:
-        response = (
-            supabase
-            .table("admin")
-            .select("admin_id")
-            .eq("email", email)
-            .limit(1)
-            .execute()
-        )
-
-        if response.data:
-            return True
-
-        if username:
-            response = (
+        if auth_user_id:
+            response = execute_with_retry(
                 supabase
-                .table("admin")
+                .table("app_accounts")
                 .select("admin_id")
-                .eq("username", username)
+                .eq("auth_user_id", auth_user_id)
+                .eq("account_type", "admin")
                 .limit(1)
-                .execute()
             )
-            return bool(response.data)
+            if response.data:
+                return bool(response.data[0].get("admin_id"))
+
+        if email:
+            response = execute_with_retry(
+                supabase
+                .table("app_accounts")
+                .select("admin_id")
+                .eq("email", email)
+                .eq("account_type", "admin")
+                .limit(1)
+            )
+            if response.data:
+                return bool(response.data[0].get("admin_id"))
 
         return False
 
     except Exception as e:
         print("Admin check error:", repr(e))
         return False
+
+
+def resolve_student_id(user):
+    """
+    Resolve the verified auth user to a student_id via the clean
+    `app_accounts` table (account_type='student' with a student_id).
+    Resolves by auth_user_id first (the verified token subject), then by
+    the verified email. The legacy email-local-part derivation is kept
+    ONLY as a clearly-commented last-resort fallback — never the primary
+    path (Blockers C).
+    """
+    auth_user_id = getattr(user, "id", None)
+    email = (getattr(user, "email", "") or "").strip().lower()
+
+    try:
+        if auth_user_id:
+            response = execute_with_retry(
+                supabase
+                .table("app_accounts")
+                .select("student_id")
+                .eq("auth_user_id", auth_user_id)
+                .eq("account_type", "student")
+                .limit(1)
+            )
+            if response.data and response.data[0].get("student_id"):
+                return response.data[0]["student_id"]
+
+        if email:
+            response = execute_with_retry(
+                supabase
+                .table("app_accounts")
+                .select("student_id")
+                .eq("email", email)
+                .eq("account_type", "student")
+                .limit(1)
+            )
+            if response.data and response.data[0].get("student_id"):
+                return response.data[0]["student_id"]
+
+    except Exception as e:
+        print("Student id resolution error:", repr(e))
+
+    # LAST-RESORT fallback only — never the primary path (Blockers C).
+    if email and "@" in email:
+        return email.split("@")[0]
+
+    return None
 
 
 # ============================================================
@@ -202,9 +243,9 @@ def require_auth(f):
 
 def require_admin(f):
     """
-    Same as require_auth, PLUS the verified user must exist in the
-    `admin` table (matched by verified email, falling back to the
-    GC username derived from it).
+    Same as require_auth, PLUS the verified user must be an admin in the
+    clean `app_accounts` table (account_type='admin' with an admin_id,
+    resolved by auth_user_id or verified email).
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
