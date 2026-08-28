@@ -143,6 +143,7 @@ export default function MedicalSummaryPanel({ student }) {
   const navigate = useNavigate();
   const [physicalOpen, setPhysicalOpen] = useState(true);
   const [labOpen, setLabOpen] = useState(true);
+  const [diagnosisOpen, setDiagnosisOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   const records = getStudentAnnualHistory();
@@ -295,6 +296,29 @@ export default function MedicalSummaryPanel({ student }) {
       ].forEach(([label, getVal]) => {
         doc.text(label, labCols[0], y);
         academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), labCols[i + 1], y));
+        y += 5.5;
+      });
+
+      heading("Diagnosis and Final Remark");
+      const diagCols = [14, 60, 95, 130, 165];
+      doc.setFont(undefined, "bold");
+      doc.text("Item", diagCols[0], y);
+      academicYears.forEach((yr, i) => doc.text(yr.label.split(" (")[0], diagCols[i + 1], y));
+      y += 5;
+      doc.setFont(undefined, "normal");
+      [
+        ["Diagnosis", (r) => r.diagnosis || "-"],
+        ["Final Remark", (r) => r.finalRemark || "-"],
+        ["Essentially Normal", (r) => (r.diagnosisNormalFindingsChecked ? "Yes" : r.normalFindingsChecked ? "Yes" : "No")],
+        ["Examined By", (r) => r.diagnosisExaminedBy || "-"],
+        ["License No.", (r) => r.diagnosisLicenseNo || "-"],
+      ].forEach(([label, getVal]) => {
+        if (y > 275) {
+          doc.addPage();
+          y = 18;
+        }
+        doc.text(label, diagCols[0], y);
+        academicYears.forEach((yr, i) => doc.text(String(getVal(records[yr.key])), diagCols[i + 1], y));
         y += 5.5;
       });
 
@@ -608,6 +632,67 @@ export default function MedicalSummaryPanel({ student }) {
                     <Td key={y.key}>
                       <Pill value={records[y.key].urinalysis.protein} />
                     </Td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ---------- diagnosis and final remark ---------- */}
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print:rounded-none print:p-0 print:pt-4 print:break-before-page">
+        <SectionHeader
+          icon="info"
+          title="Diagnosis and Final Remark"
+          right={<ChevronToggle open={diagnosisOpen} onClick={() => setDiagnosisOpen((v) => !v)} />}
+        />
+
+        {diagnosisOpen && (
+          <div className="overflow-x-auto rounded-xl print:overflow-visible">
+            <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 bg-gray-50">
+                  <Th wide>Item</Th>
+                  {academicYears.map((y) => (
+                    <Th key={y.key}>{y.label.split(" (")[0]}</Th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <Td>Diagnosis</Td>
+                  {academicYears.map((y) => (
+                    <Td key={y.key}>{v(records[y.key].diagnosis)}</Td>
+                  ))}
+                </tr>
+                <tr>
+                  <Td>Final Remark</Td>
+                  {academicYears.map((y) => (
+                    <Td key={y.key}>{v(records[y.key].finalRemark)}</Td>
+                  ))}
+                </tr>
+                <tr>
+                  <Td>Essentially normal physical findings</Td>
+                  {academicYears.map((y) => {
+                    const checked = records[y.key].diagnosisNormalFindingsChecked ?? records[y.key].normalFindingsChecked;
+                    return (
+                      <Td key={y.key}>
+                        <Pill value={checked ? "Normal" : "With Findings"} />
+                      </Td>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  <Td>Examined By</Td>
+                  {academicYears.map((y) => (
+                    <Td key={y.key}>{v(records[y.key].diagnosisExaminedBy)}</Td>
+                  ))}
+                </tr>
+                <tr>
+                  <Td>License No.</Td>
+                  {academicYears.map((y) => (
+                    <Td key={y.key}>{v(records[y.key].diagnosisLicenseNo)}</Td>
                   ))}
                 </tr>
               </tbody>
