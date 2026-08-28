@@ -1,5 +1,5 @@
 // src/components/admin/LogbookFullPanel.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import NavIcon from "./NavIcon.jsx";
 import {
   logbookEntries as sampleEntries,
@@ -118,8 +118,16 @@ export default function LogbookFullPanel() {
   const [totalEntries, setTotalEntries] = useState(0);
   const [pageSize] = useState(PAGE_SIZE);
 
+  // Guards against a stale request finishing after a newer one has already
+  // started (e.g. the user changes filters twice quickly) — without this,
+  // whichever response lands second last would win, even if it's the older
+  // one.
+  const requestIdRef = useRef(0);
+
   // Load data with server-side filtering
   const loadData = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestIdRef.current === requestId;
     try {
       setLoading(true);
       setError(null);
@@ -139,7 +147,7 @@ export default function LogbookFullPanel() {
         referenceApi.medicines(),
       ]);
 
-      if (!cancelled) {
+      if (isCurrent()) {
         setEntries((logbookRes?.logbook || []).map(mapEntry));
         setTotalEntries(logbookRes?.total || 0);
         const reasonsList = (reasonsRes?.reasons || []).filter((r) => r.description && r.description !== "-");
@@ -148,25 +156,15 @@ export default function LogbookFullPanel() {
         if (medicinesList.length) setMedicineRecords(medicinesList);
       }
     } catch (err) {
-      if (!cancelled) setError(err.message || "Failed to load logbook");
+      if (isCurrent()) setError(err.message || "Failed to load logbook");
     } finally {
-      if (!cancelled) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [page, search, dateFrom, dateTo, reasonFilter, pageSize]);
 
   // Reload when filters change
   useEffect(() => {
-    let cancelled = false;
-
-    const doLoad = async () => {
-      await loadData();
-    };
-
-    doLoad();
-
-    return () => {
-      cancelled = true;
-    };
+    loadData();
   }, [loadData]);
 
   if (loading) {

@@ -14,9 +14,10 @@ import { isSameDate, getCalendarBoxParts } from "../lib/calendar";
 
 const AppointmentContext = createContext(null);
 
-function buildAppointment({ date, time, reason }) {
+function buildAppointment({ id, date, time, reason }) {
   const { month, day, weekday } = getCalendarBoxParts(date);
   return {
+    id,
     date,
     time,
     reason,
@@ -39,16 +40,16 @@ export function AppointmentProvider({ children }) {
   }, []);
 
   const bookAppointment = useCallback(
-    ({ date, time, reason }) => {
-      setAppointment(buildAppointment({ date, time, reason }));
+    ({ id, date, time, reason }) => {
+      setAppointment(buildAppointment({ id, date, time, reason }));
       pushNotification("You have successfully booked your appointment!");
     },
     [pushNotification]
   );
 
   const rescheduleAppointment = useCallback(
-    ({ date, time, reason }) => {
-      setAppointment(buildAppointment({ date, time, reason }));
+    ({ id, date, time, reason }) => {
+      setAppointment(buildAppointment({ id, date, time, reason }));
       pushNotification("Your appointment has been rescheduled.");
     },
     [pushNotification]

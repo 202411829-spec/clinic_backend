@@ -50,8 +50,11 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
         </span>
         <div className="flex items-center gap-2 shrink-0">
           {/* Slots are set once per generated schedule and stay fixed per block,
-              regardless of later time edits on this or other blocks. */}
-          <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+              regardless of later time edits on this or other blocks. Fixed
+              width (regardless of 1, 2, or 3-digit counts) keeps this label
+              — and the ⋮ menu button next to it — aligned the same way on
+              every row. */}
+          <span className="text-xs font-semibold text-gray-500 whitespace-nowrap text-right w-[70px] shrink-0">
             {block.capacity} Slot{block.capacity === 1 ? "" : "s"}
           </span>
 

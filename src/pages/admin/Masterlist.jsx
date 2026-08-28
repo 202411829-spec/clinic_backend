@@ -185,9 +185,12 @@ export default function Masterlist() {
 
         {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
 
-        {/* Table */}
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+        {/* Table: only scrolls horizontally on small screens (below md),
+            where the min-width kicks in. On desktop the min-width is
+            removed and the table fits the panel width with no side
+            scroll — columns share the available space instead. */}
+        <div className="mt-5 overflow-x-auto md:overflow-visible">
+          <table className="w-full min-w-[900px] md:min-w-0 border-collapse text-left text-sm">
             <thead>
               <tr className="bg-[#F6F6F6] text-xs uppercase tracking-wide text-gray-500">
                 {COLUMNS.map((col) => (
@@ -233,7 +236,11 @@ export default function Masterlist() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.student_id}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                    {/* Longest cell in the row — lets text wrap on desktop
+                        (where the table no longer scrolls) so it doesn't
+                        force the whole table wider than the panel; mobile
+                        keeps it on one line since that view scrolls anyway. */}
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-700 md:whitespace-normal md:break-words md:min-w-[200px]">
                       {student.department_id ? `${student.department_name} / ${student.course_name}` : '—'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.year_level || '—'}</td>

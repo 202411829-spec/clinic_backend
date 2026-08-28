@@ -1,15 +1,15 @@
 // src/pages/student/Book.jsx
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import SelectDateCalendar from "../../components/admin/SelectDateCalendar";
-import SelectTimeSlots from "../../components/student/SelectTimeSlots";
-import SelectReasonPanel from "../../components/student/SelectReasonPanel";
-import AppointmentSummaryCard from "../../components/student/AppointmentSummaryCard";
-import BookingStepIndicator from "../../components/student/BookingStepIndicator";
+import SelectDateCalendar from "../../components/admin/SelectDateCalendar.jsx";
+import SelectTimeSlots from "../../components/student/SelectTimeSlots.jsx";
+import SelectReasonPanel from "../../components/student/SelectReasonPanel.jsx";
+import AppointmentSummaryCard from "../../components/student/AppointmentSummaryCard.jsx";
+import BookingStepIndicator from "../../components/student/BookingStepIndicator.jsx";
 import { Link } from "react-router-dom";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
-import { useAppointment } from "../../context/AppointmentContext";
-import { useAuth } from "../../context/AuthContext";
+import { useAppointment } from "../../context/AppointmentContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { addDays, startOfDay } from "../../lib/calendar.js";
 
 function getTomorrow() {
@@ -68,19 +68,73 @@ export default function Book() {
 
   // Arrived here via the Dashboard's "Reschedule" action -> pre-fill with
   // the existing appointment and switch copy/behavior into reschedule mode.
-  const isReschedule = Boolean(location.state?.reschedule && appointment);
+  // The intent to reschedule (the nav flag) is separate from having the
+  // appointment's data in hand: the in-memory `appointment` from context is
+  // only populated for a booking made earlier *this session* — if the
+  // pending appointment instead came from the backend (the normal case,
+  // e.g. after a refresh), context is empty and we must fetch it ourselves
+  // using the appointmentId the Dashboard passed along.
+  const wantsReschedule = Boolean(location.state?.reschedule);
+  const appointmentIdParam = location.state?.appointmentId;
+  const [fetchedAppt, setFetchedAppt] = useState(null);
+  const [rescheduleDataReady, setRescheduleDataReady] = useState(
+    !wantsReschedule || Boolean(appointment)
+  );
+  const rescheduleSource = appointment || fetchedAppt;
+  const isReschedule = wantsReschedule && rescheduleDataReady && Boolean(rescheduleSource);
+
+  useEffect(() => {
+    if (!wantsReschedule || appointment) return undefined;
+    if (!appointmentIdParam) {
+      setRescheduleDataReady(true);
+      return undefined;
+    }
+    let cancelled = false;
+    appointmentsApi
+      .get(appointmentIdParam)
+      .then((res) => {
+        if (cancelled) return;
+        const a = res?.appointment || res;
+        if (a?.appointment_date) {
+          setFetchedAppt({
+            date: new Date(`${String(a.appointment_date).slice(0, 10)}T00:00:00`),
+            rawTime: a.appointment_time,
+            reason_id: a.reason_id ?? "",
+          });
+        }
+      })
+      .catch((err) => console.error("Failed to load appointment for reschedule:", err))
+      .finally(() => {
+        if (!cancelled) setRescheduleDataReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only needs to run once per visit — the fetched value is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [step, setStep] = useState(1);
   const tomorrow = getTomorrow();
   const [selectedDate, setSelectedDate] = useState(
-    isReschedule ? appointment.date : getTomorrow()
+    appointment && wantsReschedule ? appointment.date : getTomorrow()
   );
   const [selectedTime, setSelectedTime] = useState(
-    isReschedule ? appointment.time : null
+    appointment && wantsReschedule ? appointment.time : null
   );
-  const [reasonId, setReasonId] = useState(isReschedule ? appointment.reason_id || "" : "");
+  const [reasonId, setReasonId] = useState(
+    appointment && wantsReschedule ? appointment.reason_id || "" : ""
+  );
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(false);
+
+  // Sync the form once a fetched (backend) reschedule source resolves —
+  // the context-based case above is already set synchronously at mount.
+  useEffect(() => {
+    if (!fetchedAppt) return;
+    setSelectedDate(fetchedAppt.date);
+    setReasonId(fetchedAppt.reason_id || "");
+  }, [fetchedAppt]);
 
   // Real slot availability for the selected date + real reason list.
 const [slots, setSlots] = useState([]);
@@ -120,6 +174,18 @@ const [slots, setSlots] = useState([]);
     };
   }, [selectedDate]);
 
+  // Once that date's real slots load, match the old appointment's time to
+  // one of them (by start time) so the calendar shows the right slot
+  // pre-selected instead of leaving it blank.
+  useEffect(() => {
+    if (!fetchedAppt?.rawTime || selectedTime) return;
+    if (slotsStatus !== "ready") return;
+    const norm = String(fetchedAppt.rawTime).slice(0, 5);
+    const match = slots.find((s) => String(s.slot_start).slice(0, 5) === norm);
+    if (match) setSelectedTime(match.time);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchedAppt, slots, slotsStatus]);
+
   useEffect(() => {
     referenceApi
       .reasons()
@@ -135,6 +201,13 @@ const [slots, setSlots] = useState([]);
     if (isReschedule) {
       setPendingCheckStatus("ready");
       setHasPending(false);
+      return undefined;
+    }
+    // Still resolving the reschedule source (fetching the old appointment) —
+    // hold off on the normal pending-check so the blocked banner doesn't
+    // flash on screen before flipping into reschedule mode.
+    if (wantsReschedule) {
+      setPendingCheckStatus("loading");
       return undefined;
     }
     // In-memory appointment from a just-completed booking is authoritative
@@ -176,7 +249,7 @@ const [slots, setSlots] = useState([]);
     return () => {
       cancelled = true;
     };
-  }, [studentId, appointment, isReschedule]);
+  }, [studentId, appointment, isReschedule, wantsReschedule]);
 
   function handleSelectDate(date) {
     setSelectedDate(date);
@@ -187,6 +260,10 @@ const [slots, setSlots] = useState([]);
   // when the user arrived via Reschedule — they are editing that appointment).
   const isBookingBlocked = !isReschedule && hasPending;
 
+  // The old appointment being replaced, for reschedule mode — needed so we
+  // can cancel it if the backend refuses the new one as a duplicate pending.
+  const oldAppointmentId = appointmentIdParam || rescheduleSource?.id;
+
   async function handleBook() {
     // Frontend guard — mirrors the backend's "only 1 pending" rule.
     if (isBookingBlocked) {
@@ -196,38 +273,68 @@ const [slots, setSlots] = useState([]);
       return;
     }
     setBookingError("");
-    // Persist via POST /appointments.
     setBooking(true);
+
+    const matchedSlot = slots.find((s) => s.time === selectedTime);
+    const matchedReason = reasonList.find((r) => r.reason_id === reasonId);
+    const createBody = {
+      student_id: studentId,
+      slot_id: matchedSlot?.id ?? null,
+      appointment_date: toYMD(selectedDate),
+      appointment_time: matchedSlot?.slot_start || "08:00",
+      reason_id: matchedReason?.reason_id,
+      purpose: matchedReason?.description || "",
+    };
+
     try {
-      const matchedSlot = slots.find((s) => s.time === selectedTime);
-      const matchedReason = reasonList.find((r) => r.reason_id === reasonId);
-      await appointmentsApi.create({
-        student_id: studentId,
-        slot_id: matchedSlot?.id ?? null,
-        appointment_date: toYMD(selectedDate),
-        appointment_time: matchedSlot?.slot_start || "08:00",
-        reason_id: matchedReason?.reason_id,
-        purpose: matchedReason?.description || "",
-      });
-      const payload = { date: selectedDate, time: selectedTime, reason: matchedReason?.description || "" };
+      const created = await appointmentsApi.create(createBody);
+      finishBooking(created);
+    } catch (err) {
+      const msg = err?.message || "Couldn't book the appointment. Please try again.";
+      const isDuplicatePending = /already have an active appointment/i.test(msg);
+
+      // Reschedule mode: the backend is correctly refusing to create a
+      // second pending appointment while the old one is still open. Cancel
+      // the old one and retry once — this is the actual "reschedule".
+      if (isReschedule && isDuplicatePending && oldAppointmentId) {
+        try {
+          await appointmentsApi.delete(oldAppointmentId);
+          const created = await appointmentsApi.create(createBody);
+          finishBooking(created);
+          return;
+        } catch (retryErr) {
+          console.error("Reschedule failed after cancelling old appointment:", retryErr);
+          setBookingError(
+            retryErr?.message || "Couldn't reschedule the appointment. Please try again."
+          );
+          setBooking(false);
+          return;
+        }
+      }
+
+      console.error("Booking failed:", err);
+      setBookingError(msg);
+      // If the backend confirmed a pending appointment exists, lock the form
+      // so the user sees the same disabled state as the pre-check.
+      if (isDuplicatePending) {
+        setHasPending(true);
+      }
+      setBooking(false);
+    }
+
+    function finishBooking(created) {
+      const payload = {
+        id: created?.appointment_id ?? created?.id ?? oldAppointmentId,
+        date: selectedDate,
+        time: selectedTime,
+        reason: matchedReason?.description || "",
+      };
       if (isReschedule) {
         rescheduleAppointment(payload);
       } else {
         bookAppointment(payload);
       }
       setBooked(true);
-    } catch (err) {
-      console.error("Booking failed:", err);
-      // Surface the backend's 400 ("You already have an active appointment")
-      // in the page banner so a bypassed frontend check is still visible.
-      const msg = err?.message || "Couldn't book the appointment. Please try again.";
-      setBookingError(msg);
-      // If the backend confirmed a pending appointment exists, lock the form
-      // so the user sees the same disabled state as the pre-check.
-      if (/already have an active appointment/i.test(msg)) {
-        setHasPending(true);
-      }
-    } finally {
       setBooking(false);
     }
   }
@@ -244,9 +351,9 @@ const [slots, setSlots] = useState([]);
     );
   }
 
-  const pageTitle = isReschedule ? "Reschedule Appointment" : "Book an Appointment";
-  const summaryActionLabel = isReschedule ? "Confirm Reschedule" : "Book";
-  const summaryLoadingLabel = isReschedule ? "Rescheduling…" : "Booking…";
+  const pageTitle = wantsReschedule ? "Reschedule Appointment" : "Book an Appointment";
+  const summaryActionLabel = wantsReschedule ? "Confirm Reschedule" : "Book";
+  const summaryLoadingLabel = wantsReschedule ? "Rescheduling…" : "Booking…";
 
   return (
     <div className="pt-2 md:pt-6">
