@@ -467,7 +467,7 @@ def get_medical_summary(student_id):
 
     return jsonify({
         "profile": profile.data,
-        "emergency_contact": emergency_contact.data,
-        "medical_history": medical_history.data,
+        "emergency_contact": emergency_contact.data if emergency_contact else None,
+        "medical_history": medical_history.data if medical_history else None,
         "years": years,
     })
