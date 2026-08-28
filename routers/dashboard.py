@@ -9,8 +9,8 @@ from routers.helpers import execute_with_retry, get_latest_status_for_appointmen
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
-APPOINTMENT_TABLE = "appointment"
-LOGBOOK_TABLE = "appointment_log"
+APPOINTMENT_TABLE = "appointments"
+LOGBOOK_TABLE = "visit_logs"
 
 
 def normalize_date(value):

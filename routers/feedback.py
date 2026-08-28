@@ -4,24 +4,31 @@ Feedback endpoints.
 Students rate their clinic visit (1-5 stars) with an optional message;
 staff-visible history is scoped per student.
 
-Requires the `feedback` table — run supabase_migrations.sql (or the
-CREATE TABLE block at the bottom of this file's docstring) once in the
-Supabase SQL editor before using these endpoints:
+Requires the clean-schema `feedback` table (spec §2.7):
 
-    create table if not exists feedback (
-        feedback_id bigint generated always as identity primary key,
-        student_id   text        not null,
-        rating       int         not null check (rating between 1 and 5),
-        message      text,
-        created_at   timestamptz not null default now()
+    CREATE TABLE "feedback" (
+        "feedback_id"  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        "student_id"   character varying(32) NOT NULL REFERENCES "students"("student_id")
+                       ON UPDATE CASCADE ON DELETE CASCADE,
+        "rating"       integer NOT NULL,
+        "message"      text,
+        "created_at"   timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT "chk_feedback_rating" CHECK ("rating" BETWEEN 1 AND 5)
     );
+
+`feedback.student_id` is a NOT NULL FK to `students(student_id)`, so the
+submitter's student_id always comes from the authenticated identity
+(`app_accounts` via `resolve_student_id(g.user)`) — never from a
+free-form request body value, which would violate the FK.
 """
 
-from flask import Blueprint, jsonify, request
+from types import SimpleNamespace
+
+from flask import Blueprint, g, jsonify, request
 
 from database import supabase
 from routers.helpers import execute_with_retry
-from routers.auth_guard import require_auth
+from routers.auth_guard import require_auth, resolve_student_id
 
 feedback_bp = Blueprint("feedback", __name__)
 
@@ -98,10 +105,13 @@ def get_feedback(student_id):
 #
 # Body:
 # {
-#     "student_id": "202411829",
 #     "rating": 4,
 #     "message": "Nurse was very helpful."
 # }
+#
+# The submitter's student_id is resolved from the authenticated
+# identity (g.user -> app_accounts.student_id), NOT from the body,
+# because clean feedback.student_id is a NOT NULL FK to students.
 # ============================================================
 
 @feedback_bp.route(
@@ -121,14 +131,25 @@ def submit_feedback():
                 "error": "Request body is required"
             }), 400
 
-        student_id = data.get("student_id")
+        # Resolve the authenticated student identity (app_accounts).
+        auth_user = SimpleNamespace(
+            id=g.user.get("id"),
+            email=g.user.get("email"),
+        )
+        student_id = resolve_student_id(auth_user)
+
+        if not student_id:
+            return jsonify({
+                "success": False,
+                "error": "Unable to verify student identity"
+            }), 403
+
         rating = data.get("rating")
         message = (data.get("message") or "").strip() or None
 
         missing = [
             field
             for field, value in [
-                ("student_id", student_id),
                 ("rating", rating),
             ]
             if value in (None, "")
