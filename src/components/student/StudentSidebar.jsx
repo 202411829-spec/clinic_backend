@@ -7,7 +7,7 @@ import StudentSidebarContent from "./StudentSidebarContent";
  */
 export default function StudentSidebar() {
   return (
-    <aside className="hidden md:flex md:flex-col w-[220px] shrink-0 bg-gc-student h-screen sticky top-0 print:hidden">
+    <aside className="hidden md:flex md:flex-col w-64 shrink-0 bg-gc-student h-screen sticky top-0 print:hidden">
       <StudentSidebarContent />
     </aside>
   );

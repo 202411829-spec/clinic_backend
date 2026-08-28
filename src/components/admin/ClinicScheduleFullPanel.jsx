@@ -3,9 +3,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon.jsx";
 import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
 import { clinicScheduleApi } from "../../lib/api.js";
 import { formatMDY } from "../../lib/calendar.js";
+
+const BLOCK_LENGTH_OPTIONS = [
+  { value: "15", label: "15 minutes" },
+  { value: "30", label: "30 minutes" },
+  { value: "60", label: "1 hour" },
+];
 
 function InfoDot({ label }) {
   return (
@@ -42,11 +49,18 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  // Split "8:00 AM - 9:00 AM" into a clean two-line label (start on line 1,
+  // end on line 2) instead of letting the browser wrap wherever it fits —
+  // that was breaking mid-unit (e.g. "9:00" / "AM" on separate lines) and
+  // looked inconsistent row to row.
+  const [startLabel, endLabel] = block.time.split(" - ");
+
   return (
     <div className="relative">
-      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5">
-        <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-          {block.time}
+      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5 min-w-0">
+        <span className="text-sm font-semibold text-gray-800 leading-tight">
+          <span className="block whitespace-nowrap">{startLabel} –</span>
+          <span className="block whitespace-nowrap">{endLabel}</span>
         </span>
         <div className="flex items-center gap-2 shrink-0">
           {/* Slots are set once per generated schedule and stay fixed per block,
@@ -125,14 +139,45 @@ export default function ClinicScheduleFullPanel() {
   const [breakStart, setBreakStart] = useState("12:00");
   const [breakEnd, setBreakEnd] = useState("13:00");
   const [numStudents, setNumStudents] = useState(100);
+  const [blockLengthMinutes, setBlockLengthMinutes] = useState("60");
 
   const [blocks, setBlocks] = useState([]);
   const [openEditId, setOpenEditId] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
 
+  // Time Block Preview is sized to match the Working Hours box exactly
+  // (instead of guessing a fixed px cap) — measured live so it stays in
+  // sync if the Working Hours box grows or shrinks. The block list then
+  // scrolls up/down inside that matched height.
+  const workingHoursRef = useRef(null);
+  const [previewHeight, setPreviewHeight] = useState(null);
+
+  useEffect(() => {
+    const el = workingHoursRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // offsetHeight (border-box, includes this box's own padding + border) —
+    // not ResizeObserver's contentRect, which reports only the inner content
+    // area and would make the matched preview box end up shorter than the
+    // Working Hours box by the amount of its padding/border.
+    const observer = new ResizeObserver(() => {
+      setPreviewHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    setPreviewHeight(el.offsetHeight);
+    return () => observer.disconnect();
+  }, []);
+
   const computed = useMemo(
-    () => generateTimeBlocks({ workStart, workEnd, breakStart, breakEnd, numStudents }),
-    [workStart, workEnd, breakStart, breakEnd, numStudents]
+    () =>
+      generateTimeBlocks({
+        workStart,
+        workEnd,
+        breakStart,
+        breakEnd,
+        numStudents,
+        blockLengthMinutes: Number(blockLengthMinutes),
+      }),
+    [workStart, workEnd, breakStart, breakEnd, numStudents, blockLengthMinutes]
   );
 
   // Re-derive the preview list whenever the inputs that drive it change.
@@ -326,7 +371,7 @@ export default function ClinicScheduleFullPanel() {
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">
         {/* left: calendar */}
         <ScheduleCalendar
           selectedDates={selectedDates}
@@ -351,7 +396,10 @@ export default function ClinicScheduleFullPanel() {
         {/* middle: working hours / break time / time block config — self-start
             so it hugs its own content instead of stretching to match the
             taller calendar/preview columns */}
-        <div className="self-start border border-gray-200 rounded-2xl p-4 md:p-5 space-y-4">
+        <div
+          ref={workingHoursRef}
+          className="self-start border border-gray-200 rounded-2xl p-4 md:p-5 space-y-4"
+        >
           <div>
             <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-2">
               Working Hours
@@ -448,47 +496,64 @@ export default function ClinicScheduleFullPanel() {
           </div>
         </div>
 
-        {/* right: live preview — capped at all breakpoints (viewport-relative
-            on lg screens) so a long block list scrolls within this panel
-            instead of stretching the grid row and forcing the whole page
-            to scroll. */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[260px] md:max-h-[300px] lg:max-h-[340px]">
-          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0 sticky top-0 bg-white z-10">
-            Time Block Preview
-          </h3>
-          <div className="space-y-2 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
-            {blocks.map((block) => (
-              <TimeBlockRow
-                key={block.id}
-                block={block}
-                editing={openEditId === block.id}
-                onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
-                onSave={handleSaveBlock}
-                onDelete={handleDeleteBlock}
+        {/* right: live preview — height is measured live to match the
+            Working Hours box exactly, with the block list scrolling
+            up/down inside that matched height instead of growing past it. */}
+        <div className="flex flex-col gap-3 self-start">
+          <div
+            className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col overflow-hidden"
+            style={previewHeight ? { height: `${previewHeight}px` } : undefined}
+          >
+            <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+              <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase">
+                Time Block Preview
+              </h3>
+              {/* Bulk action: change every block's length at once (e.g. all
+                  30-minute blocks instead of 1-hour) — slots per block are
+                  recalculated automatically to still cover Number of Students.
+                  Per-row Edit/Delete (⋮) below is unaffected and stays put. */}
+              <UniversalDropdown
+                value={blockLengthMinutes}
+                onChange={setBlockLengthMinutes}
+                options={BLOCK_LENGTH_OPTIONS}
+                className="w-[120px] shrink-0"
+                buttonClassName="!px-2.5 !py-1.5 !text-xs"
+                panelClassName="!text-xs"
               />
-            ))}
-            {blocks.length === 0 && (
-              <p className="text-center text-sm text-gray-400 py-6">
-                Adjust working hours or break time to generate time blocks.
-              </p>
+            </div>
+            <div className="space-y-2 overflow-y-auto overflow-x-hidden pr-1 -mr-1 flex-1 min-h-0">
+              {blocks.map((block) => (
+                <TimeBlockRow
+                  key={block.id}
+                  block={block}
+                  editing={openEditId === block.id}
+                  onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
+                  onSave={handleSaveBlock}
+                  onDelete={handleDeleteBlock}
+                />
+              ))}
+              {blocks.length === 0 && (
+                <p className="text-center text-sm text-gray-400 py-6">
+                  Adjust working hours or break time to generate time blocks.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Update Schedule now lives directly under its own preview
+              column instead of a full-width footer. */}
+          <div className="flex flex-col items-end gap-2">
+            {savedMessage && (
+              <p className="text-sm font-semibold text-gc-green text-right">{savedMessage}</p>
             )}
+            <button
+              onClick={handleUpdateSchedule}
+              className="w-full shrink-0 rounded-xl bg-gc-green px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
+            >
+              Update Schedule
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* footer: update schedule only — booking pill now lives inside ScheduleCalendar below Tip */}
-      <div className="mt-4 border-t border-gray-100 pt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          {savedMessage && (
-            <p className="text-sm font-semibold text-gc-green">{savedMessage}</p>
-          )}
-        </div>
-        <button
-          onClick={handleUpdateSchedule}
-          className="w-full md:w-auto shrink-0 rounded-xl bg-gc-green px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
-        >
-          Update Schedule
-        </button>
       </div>
     </section>
   );

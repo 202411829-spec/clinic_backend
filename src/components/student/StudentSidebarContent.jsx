@@ -9,11 +9,9 @@ import { studentMainNav } from "../../data/studentNav";
  * Rendered by both StudentSidebar.jsx (desktop rail) and
  * StudentMobileSidebarOverlay.jsx (mobile sheet) so the two stay in sync.
  *
- * Logos are stacked above the brand text (rather than flanking it) because
- * the fixed 220px sidebar isn't wide enough to fit two logos + "GORDON
- * COLLEGE" / "STUDENT PORTAL" side-by-side without the text wrapping.
- * Stacking gives the text the full width, so it stays on one line each
- * and stays readable.
+ * Logos are stacked above the brand text (rather than flanking it), same
+ * layout pattern as the admin sidebar, so the two portals match at the
+ * same w-64 sidebar width.
  */
 export default function StudentSidebarContent({ onNavigate }) {
   return (

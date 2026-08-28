@@ -167,6 +167,90 @@ export default function LogbookFullPanel() {
     loadData();
   }, [loadData]);
 
+  // Walk-in visit form — hidden by default, opened by the "+ Add Walk-in
+  // Visit" button, same pattern as the dashboard Logbook widget.
+  const [showWalkInForm, setShowWalkInForm] = useState(false);
+  const [regId, setRegId] = useState("");
+  const [walkInReasonId, setWalkInReasonId] = useState("");
+  const [complaint, setComplaint] = useState("");
+  const [medicineInput, setMedicineInput] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [medTags, setMedTags] = useState([]);
+  const [walkInError, setWalkInError] = useState(null);
+
+  function resetWalkInForm() {
+    setRegId("");
+    setWalkInReasonId("");
+    setComplaint("");
+    setMedicineInput("");
+    setQuantity("");
+    setMedTags([]);
+    setWalkInError(null);
+  }
+
+  function handleAddMedicine() {
+    if (!medicineInput.trim()) return;
+    const qty = quantity ? Number(quantity) : 1;
+    const match = medicineRecords.find(
+      (m) => m.medicine_name.toLowerCase() === medicineInput.trim().toLowerCase()
+    );
+    const medId = match?.medicine_id;
+    setMedTags((tags) => [
+      ...tags,
+      { name: medicineInput.trim(), quantity: qty, medicine_id: medId },
+    ]);
+    setMedicineInput("");
+    setQuantity("");
+  }
+
+  async function handleAddWalkIn() {
+    if (!regId.trim() || !walkInReasonId) return;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:00`;
+
+    const medicinesPayload = medTags
+      .filter((t) => t.medicine_id)
+      .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
+
+    try {
+      setWalkInError(null);
+      await logbookApi.createWalkIn({
+        student_id: regId.trim(),
+        appointment_date: `${y}-${m}-${d}`,
+        appointment_time: time,
+        reason_id: Number(walkInReasonId),
+        complaint: complaint.trim() || undefined,
+        medicines: medicinesPayload.length > 0 ? medicinesPayload : undefined,
+      });
+      // Refresh straight from the API with explicit page=1 params (rather
+      // than going through loadData(), which would otherwise close over
+      // whatever page the admin was on before this async call resolves).
+      const res = await logbookApi.list({
+        page: 1,
+        page_size: pageSize,
+        ...(search && { search }),
+        ...(dateFrom && { date_from: dateFrom }),
+        ...(dateTo && { date_to: dateTo }),
+        ...(reasonFilter && { reason_id: reasonFilter }),
+      });
+      setEntries((res?.logbook || []).map(mapEntry));
+      setTotalEntries(res?.total || 0);
+      setPage(1);
+    } catch (err) {
+      console.error("Walk-in failed:", err);
+      setWalkInError(err.message || "Couldn't save the walk-in visit.");
+      return;
+    }
+
+    resetWalkInForm();
+    setShowWalkInForm(false);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -185,16 +269,32 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+      {/* header — matches the dashboard Logbook widget's card header */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+          <NavIcon name="book" className="w-4 h-4" />
+        </span>
+        <div>
+          <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
+            Logbook
+          </h1>
+          <p className="text-xs text-gray-400 leading-tight">
+            View history of completed clinic visits.
+          </p>
+        </div>
+      </div>
+
       {/* Search + Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col md:flex-row gap-3 mb-3">
+        <div className="relative flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 focus-within:ring-2 focus-within:ring-gc-green focus-within:border-transparent transition">
+          <NavIcon name="user" className="w-4 h-4 shrink-0" />
           <input
             type="text"
             placeholder="Search student ID, name, complaint, medicine…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
+            className="w-full outline-none placeholder:text-gray-400 text-gray-900 bg-transparent"
           />
         </div>
         <div className="flex flex-wrap gap-2 md:w-[500px]">
@@ -202,14 +302,14 @@ export default function LogbookFullPanel() {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
+            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
             placeholder="From date"
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 focus:outline:none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
+            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
             placeholder="To date"
           />
           <UniversalDropdown
@@ -222,44 +322,45 @@ export default function LogbookFullPanel() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Student ID</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Age</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Dept / Course</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Sex</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Complaint</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Medicine</th>
+      {/* Table — same boxed/grid look as the dashboard widget: bordered
+          cells + gray-50 header, instead of a borderless divide-only table */}
+      <div className="overflow-x-auto -mx-4 md:mx-0">
+        <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse">
+          <thead>
+            <tr className="text-left text-xs text-gray-500 bg-gray-50">
+              <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300 whitespace-nowrap">Date & Time</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Student ID</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Name</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Age</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Dept / Course</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Reason</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Complaint</th>
+              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Medicine</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-gray-400">
+                <td colSpan={9} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
                   No logbook entries found
                 </td>
               </tr>
             ) : (
               entries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{entry.dateTime}</td>
-                  <td className="px-4 py-3 text-gray-700 font-medium">{entry.studentId}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.name}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.age}</td>
-                  <td className="px-4 py-3 text-gray-700">
-                    <div className="font-medium">{entry.dept}</div>
-                    <div className="text-xs text-gray-500">{entry.course}</div>
+                <tr key={entry.id}>
+                  <td className="py-2.5 px-4 md:px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.dateTime}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap">{entry.studentId}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.name}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.age}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">
+                    <div className="font-medium whitespace-nowrap">{entry.dept}</div>
+                    <div className="text-xs text-gray-500 whitespace-nowrap">{entry.course}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{entry.sex}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.reason}</td>
-                  <td className="px-4 py-3 text-gray-700 max-w-xs truncate">{entry.complaint}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.medicine}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.sex}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.reason}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 max-w-xs truncate">{entry.complaint}</td>
+                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{entry.medicine}</td>
                 </tr>
               ))
             )}
@@ -269,14 +370,141 @@ export default function LogbookFullPanel() {
 
       {/* Pagination */}
       {totalEntries > pageSize && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
             Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalEntries)} of{" "}
             {totalEntries} entries
           </p>
           <Pagination page={page} pageCount={Math.ceil(totalEntries / pageSize)} onChange={setPage} />
         </div>
       )}
-    </div>
+
+      {/* bottom trigger — hidden once the form is open, same as the dashboard widget */}
+      {!showWalkInForm && (
+        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2">
+          <button
+            onClick={() => setShowWalkInForm(true)}
+            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+          >
+            + Add Walk-in Visit
+          </button>
+        </div>
+      )}
+
+      {/* walk-in visit form — expands directly below the button, closes back into it */}
+      {showWalkInForm && (
+        <div className="mt-4 pt-4 border-t-2 border-gray-300">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
+            <button
+              onClick={() => {
+                setShowWalkInForm(false);
+                resetWalkInForm();
+              }}
+              aria-label="Close"
+              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <span aria-hidden className="text-base leading-none">×</span>
+            </button>
+          </div>
+
+          {walkInError && (
+            <p className="mb-3 text-sm font-semibold text-red-600">{walkInError}</p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500">
+                ID / Registration Number
+              </label>
+              <input
+                value={regId}
+                onChange={(e) => setRegId(e.target.value)}
+                placeholder="Student ID"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Reason</label>
+              <UniversalDropdown
+                value={walkInReasonId}
+                onChange={setWalkInReasonId}
+                options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
+                placeholder="Select Reason"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Complaint</label>
+              <input
+                value={complaint}
+                onChange={(e) => setComplaint(e.target.value)}
+                placeholder="E.g. Headache"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Medicine</label>
+                <input
+                  value={medicineInput}
+                  onChange={(e) => setMedicineInput(e.target.value)}
+                  placeholder="E.g. Paracetamol"
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                />
+                {medTags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {medTags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                      >
+                        {tag.name} x{tag.quantity}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Quantity</label>
+                <div className="mt-1 flex gap-1.5">
+                  <input
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    type="number"
+                    min="0"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+                  />
+                  <button
+                    onClick={handleAddMedicine}
+                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
+            <button
+              onClick={() => {
+                setShowWalkInForm(false);
+                resetWalkInForm();
+              }}
+              className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddWalkIn}
+              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            >
+              + Add Walk-in Visit
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
