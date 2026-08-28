@@ -326,6 +326,16 @@ export default function ClinicScheduleFullPanel() {
           mode={calendarMode}
           onModeChange={setCalendarMode}
           bookingEnabledMap={bookingEnabledMap}
+          bookingLabel={
+            calendarMode === "specific" && selectedDates.length >= 1
+              ? getBookingLabel()
+              : null
+          }
+          allOpen={allOpen}
+          allClosed={allClosed}
+          mixed={mixed}
+          onSetBooking={handleSetBooking}
+          bookingSaving={bookingSaving}
         />
 
         {/* middle: working hours / break time / time block config — self-start
@@ -456,49 +466,11 @@ export default function ClinicScheduleFullPanel() {
         </div>
       </div>
 
-      {/* footer: persisted booking toggle (lowest part) + update schedule */}
+      {/* footer: update schedule only — booking pill now lives inside ScheduleCalendar below Tip */}
       <div className="mt-4 border-t border-gray-100 pt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex-1 min-w-0">
-          {calendarMode === "specific" && selectedDates.length >= 1 ? (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
-                {getBookingLabel()}
-              </span>
-              <div className="inline-flex flex-row flex-nowrap rounded-full bg-gray-100 p-1 gap-1 self-start items-center">
-                <button
-                  type="button"
-                  onClick={() => handleSetBooking(true)}
-                  disabled={bookingSaving}
-                  aria-pressed={allOpen}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
-                    allOpen
-                      ? "bg-gc-green text-white shadow-sm"
-                      : "bg-white text-gray-500 hover:bg-gray-50"
-                  }`}
-                >
-                  {allOpen ? "● Open" : "Open"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetBooking(false)}
-                  disabled={bookingSaving}
-                  aria-pressed={allClosed}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
-                    allClosed
-                      ? "bg-red-500 text-white shadow-sm"
-                      : "bg-white text-gray-500 hover:bg-gray-50"
-                  }`}
-                >
-                  {allClosed ? "● Closed" : "Closed"}
-                </button>
-              </div>
-              {mixed && (
-                <span className="text-[11px] text-gray-400">Mixed — tap to set all</span>
-              )}
-            </div>
-          ) : null}
           {savedMessage && (
-            <p className="text-sm font-semibold text-gc-green mt-2">{savedMessage}</p>
+            <p className="text-sm font-semibold text-gc-green">{savedMessage}</p>
           )}
         </div>
         <button

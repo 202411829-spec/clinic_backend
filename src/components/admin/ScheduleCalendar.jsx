@@ -32,6 +32,12 @@ export default function ScheduleCalendar({
   mode: modeProp,
   onModeChange,
   bookingEnabledMap,
+  bookingLabel,
+  allOpen,
+  allClosed,
+  mixed,
+  onSetBooking,
+  bookingSaving,
 }) {
   const today = new Date();
   const primary = selectedDates[0] ?? today;
@@ -308,6 +314,45 @@ export default function ScheduleCalendar({
           Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
         </p>
       )}
+
+      {mode === "specific" && selectedDates.length >= 1 && bookingLabel ? (
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+            {bookingLabel}
+          </span>
+          <div className="inline-flex flex-row flex-nowrap rounded-full bg-gray-100 p-1 gap-1 self-start items-center">
+            <button
+              type="button"
+              onClick={() => onSetBooking?.(true)}
+              disabled={bookingSaving}
+              aria-pressed={allOpen}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
+                allOpen
+                  ? "bg-gc-green text-white shadow-sm"
+                  : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              {allOpen ? "● Open" : "Open"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetBooking?.(false)}
+              disabled={bookingSaving}
+              aria-pressed={allClosed}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
+                allClosed
+                  ? "bg-red-500 text-white shadow-sm"
+                  : "bg-white text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              {allClosed ? "● Closed" : "Closed"}
+            </button>
+          </div>
+          {mixed && (
+            <span className="text-[11px] text-gray-400">Mixed — tap to set all</span>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
