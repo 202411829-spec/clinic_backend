@@ -2,6 +2,7 @@ import time
 import socket
 
 from datetime import date
+from types import SimpleNamespace
 
 try:
     import httpx
@@ -9,6 +10,14 @@ except ImportError:
     httpx = None
 
 from database import supabase
+
+# Sentinel returned by execute_with_retry when a .maybe_single() query
+# finds no matching row.  postgrest-py returns None from .execute() in
+# that case, but every caller accesses .data / .error / .count on the
+# result — so we wrap None into a lightweight object that has those
+# attributes (all None) and is truthy, preventing the systemic
+# AttributeError: 'NoneType' object has no attribute 'data' bug.
+_EMPTY_RESPONSE = SimpleNamespace(data=None, error=None, count=None)
 
 
 # ============================================================
@@ -96,7 +105,16 @@ def execute_with_retry(query, retries=5, delay=0.3):
     for attempt in range(retries):
 
         try:
-            return query.execute()
+            result = query.execute()
+            # postgrest-py returns None (not an APIResponse) when a
+            # .maybe_single() chain finds no matching row.  Every caller
+            # accesses .data / .error / .count on the returned object, so
+            # we swap None for a lightweight sentinel that has those
+            # attributes as None and is truthy — preventing the systemic
+            # AttributeError: 'NoneType' object has no attribute 'data'.
+            if result is None:
+                return _EMPTY_RESPONSE
+            return result
 
         except TRANSIENT_ERRORS as e:
 

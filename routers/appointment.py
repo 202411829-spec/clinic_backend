@@ -627,32 +627,9 @@ def update_appointment_status(appointment_id):
             }), 400
 
         # Auto-resolve changed_by from authenticated admin user
-        # g.user.email is set by require_admin (via require_auth)
-        changed_by = None
-        if g.user and g.user.get("email"):
-            admin_email = g.user.get("email")
-            # Try to find admin by email
-            admin_response = execute_with_retry(
-                supabase
-                .table("admin_accounts")
-                .select("admin_id")
-                .eq("email", admin_email)
-                .maybe_single()
-            )
-            if admin_response.data:
-                changed_by = admin_response.data.get("admin_id")
-            else:
-                # Fallback: try to match by username (local part of email)
-                local_part = admin_email.split("@")[0] if "@" in admin_email else admin_email
-                admin_response = execute_with_retry(
-                    supabase
-                    .table("admin_accounts")
-                    .select("admin_id")
-                    .eq("username", local_part)
-                    .maybe_single()
-                )
-                if admin_response.data:
-                    changed_by = admin_response.data.get("admin_id")
+        # g.user.email is set by require_admin (via require_auth).
+        # Use the shared resolver (email → username → any admin fallback).
+        changed_by = resolve_changed_by_admin_id(g.user)
 
         # Fallback to provided changed_by if auto-resolve failed
         if changed_by is None:
