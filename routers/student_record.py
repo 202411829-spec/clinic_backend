@@ -7,12 +7,13 @@ forms, plus the Medical Certificate and Medical Summary views.
 Converted from FastAPI to a Flask blueprint.
 """
 
-from flask import Blueprint, jsonify, request
+from types import SimpleNamespace
+from flask import Blueprint, g, jsonify, request
 from datetime import date
 
 from database import supabase
-from routers.auth_guard import require_auth, require_admin
-from routers.helpers import execute_with_retry
+from routers.auth_guard import require_auth, require_admin, resolve_student_id, _is_admin_user
+from routers.helpers import execute_with_retry, normalize_student_id
 
 student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
@@ -80,10 +81,14 @@ def _iso_or_none(value):
 @student_record_bp.route("/<path:student_id>", methods=["GET"])
 @require_auth
 def get_student_record_header(student_id):
+    sid = normalize_student_id(student_id)
+    if not sid:
+        return _error("Student not found", 404)
+
     profile = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
         .maybe_single()
     )
     if not profile.data:
@@ -92,7 +97,7 @@ def get_student_record_header(student_id):
     exams_resp = execute_with_retry(
         supabase.table("annual_examinations")
         .select("*")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
     )
     by_year = {row["year_label"]: row for row in exams_resp.data}
 
@@ -103,7 +108,7 @@ def get_student_record_header(student_id):
         else:
             history.append({
                 "annual_exam_id": None,
-                "student_id": student_id,
+                "student_id": sid,
                 "year_label": label,
                 "school_year": None,
                 "exam_status": "no_record",
@@ -117,6 +122,10 @@ def get_student_record_header(student_id):
 @student_record_bp.route("/<path:student_id>/annual-exams", methods=["POST"])
 @require_admin
 def add_annual_exam(student_id):
+    sid = normalize_student_id(student_id)
+    if not sid:
+        return _error("Student not found", 404)
+
     body = request.get_json(silent=True) or {}
 
     year_label = body.get("year_label")
@@ -126,7 +135,7 @@ def add_annual_exam(student_id):
     existing = execute_with_retry(
         supabase.table("annual_examinations")
         .select("annual_exam_id")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
         .eq("year_label", year_label)
         .maybe_single()
     )
@@ -136,7 +145,7 @@ def add_annual_exam(student_id):
     response = execute_with_retry(
         supabase.table("annual_examinations")
         .insert({
-            "student_id": student_id,
+            "student_id": sid,
             "school_year": body.get("school_year"),
             "year_label": year_label,
             "exam_status": "pending",
@@ -435,10 +444,14 @@ def get_medical_certificate(annual_exam_id):
 @student_record_bp.route("/<path:student_id>/medical-summary", methods=["GET"])
 @require_auth
 def get_medical_summary(student_id):
+    sid = normalize_student_id(student_id)
+    if not sid:
+        return _error("Student not found", 404)
+
     profile = execute_with_retry(
         supabase.table("student_masterlist")
         .select("*")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
         .maybe_single()
     )
     if not profile.data:
@@ -447,20 +460,20 @@ def get_medical_summary(student_id):
     emergency_contact = execute_with_retry(
         supabase.table("emergency_contacts")
         .select("*")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
         .maybe_single()
     )
     medical_history = execute_with_retry(
         supabase.table("medical_histories")
         .select("*")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
         .maybe_single()
     )
 
     exams = execute_with_retry(
         supabase.table("annual_examinations")
         .select("*, physical_examinations(*, laboratory_results(*, chest_xrays(*)))")
-        .eq("student_id", student_id)
+        .eq("student_id", sid)
     )
     by_year = {row["year_label"]: row for row in exams.data}
     years = {label: by_year.get(label) for label in YEAR_LABELS}
@@ -470,4 +483,182 @@ def get_medical_summary(student_id):
         "emergency_contact": emergency_contact.data if emergency_contact else None,
         "medical_history": medical_history.data if medical_history else None,
         "years": years,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Student self-edit profile (PATCH)
+# ---------------------------------------------------------------------------
+
+# Allowed student-editable fields on the `students` table.
+_STUDENT_EDITABLE_FIELDS = {
+    "first_name", "middle_initial", "last_name", "gender",
+    "birth_date", "civil_status", "contact_number",
+    "present_address", "photo",
+}
+
+# Allowed boolean fields on `medical_histories`.
+_MEDICAL_HISTORY_BOOL_FIELDS = {
+    "has_asthma", "has_chicken_pox", "has_diabetes",
+    "has_dysmenorrhea", "has_epilepsy_seizure",
+    "has_heart_disorder", "has_hepatitis", "has_hypertension",
+    "has_measles", "has_mumps", "has_anxiety_disorder",
+    "has_panic_attack", "has_pneumonia", "has_tb_primary_complex",
+    "has_typhoid_fever", "has_covid19", "has_urinary_tract_infection",
+}
+
+# Allowed text/date fields on `medical_histories` (beyond the booleans).
+_MEDICAL_HISTORY_OTHER_FIELDS = {
+    "allergies", "has_operation_history",
+    "operation_procedure", "operation_date",
+}
+
+# Fields that need ISO-date validation.
+_DATE_FIELDS = {"birth_date", "operation_date"}
+
+
+def _upsert_by_student_id(table, student_id, payload):
+    """Update a row by student_id; insert if none exists yet."""
+    existing = execute_with_retry(
+        supabase.table(table)
+        .select("*")
+        .eq("student_id", student_id)
+        .maybe_single()
+    )
+    if existing.data:
+        # Find the PK column for the table.
+        pk_map = {
+            "emergency_contacts": "contact_id",
+            "medical_histories": "history_id",
+        }
+        pk = pk_map[table]
+        response = execute_with_retry(
+            supabase.table(table)
+            .update(payload)
+            .eq(pk, existing.data[pk])
+        )
+    else:
+        payload["student_id"] = student_id
+        response = execute_with_retry(
+            supabase.table(table).insert(payload)
+        )
+    return response
+
+
+@student_record_bp.route("/<path:student_id>/profile", methods=["PATCH"])
+@require_auth
+def update_student_profile(student_id):
+    """Allow a student to edit their own profile, emergency contact, and
+    medical history.  Admins may edit any student."""
+
+    sid = normalize_student_id(student_id)
+    if not sid:
+        return _error("Invalid student ID", 400)
+
+    # --- Ownership check ---
+    # `g.user` is a dict {id, email}; the auth_guard resolvers expect an
+    # object with .id/.email attributes (feedback.py pattern).
+    auth_user = SimpleNamespace(
+        id=g.user.get("id"),
+        email=g.user.get("email"),
+    )
+
+    # Admin can edit any student — check first so the student-id
+    # resolver's email-local-part fallback doesn't misclassify an admin
+    # (e.g. "admin@gordoncollege.edu.ph" -> "ADMIN") as a foreign student.
+    if _is_admin_user(auth_user):
+        pass  # allowed
+    else:
+        caller_student_id = resolve_student_id(auth_user)
+        if caller_student_id is not None:
+            # Caller is a student — must be editing their own record.
+            if normalize_student_id(caller_student_id) != sid:
+                return _error("You can only edit your own profile", 403)
+        else:
+            # Neither admin nor a resolvable student — deny.
+            return _error("Forbidden", 403)
+
+    # --- Verify student exists ---
+    existing = execute_with_retry(
+        supabase.table("students")
+        .select("student_id")
+        .eq("student_id", sid)
+        .maybe_single()
+    )
+    if not existing.data:
+        return _error("Student not found", 404)
+
+    body = request.get_json(silent=True) or {}
+
+    # --- Update students table (partial) ---
+    student_payload = {}
+    for key in _STUDENT_EDITABLE_FIELDS:
+        if key in body:
+            value = body[key]
+            if key in _DATE_FIELDS:
+                value = _iso_or_none(value)
+            student_payload[key] = value
+
+    if student_payload:
+        execute_with_retry(
+            supabase.table("students")
+            .update(student_payload)
+            .eq("student_id", sid)
+        )
+
+    # --- Upsert emergency_contact ---
+    ec_body = body.get("emergency_contact")
+    if ec_body and isinstance(ec_body, dict):
+        ec_payload = {}
+        for key in ("contact_name", "relationship", "phone_number", "present_address"):
+            if key in ec_body:
+                ec_payload[key] = ec_body[key]
+        if ec_payload:
+            _upsert_by_student_id("emergency_contacts", sid, ec_payload)
+
+    # --- Upsert medical_history ---
+    mh_body = body.get("medical_history")
+    if mh_body and isinstance(mh_body, dict):
+        mh_payload = {}
+        for key in _MEDICAL_HISTORY_BOOL_FIELDS:
+            if key in mh_body:
+                mh_payload[key] = bool(mh_body[key])
+        for key in _MEDICAL_HISTORY_OTHER_FIELDS:
+            if key in mh_body:
+                value = mh_body[key]
+                if key == "operation_date":
+                    value = _iso_or_none(value)
+                elif key == "has_operation_history":
+                    value = bool(value)
+                mh_payload[key] = value
+        if mh_payload:
+            _upsert_by_student_id("medical_histories", sid, mh_payload)
+
+    # --- Build response: updated profile + related data ---
+    profile = execute_with_retry(
+        supabase.table("student_masterlist")
+        .select("*")
+        .eq("student_id", sid)
+        .maybe_single()
+    )
+    emergency_contact = execute_with_retry(
+        supabase.table("emergency_contacts")
+        .select("*")
+        .eq("student_id", sid)
+        .maybe_single()
+    )
+    medical_history = execute_with_retry(
+        supabase.table("medical_histories")
+        .select("*")
+        .eq("student_id", sid)
+        .maybe_single()
+    )
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "profile": profile.data,
+            "emergency_contact": emergency_contact.data if emergency_contact else None,
+            "medical_history": medical_history.data if medical_history else None,
+        },
     })
