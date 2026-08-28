@@ -163,7 +163,7 @@ export default function ClinicScheduleFullPanel() {
         work_end: workEnd,
         break_start: breakStart,
         break_end: breakEnd,
-        max_student_per_slot: Number(computed.slotsPerBlock) || undefined,
+        max_students_per_slot: Number(computed.slotsPerBlock) || undefined,
       });
     } catch (err) {
       console.error("Failed to save settings:", err);

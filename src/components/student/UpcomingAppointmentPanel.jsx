@@ -107,10 +107,7 @@ function handleReschedule() {
     setMenuOpen(false);
     if (appt?.id) {
       try {
-        await appointmentsApi.updateStatus(appt.id, {
-          new_status: "Cancelled",
-          remarks: "Cancelled by student",
-        });
+        await appointmentsApi.delete(appt.id);
         // Only clear after successful API response
         cancelAppointment();
         setUpcoming(null);

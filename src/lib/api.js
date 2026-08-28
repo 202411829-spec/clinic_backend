@@ -92,11 +92,12 @@ export const appointmentsApi = {
   getStatus: (appointmentId) => api.get(`/appointments/${appointmentId}/status`),
   updateStatus: (appointmentId, body) =>
     api.patch(`/appointments/${appointmentId}/status`, body),
+  delete: (appointmentId) => api.del(`/appointments/${appointmentId}`),
 }
 
 // ---- Logbook ----
 export const logbookApi = {
-  list: () => api.get('/logbook'),
+  list: (params = {}) => api.get('/logbook', params),
   byStudent: (studentId) => api.get(`/logbook/student/${studentId}`),
   createWalkIn: (body) => api.post('/logbook/walk-in', body),
   addMedicine: (logId, medicines) => api.post(`/logbook/${logId}/medicine`, { medicines }),
