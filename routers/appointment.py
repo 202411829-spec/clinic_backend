@@ -45,9 +45,33 @@ def _is_tomorrow_date(date_str):
 
 def _caller_is_admin():
     """Check whether the current caller (g.user) is an admin via app_accounts. Returns False for students/unknown."""
-    user = getattr(g, "user", None) or {}
-    auth_user_id = user.get("id")
-    email = (user.get("email") or "").strip().lower()
+    raw = getattr(g, "user", None) or {}
+    # Normalize to dict: g.user is normally {"id": ..., "email": ...} from require_auth (routers/auth_guard.py:234-237),
+    # but be defensive if it is an attribute-style object or uses alternative key names.
+    if not isinstance(raw, dict):
+        try:
+            raw = {
+                "id": getattr(raw, "id", None),
+                "email": getattr(raw, "email", None),
+                "account_type": getattr(raw, "account_type", None),
+                "role": getattr(raw, "role", None),
+            }
+        except Exception:
+            raw = {}
+    user = raw
+    # Fast-path: if g.user already carries account_type/role == admin, bypass DB lookup.
+    # This covers future auth_guard changes and avoids a DB round-trip for admins.
+    acct = str(user.get("account_type") or user.get("role") or user.get("type") or "").strip().lower()
+    if acct == "admin":
+        return True
+    auth_user_id = (
+        user.get("id")
+        or user.get("auth_user_id")
+        or user.get("user_id")
+        or user.get("sub")
+        or user.get("uid")
+    )
+    email = (user.get("email") or user.get("user_email") or user.get("mail") or "").strip().lower()
     try:
         if auth_user_id:
             resp = execute_with_retry(
@@ -61,7 +85,8 @@ def _caller_is_admin():
             )
             if resp.data and resp.data[0].get("admin_id"):
                 return True
-    except Exception:
+    except Exception as e:
+        print(f"_caller_is_admin check failed for {auth_user_id or email}: {repr(e)}")
         pass
     return False
 
