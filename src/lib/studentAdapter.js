@@ -61,6 +61,138 @@ export function adaptStudentProfile(profile, medSummary) {
   };
 }
 
+// Converts one backend `years[label]` row (from `GET .../medical-summary`)
+// into the per-year shape the MedicalSummaryPanel renders. Falls back to the
+// empty-record shape when the row (or one of its sub-records) is null/missing.
+// The nested Supabase joins come back as EITHER a single object (one-to-one)
+// OR a one-element array depending on the FK relationship, so every join is
+// normalized through `firstOf()` to accept both shapes.
+function firstOf(value) {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function emptyPanelYear() {
+  return {
+    dateExamined: "",
+    bp: "",
+    cr: "",
+    rr: "",
+    temperature: "",
+    weight: "",
+    height: "",
+    visualAcuity: "",
+    findings: {
+      skin: "Normal",
+      heent: "Normal",
+      heart: "Normal",
+      abdomen: "Normal",
+      extremities: "Normal",
+      others: "Normal",
+    },
+    findingsRemarks: {
+      skin: "",
+      heent: "",
+      heart: "",
+      abdomen: "",
+      extremities: "",
+      others: "",
+    },
+    othersSpecify: "",
+    extraOthersFindings: [],
+    generalRemarks: "",
+    finalAssessment: "",
+    physicalExaminedBy: "",
+    physicalLicenseNo: "",
+    chestXray: { date: "", result: "Normal", remarks: "" },
+    cbc: { date: "", hemoglobin: "", hematocrit: "", wbc: "", plateletCount: "", bloodType: "" },
+    urinalysis: { date: "", glucose: "", protein: "" },
+    otherLabType: "",
+    otherLabDetails: {},
+    extraLabOthers: [],
+    diagnosis: "",
+    finalRemark: "",
+    diagnosisExaminedBy: "",
+    diagnosisLicenseNo: "",
+    diagnosisNormalFindingsChecked: false,
+    normalFindingsChecked: false,
+  };
+}
+
+export function adaptMedicalSummaryYear(row) {
+  const out = emptyPanelYear();
+  if (!row) return out;
+
+  out.dateExamined = row.date_examined || row.date_examined_at || "";
+
+  // Labs are nested inside physical_examinations in this schema.
+  const phys = firstOf(row.physical_examinations);
+  if (phys) {
+    out.bp = phys.blood_pressure || "";
+    out.cr = phys.cardiac_rate || "";
+    out.rr = phys.respiratory_rate || "";
+    out.temperature = phys.temperature || "";
+    out.weight = phys.weight_kg || "";
+    out.height = phys.height_cm || "";
+    out.visualAcuity = phys.visual_acuity || "";
+    out.findings = {
+      skin: phys.skin_result || "Normal",
+      heent: phys.heent_result || "Normal",
+      heart: phys.heart_result || "Normal",
+      abdomen: phys.abdomen_result || "Normal",
+      extremities: phys.extremities_result || "Normal",
+      others: phys.other_findings_result || "Normal",
+    };
+    out.findingsRemarks = {
+      skin: phys.skin_remarks || "",
+      heent: phys.heent_remarks || "",
+      heart: phys.heart_remarks || "",
+      abdomen: phys.abdomen_remarks || "",
+      extremities: phys.extremities_remarks || "",
+      others: phys.other_findings_remarks || "",
+    };
+    out.generalRemarks = phys.general_remarks || "";
+    out.finalAssessment = phys.final_assessment || "";
+    out.physicalExaminedBy = phys.examined_by_admin_id || "";
+
+    const lab = firstOf(phys.laboratory_results);
+    if (lab) {
+      const xray = firstOf(lab.chest_xrays) || {};
+      out.chestXray = {
+        date: xray.date || xray.date_taken || "",
+        result: xray.result || "Normal",
+        remarks: xray.remarks || "",
+      };
+      out.cbc = {
+        date: lab.cbc_date || "",
+        hemoglobin: lab.hemoglobin || "",
+        hematocrit: lab.hematocrit || "",
+        wbc: lab.wbc || "",
+        plateletCount: lab.platelet_count || "",
+        bloodType: lab.blood_type || "",
+      };
+      out.urinalysis = {
+        date: lab.urinalysis_date || "",
+        glucose: lab.glucose || "",
+        protein: lab.protein || "",
+      };
+    }
+  }
+
+  const cert = firstOf(row.medical_certificates);
+  if (cert) {
+    out.diagnosis = cert.diagnosis || "";
+    out.finalRemark = cert.final_remark || "";
+    out.diagnosisExaminedBy = cert.prepared_by_admin_id || "";
+    out.diagnosisLicenseNo = "";
+    const essentiallyNormal = Boolean(cert.is_essentially_normal);
+    out.diagnosisNormalFindingsChecked = essentiallyNormal;
+    out.normalFindingsChecked = essentiallyNormal;
+  }
+
+  return out;
+}
+
 // Picks the most recent annual exam id that actually exists, so
 // certificate/diagnosis views have something concrete to load.
 export function latestAnnualExamId(medSummaryOrHeader) {

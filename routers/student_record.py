@@ -489,7 +489,7 @@ def get_medical_summary(student_id):
 
     exams = execute_with_retry(
         supabase.table("annual_examinations")
-        .select("*, physical_examinations(*, laboratory_results(*, chest_xrays(*)))")
+        .select("*, physical_examinations(*, laboratory_results(*, chest_xrays(*))), medical_certificates(*)")
         .eq("student_id", sid)
     )
     by_year = {row["year_label"]: row for row in exams.data}

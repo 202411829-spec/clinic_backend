@@ -8,10 +8,10 @@ import NavIcon from "./NavIcon.jsx";
 import { ChevronLeftIcon } from "../icons.jsx";
 import {
   academicYears,
-  getStudentAnnualHistory,
   computeAge,
   formatLongDate,
 } from "../../data/studentRecordSample.js";
+import { adaptMedicalSummaryYear } from "../../lib/studentAdapter.js";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
@@ -139,14 +139,18 @@ function GroupRow({ label, span }) {
   );
 }
 
-export default function MedicalSummaryPanel({ student }) {
+export default function MedicalSummaryPanel({ student, medicalSummary }) {
   const navigate = useNavigate();
   const [physicalOpen, setPhysicalOpen] = useState(true);
   const [labOpen, setLabOpen] = useState(true);
   const [diagnosisOpen, setDiagnosisOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
-  const records = getStudentAnnualHistory();
+  const records = academicYears.reduce((acc, yr) => {
+    const label = yr.label.split(" (")[0];
+    acc[yr.key] = adaptMedicalSummaryYear(medicalSummary?.years?.[label]);
+    return acc;
+  }, {});
   const age = computeAge(student.birthday);
   const conditions = student.medicalConditions ?? [];
   const emergency = student.emergencyContact ?? {};
