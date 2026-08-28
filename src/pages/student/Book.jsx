@@ -288,9 +288,8 @@ const [slots, setSlots] = useState([]);
               onSelectDate={handleSelectDate}
               navigationMode="month"
               minDate={tomorrow}
-              maxDate={tomorrow}
             />
-            <p className="text-xs text-gray-500 text-center">Booking is open for tomorrow only</p>
+            <p className="text-xs text-gray-500 text-center">Booking is available starting tomorrow</p>
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -371,9 +370,8 @@ const [slots, setSlots] = useState([]);
             onSelectDate={handleSelectDate}
             navigationMode="month"
             minDate={tomorrow}
-            maxDate={tomorrow}
           />
-          <p className="text-xs text-gray-500 text-center mt-2">Booking is open for tomorrow only</p>
+          <p className="text-xs text-gray-500 text-center mt-2">Booking is available starting tomorrow</p>
         </div>
         <SelectTimeSlots
           slots={slots}

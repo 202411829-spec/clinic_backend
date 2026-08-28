@@ -29,13 +29,18 @@ def _get_tomorrow_date():
     return today_manila + timedelta(days=1)
 
 
-def _is_tomorrow_date(date_str):
-    """Return True iff date_str (YYYY-MM-DD) equals tomorrow in Manila time."""
+def _is_bookable_date(date_str):
+    """Return True iff date_str (YYYY-MM-DD) is >= tomorrow in Manila time."""
     try:
         parsed = datetime.strptime(str(date_str)[:10], "%Y-%m-%d").date()
     except (ValueError, TypeError, AttributeError):
         return False
-    return parsed == _get_tomorrow_date()
+    return parsed >= _get_tomorrow_date()
+
+
+def _is_tomorrow_date(date_str):
+    """Backward compat alias — now checks date >= tomorrow (booking window)."""
+    return _is_bookable_date(date_str)
 
 
 def _caller_is_admin():
@@ -561,16 +566,17 @@ def get_time_slots():
 
         # ----------------------------------------------------
         # Booking window defense-in-depth: students may only query
-        # slots for tomorrow. Admins are unrestricted so the admin
-        # AppointmentsPanel can inspect any date. Direct API calls
-        # with a non-tomorrow date are rejected with the same 400
-        # message as the booking endpoint.
+        # slots starting tomorrow (>= tomorrow). Today and past are
+        # blocked; any future date >= tomorrow is allowed. Admins are
+        # unrestricted so the admin AppointmentsPanel can inspect any
+        # date. Direct API calls with a non-bookable date are rejected
+        # with the same 400 message as the booking endpoint.
         # ----------------------------------------------------
         if requested_date and not _caller_is_admin():
-            if not _is_tomorrow_date(requested_date):
+            if not _is_bookable_date(requested_date):
                 return jsonify({
                     "success": False,
-                    "error": "Booking is allowed for tomorrow only."
+                    "error": "Booking is allowed starting tomorrow."
                 }), 400
 
         # ----------------------------------------------------
@@ -1276,17 +1282,17 @@ def create_appointment():
         # ----------------------------------------------------
 
         # ----------------------------------------------------
-        # Server-side booking window (Manila/UTC+8): student can only
-        # book for tomorrow. Today, past, and dates beyond tomorrow
-        # are all rejected with the same message. Admins bypass this
-        # check (admin has separate walk-in path via /logbook/walk-in
-        # for today; student booking endpoint must remain strict).
+        # Server-side booking window (Manila/UTC+8): student can book
+        # for any date >= tomorrow (starting tomorrow onwards). Today
+        # and past are blocked. Admins bypass this check (admin has
+        # separate walk-in path via /logbook/walk-in for today;
+        # student booking endpoint must remain strict).
         # ----------------------------------------------------
         if not _caller_is_admin():
-            if not _is_tomorrow_date(appointment_date):
+            if not _is_bookable_date(appointment_date):
                 return jsonify({
                     "success": False,
-                    "error": "Booking is allowed for tomorrow only."
+                    "error": "Booking is allowed starting tomorrow."
                 }), 400
 
         if is_slot_closed_for_date(appointment_date):
