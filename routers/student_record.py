@@ -209,6 +209,11 @@ def save_physical_examination(annual_exam_id):
             return value.get("remarks")
         return None
 
+    examined_by_raw = body.get("examined_by")
+    try:
+        examined_by_id = int(examined_by_raw) if examined_by_raw not in (None, "") else None
+    except (ValueError, TypeError):
+        examined_by_id = None
     row = {
         "annual_exam_id": annual_exam_id,
         "blood_pressure": body.get("blood_pressure"),
@@ -219,7 +224,7 @@ def save_physical_examination(annual_exam_id):
         "height_cm": body.get("height"),
         "bmi": _compute_bmi(body.get("weight"), body.get("height")),
         "visual_acuity": body.get("visual_acuity"),
-        "examined_by_admin_id": body.get("examined_by"),
+        "examined_by_admin_id": examined_by_id,
         "examined_at": _iso_or_none(body.get("date_examined")),
         "other_findings_label": body.get("other_findings_label"),
         "general_remarks": body.get("general_remarks"),
@@ -379,13 +384,18 @@ def save_diagnosis(annual_exam_id):
 
     body = request.get_json(silent=True) or {}
 
+    examined_by_raw = body.get("examined_by")
+    try:
+        prepared_by_admin_id = int(examined_by_raw) if examined_by_raw not in (None, "") else None
+    except (ValueError, TypeError):
+        prepared_by_admin_id = None
     row = {
         "annual_exam_id": annual_exam_id,
         "diagnosis": body.get("diagnosis"),
         "final_remark": body.get("final_remark"),
         "is_essentially_normal": bool(body.get("essentially_normal", False)),
         "purposes": body.get("purposes") or [],
-        "prepared_by_admin_id": body.get("examined_by"),
+        "prepared_by_admin_id": prepared_by_admin_id,
         "date_issued": _iso_or_none(body.get("issued_on")) or date.today().isoformat(),
     }
 
