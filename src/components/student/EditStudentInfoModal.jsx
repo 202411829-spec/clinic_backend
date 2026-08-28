@@ -236,7 +236,7 @@ function mapToBackendPayload(student, form, photoDataUrl) {
 
   const ec = updated.emergencyContact || {};
 
-  return {
+  const payload = {
     first_name: firstName,
     middle_initial: middleName || null,
     last_name: lastName,
@@ -246,8 +246,6 @@ function mapToBackendPayload(student, form, photoDataUrl) {
     contact_number: updated.contactNumber,
     present_address: updated.presentAddress,
     photo: updated.photo || null,
-    department_id: form.departmentId ? Number(form.departmentId) : null,
-    course_id: form.courseId ? Number(form.courseId) : null,
     emergency_contact: {
       contact_name: ec.name,
       relationship: ec.relationship,
@@ -256,11 +254,16 @@ function mapToBackendPayload(student, form, photoDataUrl) {
     },
     medical_history,
   };
+  // Only send department/course when the student actually selected them,
+  // so we never overwrite an existing value with null (the IDs may not
+  // resolve from the dropdown for students whose dept/course isn't in the
+  // loaded list). They remain required in the UI dropdown when changed.
+  if (form.departmentId) payload.department_id = Number(form.departmentId);
+  if (form.courseId) payload.course_id = Number(form.courseId);
+  return payload;
 }
 
 const STEP1_REQUIRED = [
-  "departmentId",
-  "courseId",
   "lastName",
   "firstName",
   "birthday",
