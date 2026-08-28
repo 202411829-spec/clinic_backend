@@ -216,7 +216,19 @@ export default function ScheduleCalendar({
             </button>
           );
         })}
+      </div>
 
+      <p className="text-xs font-semibold text-gc-green text-center mt-2 mb-1">
+        {selectedWeekdays.length} day{selectedWeekdays.length === 1 ? "" : "s"} open by default
+      </p>
+
+      {selectedDates.length > 1 && (
+        <p className="text-xs font-semibold text-gc-green text-center mb-1">
+          {selectedDates.length} days selected
+        </p>
+      )}
+
+      <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center">
         {weeks.flat().map((day, i) => {
           const date = day ? new Date(viewYear, viewMonth, day) : null;
           const selected = date && isSelected(date);
@@ -254,16 +266,6 @@ export default function ScheduleCalendar({
           );
         })}
       </div>
-
-      <p className="mt-3 text-xs font-semibold text-gc-green">
-        {selectedWeekdays.length} day{selectedWeekdays.length === 1 ? "" : "s"} open by default
-      </p>
-
-      {selectedDates.length > 1 && (
-        <p className="mt-1 text-xs font-semibold text-gc-green">
-          {selectedDates.length} days selected
-        </p>
-      )}
 
       {/* on/off switch for marking specific individual dates unavailable —
           sits right below the "days open by default" summary. While on,
