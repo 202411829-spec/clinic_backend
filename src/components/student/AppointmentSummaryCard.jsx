@@ -34,8 +34,10 @@ export default function AppointmentSummaryCard({
   booking,
   actionLabel = "Book",
   loadingLabel = "Booking…",
+  disabled = false,
+  disabledReason = "",
 }) {
-  const canBook = Boolean(date && time && reason) && !booking;
+  const canBook = Boolean(date && time && reason) && !booking && !disabled;
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
@@ -51,6 +53,11 @@ export default function AppointmentSummaryCard({
         <SummaryRow label="Reason" value={reason} />
       </div>
 
+      {disabled && disabledReason && (
+        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          {disabledReason}
+        </p>
+      )}
       <button
         type="button"
         disabled={!canBook}

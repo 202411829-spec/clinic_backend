@@ -6,6 +6,7 @@ import SelectTimeSlots from "../../components/student/SelectTimeSlots";
 import SelectReasonPanel from "../../components/student/SelectReasonPanel";
 import AppointmentSummaryCard from "../../components/student/AppointmentSummaryCard";
 import BookingStepIndicator from "../../components/student/BookingStepIndicator";
+import { Link } from "react-router-dom";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext";
 import { useAuth } from "../../context/AuthContext";
@@ -83,8 +84,11 @@ export default function Book() {
 
   // Real slot availability for the selected date + real reason list.
 const [slots, setSlots] = useState([]);
-const [reasonList, setReasonList] = useState([]);
-const [slotsStatus, setSlotsStatus] = useState("loading");
+  const [reasonList, setReasonList] = useState([]);
+  const [slotsStatus, setSlotsStatus] = useState("loading");
+  const [bookingError, setBookingError] = useState("");
+  const [hasPending, setHasPending] = useState(false);
+  const [pendingCheckStatus, setPendingCheckStatus] = useState("loading");
 
   useEffect(() => {
     let cancelled = false;
@@ -123,12 +127,75 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
       .catch(() => {});
   }, []);
 
+  // Check if student already has a pending appointment. Reuses the same
+  // appointmentsApi.list() that UpcomingAppointmentPanel uses, filtered to
+  // pending. Reschedule mode is exempt — the user is editing that pending
+  // appointment.
+  useEffect(() => {
+    if (isReschedule) {
+      setPendingCheckStatus("ready");
+      setHasPending(false);
+      return undefined;
+    }
+    // In-memory appointment from a just-completed booking is authoritative
+    // even before the backend list reflects it.
+    if (appointment) {
+      setHasPending(true);
+      setPendingCheckStatus("ready");
+      return undefined;
+    }
+    if (!studentId) {
+      setPendingCheckStatus("ready");
+      return undefined;
+    }
+    let cancelled = false;
+    setPendingCheckStatus("loading");
+    appointmentsApi
+      .list()
+      .then((res) => {
+        if (cancelled) return;
+        const rows = res?.appointments || [];
+        const hasStudentField = rows.some((a) => a.student_id != null);
+        const pendingRows = rows.filter((a) => {
+          const status = String(a.current_status ?? a.status ?? "").toLowerCase();
+          if (status !== "pending") return false;
+          if (!hasStudentField) return true;
+          return String(a.student_id).trim().toUpperCase() === String(studentId).trim().toUpperCase();
+        });
+        setHasPending(pendingRows.length > 0);
+        setPendingCheckStatus("ready");
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error("Failed to check pending appointments:", err);
+          // Don't block booking if the check itself failed; let the backend
+          // enforce the rule and surface its 400 error below.
+          setPendingCheckStatus("ready");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId, appointment, isReschedule]);
+
   function handleSelectDate(date) {
     setSelectedDate(date);
     setSelectedTime(null); // availability differs per day — clear a stale pick
   }
 
+  // Derived: booking is blocked when a pending appointment exists (except
+  // when the user arrived via Reschedule — they are editing that appointment).
+  const isBookingBlocked = !isReschedule && hasPending;
+
   async function handleBook() {
+    // Frontend guard — mirrors the backend's "only 1 pending" rule.
+    if (isBookingBlocked) {
+      setBookingError(
+        "You already have an active appointment (pending). Please wait until it is completed or cancelled before booking again."
+      );
+      return;
+    }
+    setBookingError("");
     // Persist via POST /appointments.
     setBooking(true);
     try {
@@ -151,7 +218,15 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
       setBooked(true);
     } catch (err) {
       console.error("Booking failed:", err);
-      alert(`Couldn't book the appointment: ${err.message}`);
+      // Surface the backend's 400 ("You already have an active appointment")
+      // in the page banner so a bypassed frontend check is still visible.
+      const msg = err?.message || "Couldn't book the appointment. Please try again.";
+      setBookingError(msg);
+      // If the backend confirmed a pending appointment exists, lock the form
+      // so the user sees the same disabled state as the pre-check.
+      if (/already have an active appointment/i.test(msg)) {
+        setHasPending(true);
+      }
     } finally {
       setBooking(false);
     }
@@ -178,6 +253,28 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
       <h1 className="hidden md:block font-bold text-gray-800 text-lg mb-5">
         {pageTitle}
       </h1>
+
+      {/* Active-appointment guard + backend error banner */}
+      {isBookingBlocked && (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          <p className="font-semibold">You already have an active appointment (pending).</p>
+          <p className="mt-1">Please wait until it is completed or cancelled before booking again.</p>
+          <Link to="/student/dashboard" className="mt-2 inline-block font-semibold text-amber-900 underline underline-offset-2">
+            View upcoming appointment
+          </Link>
+        </div>
+      )}
+      {bookingError && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {bookingError}
+        </div>
+      )}
+      {pendingCheckStatus === "loading" && !isReschedule && (
+        <p className="mb-4 text-xs text-gray-400">Checking existing appointments…</p>
+      )}
 
       {/* ---------- Mobile: one step at a time ---------- */}
       <div className="md:hidden max-w-sm mx-auto">
@@ -256,6 +353,12 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
             onBook={handleBook}
             actionLabel={summaryActionLabel}
             loadingLabel={summaryLoadingLabel}
+            disabled={isBookingBlocked || pendingCheckStatus === "loading"}
+            disabledReason={
+              isBookingBlocked
+                ? "You already have an active appointment (pending)."
+                : undefined
+            }
           />
         )}
       </div>
@@ -286,6 +389,10 @@ const [slotsStatus, setSlotsStatus] = useState("loading");
           onBook={handleBook}
           actionLabel={summaryActionLabel}
           loadingLabel={summaryLoadingLabel}
+          disabled={isBookingBlocked || pendingCheckStatus === "loading"}
+          disabledReason={
+            isBookingBlocked ? "You already have an active appointment (pending)." : undefined
+          }
         />
       </div>
     </div>

@@ -1360,6 +1360,88 @@ def create_appointment():
                 "error": "This time slot is fully booked"
             }), 409
 
+        # ----------------------------------------------------
+        # Enforce single active (pending) appointment per student
+        # Non-admin (student) callers may only have one appointment
+        # whose latest status is 'pending'. Admin bookings bypass.
+        # Reschedule support: if the frontend is replacing an
+        # existing pending appointment in one action, it may pass
+        # the old appointment_id via `rescheduled_id`
+        # (also accepts rescheduled_appointment_id /
+        # reschedule_from_id / previous_appointment_id) — that id
+        # is excluded from the pending check. Otherwise the
+        # recommended frontend flow is cancel-first-then-book,
+        # during which there is no pending row and the check passes.
+        # Race note: SELECT-then-INSERT is not atomic. Two
+        # simultaneous requests could both pass the check. A
+        # partial unique index / DB constraint would be the
+        # proper fix if strict atomicity is required.
+        # ----------------------------------------------------
+        if not _caller_is_admin():
+            # Resolve the requesting student's id authoritatively from JWT
+            token_sid = resolve_student_id(g.user)
+            effective_sid = normalize_student_id(token_sid) if token_sid else None
+            # Fallback to the payload's student_id when JWT resolution fails
+            if not effective_sid:
+                effective_sid = normalized_student_id
+            if effective_sid:
+                # Support reschedule replacement: exclude the old appointment
+                rescheduled_raw = (
+                    data.get("rescheduled_id")
+                    or data.get("rescheduled_appointment_id")
+                    or data.get("reschedule_from_id")
+                    or data.get("previous_appointment_id")
+                )
+                parsed_rescheduled_id = None
+                if rescheduled_raw is not None:
+                    try:
+                        parsed_rescheduled_id = int(rescheduled_raw)
+                    except (TypeError, ValueError):
+                        parsed_rescheduled_id = None
+                try:
+                    pending_q = supabase.table("appointments").select("appointment_id, student_id").eq("student_id", effective_sid)
+                    pending_resp = execute_with_retry(pending_q)
+                    candidate_rows = pending_resp.data or []
+                    # Normalize filter in Python for legacy case differences
+                    candidate_rows = [
+                        r for r in candidate_rows
+                        if normalize_student_id(r.get("student_id")) == effective_sid
+                    ]
+                    if parsed_rescheduled_id is not None:
+                        candidate_rows = [
+                            r for r in candidate_rows
+                            if r.get("appointment_id") != parsed_rescheduled_id
+                        ]
+                    if candidate_rows:
+                        cand_ids = [r.get("appointment_id") for r in candidate_rows]
+                        latest_map = get_latest_status_for_appointments(cand_ids)
+                        has_pending = False
+                        for aid in cand_ids:
+                            row = latest_map.get(aid)
+                            if row is None:
+                                # No history yet — treat as active pending (new row seeds pending)
+                                has_pending = True
+                                break
+                            latest = str((row.get("new_status") or "")).strip().lower()
+                            if latest == "pending":
+                                has_pending = True
+                                break
+                        if has_pending:
+                            return jsonify({
+                                "success": False,
+                                "error": "You already have an active appointment (pending). Please wait until it is completed, cancelled, or marked as no-show before booking again."
+                            }), 400
+                except Exception as pending_check_err:
+                    # If the pending check itself returned the 400 above, it would have already returned.
+                    # Only log unexpected errors and fail open? We choose to log and continue
+                    # only if the error is transient; otherwise surface as 500.
+                    # To avoid silently allowing double-booking on DB errors, re-raise.
+                    # However, if the error message is our pending error, it was already handled.
+                    print("Pending check error:", repr(pending_check_err))
+                    # Re-raise to surface as 500 via outer except, unless it's the expected flow
+                    # Check if response already sent — here we haven't sent, so propagate
+                    raise
+
         # Use the resolved slot's id so bookings always line up with
         # the time_slot rows the slots endpoint reports on.
         # Normalize student_id for FK matching (Supabase lowercases emails)
