@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import EditStudentInfoModal from "./EditStudentInfoModal";
+import { recordsApi } from "../../lib/api.js";
 
 function SectionHeader({ icon, title }) {
   return (
@@ -52,13 +53,11 @@ function formatDisplayName(name = "") {
   return `${rest} ${last}`;
 }
 
-export default function StudentRecordPanel({ student: initialStudent, error }) {
-  // Kept in local state (seeded from the prop) so the Edit modal can update
-  // it in place. Swap this for a real Supabase write + refetch once the
-  // student-profile write path is wired up — the shape stays the same.
+export default function StudentRecordPanel({ student: initialStudent, studentId, error }) {
   const [student, setStudent] = useState(initialStudent);
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   // Keep local copy in sync as the async fetch fills the prop in.
   useEffect(() => {
@@ -90,11 +89,17 @@ export default function StudentRecordPanel({ student: initialStudent, error }) {
     setEditing(true);
   }
 
-  function handleSave(updatedStudent) {
-    setStudent(updatedStudent);
-    setEditing(false);
-    setSavedNotice(true);
-    window.setTimeout(() => setSavedNotice(false), 4000);
+  async function handleSave(payload, updatedStudent) {
+    setSaveError(null);
+    try {
+      await recordsApi.updateProfile(studentId, payload);
+      setStudent(updatedStudent);
+      setEditing(false);
+      setSavedNotice(true);
+      window.setTimeout(() => setSavedNotice(false), 4000);
+    } catch (err) {
+      setSaveError(err.message || "Failed to save. Please try again.");
+    }
   }
 
   // Full-page edit view — takes over the whole page instead of popping up
@@ -128,6 +133,22 @@ export default function StudentRecordPanel({ student: initialStudent, error }) {
             onClick={() => setSavedNotice(false)}
             aria-label="Dismiss"
             className="shrink-0 text-gc-green/70 hover:text-gc-green"
+          >
+            <NavIcon name="x" className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="flex items-start justify-between gap-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
+          <span className="flex items-center gap-2">
+            <NavIcon name="x" className="w-4 h-4 shrink-0" />
+            {saveError}
+          </span>
+          <button
+            onClick={() => setSaveError(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-red-400 hover:text-red-600"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>

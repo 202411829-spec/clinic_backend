@@ -80,7 +80,7 @@ export default function StudentRecord() {
 
   return (
     <div className="pt-2 md:pt-4 max-w-6xl mx-auto">
-      <StudentRecordPanel student={student} error={error} />
+      <StudentRecordPanel student={student} studentId={studentId} error={error} />
     </div>
   );
 }

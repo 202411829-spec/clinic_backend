@@ -150,6 +150,76 @@ function buildStudentFromForm(student, form, photoDataUrl) {
   };
 }
 
+const CONDITION_TO_COLUMN = {
+  "Asthma": "has_asthma",
+  "Chicken Pox": "has_chicken_pox",
+  "COVID-19": "has_covid19",
+  "Diabetes": "has_diabetes",
+  "Dysmenorrhea": "has_dysmenorrhea",
+  "Epilepsy / Seizure": "has_epilepsy_seizure",
+  "Heart Disorder": "has_heart_disorder",
+  "Hepatitis": "has_hepatitis",
+  "Hypertension": "has_hypertension",
+  "Measles": "has_measles",
+  "Mumps": "has_mumps",
+  "Anxiety Disorder": "has_anxiety_disorder",
+  "Panic Attack / Hyperventilation": "has_panic_attack",
+  "Pneumonia": "has_pneumonia",
+  "PTB / Primary Complex": "has_tb_primary_complex",
+  "Typhoid Fever": "has_typhoid_fever",
+  "Urinary Tract Infection (UTI)": "has_urinary_tract_infection",
+};
+
+function mapToBackendPayload(student, form, photoDataUrl) {
+  const updated = buildStudentFromForm(student, form, photoDataUrl);
+  const { lastName, firstName, middleName } = splitName(updated.name);
+
+  const hasAllergy = updated.medicalConditions.some((c) => /^allergy/i.test(c));
+  let allergies = "";
+  if (hasAllergy) {
+    const allergyEntry = updated.medicalConditions.find((c) => /^allergy/i.test(c));
+    const idx = allergyEntry?.indexOf(":");
+    allergies = idx !== -1 ? allergyEntry.slice(idx + 1).trim() : "";
+  }
+
+  const medical_history = {
+    has_operation_history: updated.previousOperation != null,
+    operation_procedure: updated.previousOperation?.procedure || null,
+    operation_date: updated.previousOperation?.date
+      ? toDateInputValue(updated.previousOperation.date)
+      : null,
+    allergies: allergies || null,
+  };
+  Object.values(CONDITION_TO_COLUMN).forEach((col) => {
+    medical_history[col] = false;
+  });
+  updated.medicalConditions.forEach((c) => {
+    const col = CONDITION_TO_COLUMN[c];
+    if (col) medical_history[col] = true;
+  });
+
+  const ec = updated.emergencyContact || {};
+
+  return {
+    first_name: firstName,
+    middle_initial: middleName || null,
+    last_name: lastName,
+    gender: updated.sex,
+    birth_date: updated.birthday ? toDateInputValue(updated.birthday) : null,
+    civil_status: updated.civilStatus,
+    contact_number: updated.contactNumber,
+    present_address: updated.presentAddress,
+    photo: updated.photo || null,
+    emergency_contact: {
+      contact_name: ec.name,
+      relationship: ec.relationship,
+      phone_number: ec.contactNumber,
+      present_address: ec.presentAddress,
+    },
+    medical_history,
+  };
+}
+
 const STEP1_REQUIRED = [
   "studentNumber",
   "department",
@@ -748,7 +818,9 @@ export default function EditStudentInfoModal({ student, onClose, onSave }) {
 
   function handleSubmit() {
     if (!form.consent) return;
-    onSave?.(buildStudentFromForm(student, form, photoPreview));
+    const updatedStudent = buildStudentFromForm(student, form, photoPreview);
+    const payload = mapToBackendPayload(student, form, photoPreview);
+    onSave?.(payload, updatedStudent);
   }
 
   return (
