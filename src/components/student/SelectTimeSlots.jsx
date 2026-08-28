@@ -9,11 +9,11 @@ function SlotBar({ slot }) {
   return (
     <div className="h-1 w-full rounded-full bg-gray-100 overflow-hidden flex">
       <div
-        className={full ? "bg-red-500" : "bg-gc-green"}
+        className="bg-red-500"
         style={{ width: `${full ? 100 : bookedPct}%` }}
       />
       {!full && (
-        <div className="bg-red-400" style={{ width: `${100 - bookedPct}%` }} />
+        <div className="bg-gc-green" style={{ width: `${100 - bookedPct}%` }} />
       )}
     </div>
   );
