@@ -229,7 +229,11 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
 
   const filteredSlots = useMemo(() => {
     return slots.map((slot) => {
-      const filteredBookings = slot.bookings.filter((b) => {
+      const nonCancelled = slot.bookings.filter(
+        (b) => String(b.status ?? "").toLowerCase() !== "cancelled"
+      );
+      const pendingCount = nonCancelled.length;
+      const filteredBookings = nonCancelled.filter((b) => {
         const q = search.trim().toLowerCase();
         const matchesSearch =
           !q ||
@@ -239,7 +243,13 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
         const matchesReason = reasonFilter === "All Reason" || b.reason === reasonFilter;
         return matchesSearch && matchesDept && matchesReason;
       });
-      return { ...slot, bookings: filteredBookings };
+      return {
+        ...slot,
+        bookings: filteredBookings,
+        booked: pendingCount,
+        slotsLeft: Math.max(slot.capacity - pendingCount, 0),
+        full: pendingCount >= slot.capacity,
+      };
     });
   }, [slots, search, department, reasonFilter]);
 

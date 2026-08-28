@@ -288,10 +288,23 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   }
 
   const filteredSlots = useMemo(() => {
+    const withPendingOnly = slots.map((slot) => {
+      const nonCancelled = slot.bookings.filter(
+        (b) => String(b.status ?? "").toLowerCase() !== "cancelled"
+      );
+      const pendingCount = nonCancelled.length;
+      return {
+        ...slot,
+        bookings: nonCancelled,
+        booked: pendingCount,
+        slotsLeft: Math.max(slot.capacity - pendingCount, 0),
+        full: pendingCount >= slot.capacity,
+      };
+    });
     if (!search && department === "All Department" && reasonFilter === "All Reason") {
-      return slots;
+      return withPendingOnly;
     }
-    return slots.map((slot) => ({
+    return withPendingOnly.map((slot) => ({
       ...slot,
       bookings: slot.bookings.filter((b) => {
         const q = search.trim().toLowerCase();

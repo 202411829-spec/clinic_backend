@@ -658,15 +658,18 @@ def get_time_slots():
                 # rather than time_slot_id (virtual slots have no real slot_id).
                 bookings_by_time = {}
                 for appointment in appointments:
+                    status_row = latest_status_by_appointment.get(
+                        appointment.get("appointment_id"), {}
+                    )
+                    # Hide cancelled bookings from display and booked counts
+                    if str((status_row or {}).get("new_status") or "").strip().lower() == "cancelled":
+                        continue
                     time_key = str(appointment.get("appointment_time") or "")[:5]
                     student = students_by_id.get(
                         normalize_student_id(appointment.get("student_id")), {}
                     )
                     reason_row = reasons_by_id.get(
                         appointment.get("reason_id"), {}
-                    )
-                    status_row = latest_status_by_appointment.get(
-                        appointment.get("appointment_id"), {}
                     )
                     booking = {
                         "id": appointment.get("appointment_id"),
@@ -844,16 +847,18 @@ def get_time_slots():
 
             # build_student_lookup() keys students by
             # normalize_student_id(), so normalize the raw id here too.
+            status_row = latest_status_by_appointment.get(
+                appointment.get("appointment_id"), {}
+            )
+            # Hide cancelled bookings from display and booked counts
+            if str((status_row or {}).get("new_status") or "").strip().lower() == "cancelled":
+                continue
             student = students_by_id.get(
                 normalize_student_id(appointment.get("student_id")), {}
             )
 
             reason_row = reasons_by_id.get(
                 appointment.get("reason_id"), {}
-            )
-
-            status_row = latest_status_by_appointment.get(
-                appointment.get("appointment_id"), {}
             )
 
             booking = {

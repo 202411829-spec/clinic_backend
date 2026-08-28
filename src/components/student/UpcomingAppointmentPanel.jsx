@@ -58,11 +58,14 @@ export default function UpcomingAppointmentPanel() {
         if (cancelled) return;
         const today = toYMD(new Date());
         const mine = (res?.appointments || [])
-          .filter(
-            (a) =>
-              String(a.student_id).toUpperCase().trim() === String(studentId).toUpperCase().trim() &&
-              String(a.appointment_date).slice(0, 10) >= today
-          )
+          .filter((a) => {
+            if (String(a.student_id).toUpperCase().trim() !== String(studentId).toUpperCase().trim())
+              return false;
+            if (String(a.appointment_date).slice(0, 10) < today) return false;
+            const raw = a.current_status ?? a.status ?? a.new_status;
+            if (raw == null || raw === "") return true;
+            return String(raw).toLowerCase() === "pending";
+          })
           .sort((a, b) =>
             `${a.appointment_date} ${a.appointment_time}`.localeCompare(
               `${b.appointment_date} ${b.appointment_time}`
