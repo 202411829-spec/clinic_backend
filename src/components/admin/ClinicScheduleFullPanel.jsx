@@ -442,8 +442,8 @@ export default function ClinicScheduleFullPanel() {
             on lg screens) so a long block list scrolls within this panel
             instead of stretching the grid row and forcing the whole page
             to scroll. */}
-        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[420px] lg:max-h-[calc(100vh-160px)]">
-          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0">
+        <div className="border border-gray-200 rounded-2xl p-4 md:p-5 flex flex-col max-h-[260px] md:max-h-[300px] lg:max-h-[340px]">
+          <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase mb-3 shrink-0 sticky top-0 bg-white z-10">
             Time Block Preview
           </h3>
           <div className="space-y-2 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
