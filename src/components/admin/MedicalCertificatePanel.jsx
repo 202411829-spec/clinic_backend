@@ -6,7 +6,7 @@
 // Print output: formal format, A4 portrait, three copies stacked on one
 // sheet (per the clinic's paper trail — one for the student, one for the
 // department, one for the clinic's own file).
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon.jsx";
 import { ChevronLeftIcon } from "../icons.jsx";
@@ -123,20 +123,45 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
   );
 }
 
-export default function MedicalCertificatePanel({ student }) {
+export default function MedicalCertificatePanel({ student, certificate = null, yearLabel = null }) {
   const navigate = useNavigate();
   // Pre-fill from whatever was last saved on the Diagnosis and Final Remark
-  // section of this student's Student Record — the nurse can still edit any
-  // of these here, this just saves re-typing them.
-  const certDefaults = getCertificateDefaults(student.id);
-  const [normalFindings, setNormalFindings] = useState(certDefaults.normalFindingsChecked);
-  const [diagnosis, setDiagnosis] = useState(certDefaults.diagnosis);
-  const [finalRemark, setFinalRemark] = useState(certDefaults.finalRemark);
+  // section of this student's Student Record for the selected Year I–IV — the
+  // nurse can still edit any of these here, this just saves re-typing them.
+  // If backend certificate row exists for that year, prefer its values.
+  function resolveDefaults() {
+    const sync = getCertificateDefaults(student.id, yearLabel);
+    if (certificate && typeof certificate === "object" && Object.keys(certificate).length) {
+      const diag = certificate.diagnosis ?? sync.diagnosis ?? "";
+      const remark = certificate.final_remark ?? certificate.finalRemark ?? sync.finalRemark ?? "";
+      const normal = certificate.is_essentially_normal ?? certificate.essentially_normal ?? sync.normalFindingsChecked ?? false;
+      return { diagnosis: diag ?? "", finalRemark: remark ?? "", normalFindingsChecked: !!normal };
+    }
+    return sync;
+  }
+  const _initial = resolveDefaults();
+  const [normalFindings, setNormalFindings] = useState(_initial.normalFindingsChecked);
+  const [diagnosis, setDiagnosis] = useState(_initial.diagnosis);
+  const [finalRemark, setFinalRemark] = useState(_initial.finalRemark);
   const [purpose, setPurpose] = useState(() => new Set());
   const [issuedOn, setIssuedOn] = useState(() => formatMDY(new Date()));
   const [sending, setSending] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const printRef = useRef(null);
+
+  useEffect(() => {
+    const next = resolveDefaults();
+    setNormalFindings(next.normalFindingsChecked);
+    setDiagnosis(next.diagnosis);
+    setFinalRemark(next.finalRemark);
+    // purposes and issuedOn are certificate-local; hydrate them if present
+    if (certificate && Array.isArray(certificate.purposes)) {
+      setPurpose(new Set(certificate.purposes));
+    }
+    if (certificate?.date_issued) {
+      try { setIssuedOn(formatMDY(new Date(certificate.date_issued))); } catch { /* keep current */ }
+    }
+  }, [yearLabel, certificate, student.id]);
 
   const age = computeAge(student.birthday);
 

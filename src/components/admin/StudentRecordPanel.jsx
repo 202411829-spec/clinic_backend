@@ -633,10 +633,12 @@ export default function StudentRecordPanel({ student }) {
     setSavingSection("diagnosis");
     try {
       const cur = records[activeYear];
+      const yearLabel = YEAR_LABEL_BY_KEY[activeYear] ?? activeYear;
       saveCertificateDefaults(student.id, {
         diagnosis: cur.diagnosis,
         finalRemark: cur.finalRemark,
         normalFindingsChecked: cur.diagnosisNormalFindingsChecked,
+        yearLabel,
       });
       const examId = await ensureAnnualExamId(activeYear);
       // ensure physical exists for lab/diagnosis flow — no-op if already there
@@ -763,7 +765,7 @@ export default function StudentRecordPanel({ student }) {
 
         <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
           <button
-            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
+            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate?year=${activeYear}`, { state: { year: activeYear } })}
             className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             Medical Certificate
