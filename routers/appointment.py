@@ -1026,11 +1026,46 @@ def update_appointment_status(appointment_id):
             .insert(status_data)
         )
 
-        return jsonify({
+        # Auto-create logbook entry when appointment is completed
+        logbook_entry = None
+        logbook_created = False
+        if _normalize_status(new_status) == "completed":
+            try:
+                existing_log = execute_with_retry(
+                    supabase
+                    .table("visit_logs")
+                    .select("visit_log_id")
+                    .eq("appointment_id", appointment_id)
+                    .limit(1)
+                )
+                if not existing_log.data:
+                    log_data = {
+                        "appointment_id": appointment_id,
+                        "attending_admin_id": changed_by,
+                        "is_walk_in": False,
+                        "complaint": remarks or None,
+                    }
+                    log_resp = execute_with_retry(
+                        supabase.table("visit_logs").insert(log_data)
+                    )
+                    if log_resp.data:
+                        logbook_entry = log_resp.data[0]
+                        logbook_created = True
+            except Exception as log_err:
+                print("Auto-create visit_logs failed:", repr(log_err))
+
+        result = {
             "success": True,
             "message": "Appointment status updated",
-            "status": response.data
-        })
+            "status": response.data,
+        }
+        if logbook_entry is not None:
+            result["logbook"] = logbook_entry
+            result["logbook_created"] = logbook_created
+        elif _normalize_status(new_status) == "completed":
+            result["logbook_created"] = logbook_created
+
+        return jsonify(result)
 
     except Exception as e:
 
