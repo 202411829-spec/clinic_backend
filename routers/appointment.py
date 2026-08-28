@@ -354,7 +354,147 @@ def get_time_slots():
         requested_date = request.args.get("date")
 
         # ----------------------------------------------------
-        # Fetch time slots
+        # Date-filtered handling: dedup by filtering to
+        # requested_date's schedule (prevents returning all
+        # schedules' slots with duplicate times).
+        # ----------------------------------------------------
+        # Lazy import to avoid circular import at module load.
+        if requested_date:
+            from routers.clinic_schedule import (
+                get_schedule_for_date,
+                get_default_settings,
+                generate_time_blocks,
+            )
+
+            override = get_schedule_for_date(requested_date)
+
+            # Closed day → empty
+            if override and override.get("is_enabled") is False:
+                return jsonify({
+                    "success": True,
+                    "count": 0,
+                    "slots": []
+                })
+
+            # No override and no explicit schedule_id → generate
+            # virtual default slots (do NOT return all schedules'
+            # time_slots). Keep schedule_id param handling: if
+            # caller passed schedule_id, honour that filter instead
+            # of generating virtual slots.
+            if not override and not schedule_id:
+                settings = get_default_settings()
+                if not settings:
+                    return jsonify({
+                        "success": True,
+                        "count": 0,
+                        "slots": []
+                    })
+                # Build config like clinic_schedule preview
+                try:
+                    slot_interval = int(settings.get("slot_interval_minutes", 30))
+                except (TypeError, ValueError):
+                    slot_interval = 30
+                if slot_interval <= 0:
+                    slot_interval = 30
+                try:
+                    max_students = int(settings.get("max_students_per_slot", 10))
+                except (TypeError, ValueError):
+                    max_students = 10
+                config = {
+                    "work_start": settings.get("work_start"),
+                    "work_end": settings.get("work_end"),
+                    "break_start": settings.get("break_start"),
+                    "break_end": settings.get("break_end"),
+                    "slot_interval": slot_interval,
+                    "max_students": max_students,
+                }
+                blocks = generate_time_blocks(config)
+
+                # Fetch appointments for date to compute booked counts
+                appointment_query = (
+                    supabase
+                    .table("appointments")
+                    .select("*")
+                    .eq("appointment_date", requested_date)
+                )
+                appointment_response = execute_with_retry(
+                    appointment_query
+                )
+                appointments = appointment_response.data or []
+                appointment_ids = [a["appointment_id"] for a in appointments]
+                students_by_id = build_student_lookup()
+                reasons_by_id = build_reason_lookup()
+                latest_status_by_appointment = (
+                    get_latest_status_for_appointments(appointment_ids)
+                )
+
+                # Build bookings grouped by time (HH:MM)
+                # For virtual slots we match appointments by appointment_time
+                # rather than time_slot_id (virtual slots have no real slot_id).
+                bookings_by_time = {}
+                for appointment in appointments:
+                    time_key = str(appointment.get("appointment_time") or "")[:5]
+                    student = students_by_id.get(
+                        normalize_student_id(appointment.get("student_id")), {}
+                    )
+                    reason_row = reasons_by_id.get(
+                        appointment.get("reason_id"), {}
+                    )
+                    status_row = latest_status_by_appointment.get(
+                        appointment.get("appointment_id"), {}
+                    )
+                    booking = {
+                        "id": appointment.get("appointment_id"),
+                        "appointment_id": appointment.get("appointment_id"),
+                        "student_id": appointment.get("student_id"),
+                        "name": student.get("name", "-"),
+                        "age": (
+                            student.get("age")
+                            if student.get("age") is not None
+                            else "-"
+                        ),
+                        "dept": student.get("dept", "-"),
+                        "sex": student.get("sex", "-"),
+                        "reason": reason_row.get("description") or "-",
+                        "status": (_STATUS_LABELS.get(status_row.get("new_status"))
+                                   or "Pending"),
+                        "bookedAt": format_date_time(
+                            appointment.get("booked_at")
+                        )
+                    }
+                    bookings_by_time.setdefault(time_key, []).append(booking)
+
+                formatted_slots = []
+                for idx, block in enumerate(blocks):
+                    time_key = block["start"]
+                    bookings = bookings_by_time.get(time_key, [])
+                    booked_count = len(bookings)
+                    remaining = max(0, max_students - booked_count)
+                    # Virtual slot identifiers: schedule_id None, slot_id negative/index
+                    virtual_slot_id = -(idx + 1)
+                    formatted_slots.append({
+                        "id": virtual_slot_id,
+                        "slot_id": virtual_slot_id,
+                        "schedule_id": None,
+                        "time": f"{block['start']} - {block['end']}",
+                        "slot_start": block["start"],
+                        "slot_end": block["end"],
+                        "capacity": max_students,
+                        "booked": booked_count,
+                        "slotsLeft": remaining,
+                        "full": booked_count >= max_students,
+                        "available": booked_count < max_students,
+                        "bookings": bookings
+                    })
+
+                return jsonify({
+                    "success": True,
+                    "count": len(formatted_slots),
+                    "slots": formatted_slots
+                })
+
+        # ----------------------------------------------------
+        # Fetch time slots (filtered by schedule_id / date's schedule)
         # ----------------------------------------------------
 
         slot_query = (
@@ -368,6 +508,16 @@ def get_time_slots():
                 "schedule_id",
                 schedule_id
             )
+        elif requested_date:
+            # requested_date provided without schedule_id: filter to that date's schedule
+            # (already handled closed/virtual cases above; if override exists, filter)
+            from routers.clinic_schedule import get_schedule_for_date as _get_schedule
+            _override = _get_schedule(requested_date)
+            if _override:
+                slot_query = slot_query.eq(
+                    "schedule_id",
+                    _override.get("schedule_id")
+                )
 
         slot_response = execute_with_retry(
             slot_query
@@ -463,17 +613,35 @@ def get_time_slots():
             bookings_by_slot.setdefault(slot_id, []).append(booking)
 
         # ----------------------------------------------------
-        # Build formatted slot list
+        # Build formatted slot list (deduplicate by time)
         # ----------------------------------------------------
+
+        # Deduplicate slots that share the same time string
+        # within the same schedule (legacy double-insert left two
+        # rows per block). Keep different schedule_ids distinct
+        # when no date filter is applied.
+        deduped = {}
+        time_to_ids = {}
+        for slot in slots:
+            time_key = f"{(slot.get('slot_start') or '')[:5]} - {(slot.get('slot_end') or '')[:5]}"
+            dedup_key = (slot.get("schedule_id"), time_key)
+            slot_id = slot.get("slot_id")
+            time_to_ids.setdefault(dedup_key, []).append(slot_id)
+            if dedup_key not in deduped:
+                deduped[dedup_key] = slot
 
         formatted_slots = []
 
-        for slot in slots:
-
+        for dedup_key, slot in deduped.items():
+            time_key = dedup_key[1]
             slot_id = slot.get("slot_id")
-
             max_capacity = slot.get("max_capacity") or 0
-            bookings = bookings_by_slot.get(slot_id, [])
+            # Merge bookings from all duplicate ids for this time+schedule
+            ids_for_time = time_to_ids.get(dedup_key, [slot_id])
+            merged_bookings = []
+            for dup_id in ids_for_time:
+                merged_bookings.extend(bookings_by_slot.get(dup_id, []))
+            bookings = merged_bookings
             booked_count = len(bookings)
             remaining = max(0, max_capacity - booked_count)
 
@@ -481,10 +649,7 @@ def get_time_slots():
                 "id": slot_id,
                 "slot_id": slot_id,
                 "schedule_id": slot.get("schedule_id"),
-                "time": (
-                    f"{(slot.get('slot_start') or '')[:5]} - "
-                    f"{(slot.get('slot_end') or '')[:5]}"
-                ),
+                "time": time_key,
                 "slot_start": slot.get("slot_start"),
                 "slot_end": slot.get("slot_end"),
                 "capacity": max_capacity,
@@ -494,6 +659,9 @@ def get_time_slots():
                 "available": booked_count < max_capacity,
                 "bookings": bookings
             })
+
+        # Keep chronological order
+        formatted_slots.sort(key=lambda s: (s.get("slot_start") or ""))
 
         return jsonify({
             "success": True,
