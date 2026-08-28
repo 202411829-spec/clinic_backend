@@ -464,18 +464,16 @@ export default function ClinicScheduleFullPanel() {
               <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
                 {getBookingLabel()}
               </span>
-              <div className="inline-flex rounded-full bg-gray-100 p-1 gap-1 self-start">
+              <div className="inline-flex flex-row flex-nowrap rounded-full bg-gray-100 p-1 gap-1 self-start items-center">
                 <button
                   type="button"
                   onClick={() => handleSetBooking(true)}
                   disabled={bookingSaving}
                   aria-pressed={allOpen}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
                     allOpen
                       ? "bg-gc-green text-white shadow-sm"
-                      : mixed
-                        ? "bg-white text-gray-500 hover:bg-gray-50"
-                        : "bg-white text-gray-500 hover:bg-gray-50"
+                      : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
                   {allOpen ? "● Open" : "Open"}
@@ -485,12 +483,10 @@ export default function ClinicScheduleFullPanel() {
                   onClick={() => handleSetBooking(false)}
                   disabled={bookingSaving}
                   aria-pressed={allClosed}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${
                     allClosed
                       ? "bg-red-500 text-white shadow-sm"
-                      : mixed
-                        ? "bg-white text-gray-500 hover:bg-gray-50"
-                        : "bg-white text-gray-500 hover:bg-gray-50"
+                      : "bg-white text-gray-500 hover:bg-gray-50"
                   }`}
                 >
                   {allClosed ? "● Closed" : "Closed"}
