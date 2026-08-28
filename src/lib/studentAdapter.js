@@ -25,11 +25,14 @@ export function adaptStudentProfile(profile, medSummary) {
   const ec = medSummary?.emergency_contact || {};
   const history = medSummary?.medical_history || {};
 
-  const conditions = Array.isArray(history.conditions)
-    ? history.conditions
-    : history.conditions
-    ? [String(history.conditions)]
-    : [];
+  const CONDITION_FIELDS = [
+    "has_asthma", "has_chicken_pox", "has_diabetes", "has_dysmenorrhea",
+    "has_epilepsy_seizure", "has_heart_disorder", "has_hepatitis",
+    "has_hypertension", "has_measles", "has_mumps", "has_anxiety_disorder",
+    "has_panic_attack", "has_pneumonia", "has_tb_primary_complex",
+    "has_typhoid_fever", "has_covid19", "has_urinary_tract_infection",
+  ];
+  const conditions = CONDITION_FIELDS.filter((k) => history[k]);
 
   return {
     id: profile.student_id,
@@ -48,12 +51,12 @@ export function adaptStudentProfile(profile, medSummary) {
       name: ec.contact_name ?? ec.name ?? "-",
       relationship: ec.relationship ?? "-",
       contactNumber: ec.contact_number ?? ec.phone ?? "-",
-      presentAddress: ec.address ?? profile.present_address ?? "-",
+      presentAddress: ec.present_address ?? profile.present_address ?? "-",
     },
     medicalConditions: conditions,
     previousOperation: {
       date: formatDate(history.operation_date),
-      procedure: history.procedure ?? "-",
+      procedure: history.operation_procedure ?? "-",
     },
   };
 }

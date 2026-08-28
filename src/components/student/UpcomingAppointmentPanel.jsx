@@ -22,6 +22,8 @@ function formatTime(value) {
   return `${h12}:${m} ${period}`;
 }
 
+const STATUS_LABELS = { pending: "Pending", completed: "Completed", no_show: "No Show", cancelled: "Cancelled" };
+
 // Map a raw /appointments row onto the card's display shape.
 function mapAppointment(a) {
   const d = new Date(`${String(a.appointment_date).slice(0, 10)}T00:00:00`);
@@ -31,8 +33,8 @@ function mapAppointment(a) {
     day: String(d.getDate()),
     weekday: d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase(),
     time: formatTime(a.appointment_time),
-    reason: a.purpose ?? "-",
-    badge: a.current_status ?? "Pending",
+    reason: a.appointment_purpose ?? "-",
+    badge: STATUS_LABELS[a.current_status] ?? "Pending",
   };
 }
 

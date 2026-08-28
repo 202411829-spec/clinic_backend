@@ -152,4 +152,4 @@ export const reasonOptions = [
   "Other",
 ];
 
-export const statusOptions = ["Completed", "Pending", "No-show"];
+export const statusOptions = ["Completed", "Pending", "No-show", "Cancelled"];
