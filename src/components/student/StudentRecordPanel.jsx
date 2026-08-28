@@ -58,6 +58,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Keep local copy in sync as the async fetch fills the prop in.
   useEffect(() => {
@@ -91,6 +92,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
 
   async function handleSave(payload, updatedStudent) {
     setSaveError(null);
+    setIsSaving(true);
     try {
       await recordsApi.updateProfile(studentId, payload);
       setStudent(updatedStudent);
@@ -99,6 +101,8 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       window.setTimeout(() => setSavedNotice(false), 4000);
     } catch (err) {
       setSaveError(err.message || "Failed to save. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -106,7 +110,13 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   // in a small box, so the two-column layout has real room to breathe.
   if (editing) {
     return (
-      <EditStudentInfoModal student={student} onClose={() => setEditing(false)} onSave={handleSave} />
+      <EditStudentInfoModal
+        student={student}
+        onClose={() => setEditing(false)}
+        onSave={handleSave}
+        isSaving={isSaving}
+        saveError={saveError}
+      />
     );
   }
 

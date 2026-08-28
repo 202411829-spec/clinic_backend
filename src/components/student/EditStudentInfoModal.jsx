@@ -704,7 +704,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
 
 /* ---------------------------- step 3: data privacy ---------------------------- */
 
-function StepPrivacy({ form, update, onBack, onSubmit }) {
+function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2">
@@ -744,26 +744,66 @@ function StepPrivacy({ form, update, onBack, onSubmit }) {
         </span>
       </label>
 
+      {submitError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3"
+        >
+          <NavIcon name="x" className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
       <div className="flex gap-3 pt-2">
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold bg-gray-100 text-gray-600 px-5 py-3 rounded-lg hover:bg-gray-200"
+          disabled={isSaving}
+          className={`flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold px-5 py-3 rounded-lg transition-colors ${
+            isSaving
+              ? "bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
           Back
         </button>
         <button
           type="button"
-          disabled={!form.consent}
+          disabled={!form.consent || isSaving}
           onClick={onSubmit}
-          className={`flex-1 text-sm font-semibold px-5 py-3 rounded-lg transition-colors ${
-            form.consent
+          aria-busy={isSaving}
+          className={`flex-1 inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3 rounded-lg transition-colors ${
+            isSaving
+              ? "bg-gc-green text-white opacity-50 cursor-not-allowed"
+              : form.consent
               ? "bg-gc-green text-white hover:opacity-90"
               : "bg-gray-200 text-gray-400 cursor-not-allowed"
           }`}
         >
-          Submit
+          {isSaving && (
+            <svg
+              className="w-4 h-4 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+          )}
+          {isSaving ? "Saving..." : "Submit"}
         </button>
       </div>
     </div>
@@ -772,7 +812,13 @@ function StepPrivacy({ form, update, onBack, onSubmit }) {
 
 /* ---------------------------- main modal ---------------------------- */
 
-export default function EditStudentInfoModal({ student, onClose, onSave }) {
+export default function EditStudentInfoModal({
+  student,
+  onClose,
+  onSave,
+  isSaving = false,
+  saveError = null,
+}) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => buildInitialForm(student));
   const [touchedStep1, setTouchedStep1] = useState(false);
@@ -816,11 +862,11 @@ export default function EditStudentInfoModal({ student, onClose, onSave }) {
     setStep(3);
   }
 
-  function handleSubmit() {
-    if (!form.consent) return;
+  async function handleSubmit() {
+    if (!form.consent || isSaving) return;
     const updatedStudent = buildStudentFromForm(student, form, photoPreview);
     const payload = mapToBackendPayload(student, form, photoPreview);
-    onSave?.(payload, updatedStudent);
+    await onSave?.(payload, updatedStudent);
   }
 
   return (
@@ -830,7 +876,12 @@ export default function EditStudentInfoModal({ student, onClose, onSave }) {
       <button
         type="button"
         onClick={onClose}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gc-green w-fit"
+        disabled={isSaving}
+        className={`inline-flex items-center gap-1.5 text-sm font-semibold w-fit ${
+          isSaving
+            ? "text-gray-400 opacity-50 cursor-not-allowed"
+            : "text-gray-500 hover:text-gc-green"
+        }`}
       >
         <NavIcon name="back" className="w-4 h-4" />
         Back
@@ -871,6 +922,8 @@ export default function EditStudentInfoModal({ student, onClose, onSave }) {
               update={update}
               onBack={() => setStep(2)}
               onSubmit={handleSubmit}
+              isSaving={isSaving}
+              submitError={saveError}
             />
           )}
         </div>
