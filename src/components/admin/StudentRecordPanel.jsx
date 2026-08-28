@@ -15,15 +15,37 @@ import {
   computeAge,
 } from "../../data/studentRecordSample";
 import { saveCertificateDefaults } from "../../lib/certificateSync";
+import { recordsApi } from "../../lib/api";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
 // once auth is wired up — matches the placeholder used in AdminLayout.
 const currentExaminer = "Joseph Daniel B. Ramos";
 
+const YEAR_LABEL_BY_KEY = {
+  y1: "Year I",
+  y2: "Year II",
+  y3: "Year III",
+  y4: "Year IV",
+};
+
+function schoolYearForKey(key) {
+  const found = academicYears.find((y) => y.key === key);
+  if (!found) return null;
+  // "Year I (2025 - 2026)" -> "2025-2026"
+  const m = found.label.match(/(\d{4})\s*-\s*(\d{4})/);
+  if (m) return `${m[1]}-${m[2]}`;
+  return null;
+}
+
+function parseNumberOrNull(v) {
+  if (v === "" || v == null) return null;
+  const n = Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
 function initials(name = "") {
   const parts = name.split(",").map((p) => p.trim()).filter(Boolean);
   if (parts.length === 2) {
-    // "Last, First M." shape (used by the masterlist rows)
     return `${parts[1]?.[0] ?? ""}${parts[0]?.[0] ?? ""}`.toUpperCase();
   }
   const words = name.split(" ").filter(Boolean);
@@ -40,7 +62,7 @@ const RESULT_STYLES = {
   "With Findings": "bg-amber-100 text-amber-700",
 };
 
-/* ---------- small shared field pieces, styled to match the rest of the app ---------- */
+/* ---------- small shared field pieces ---------- */
 
 function FieldLabel({ children }) {
   return <label className="block text-xs font-semibold text-gray-500 mb-1">{children}</label>;
@@ -90,12 +112,6 @@ function SelectInput({ label, options, placeholder, ...props }) {
   );
 }
 
-/**
- * Extra fields that appear under an "Others" Examination Type once one is
- * picked (e.g. Fecalysis -> Color / Consistency / Pus Cells / Rbc / Parasites
- * Ova, Drug Testing -> Methamphetamine / Tetrahydrocannabinol, etc). Driven
- * entirely by labOtherFieldsConfig so adding a new exam type there is enough.
- */
 function LabOtherDynamicFields({ examType, details, onChange }) {
   const fields = labOtherFieldsConfig[examType];
   if (!fields || fields.length === 0) return null;
@@ -125,7 +141,6 @@ function LabOtherDynamicFields({ examType, details, onChange }) {
   );
 }
 
-/** Rounded, color-coded "Normal / With Findings" dropdown used in the findings tables. */
 function ResultSelect({ value, onChange }) {
   return (
     <div className="relative inline-block w-full max-w-[150px]">
@@ -166,7 +181,6 @@ function SectionHeader({ icon, title, subtitle }) {
   );
 }
 
-/** Thin gray label bar used to split up the Laboratory Results sub-sections. */
 function GroupBar({ children }) {
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
@@ -175,21 +189,21 @@ function GroupBar({ children }) {
   );
 }
 
-function SaveButton({ children, onClick, saved }) {
+function SaveButton({ children, onClick, saved, saving, disabled }) {
   return (
     <div className="flex items-center justify-end gap-3">
       {saved && <span className="text-xs font-semibold text-gc-green">Saved ✓</span>}
+      {saving && <span className="text-xs font-semibold text-gray-500">Saving…</span>}
       <button
         onClick={onClick}
-        className="text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-lg hover:opacity-90"
+        disabled={disabled || saving}
+        className="text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {children}
       </button>
     </div>
   );
 }
-
-/* ---------- per-row action menu on the Annual Examination History table ---------- */
 
 function HistoryActionMenu({ year, disabled, onSelectYear }) {
   const [open, setOpen] = useState(false);
@@ -237,6 +251,65 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
   );
 }
 
+/* ---------- payload builders ---------- */
+
+function buildPhysicalPayload(rec) {
+  const weight = parseNumberOrNull(rec.weight);
+  const height = parseNumberOrNull(rec.height);
+  return {
+    date_examined: rec.dateExamined || null,
+    blood_pressure: rec.bp || null,
+    cardiac_rate: parseNumberOrNull(rec.cr),
+    respiratory_rate: parseNumberOrNull(rec.rr),
+    temperature: parseNumberOrNull(rec.temperature),
+    weight: weight,
+    height: height,
+    visual_acuity: rec.visualAcuity || null,
+    examined_by: rec.physicalExaminedBy || currentExaminer,
+    other_findings_label: rec.othersSpecify || null,
+    general_remarks: rec.generalRemarks || null,
+    final_assessment: rec.finalAssessment || null,
+    skin: { result: rec.findings.skin || "Normal", remarks: rec.findingsRemarks.skin || null },
+    heent: { result: rec.findings.heent || "Normal", remarks: rec.findingsRemarks.heent || null },
+    heart: { result: rec.findings.heart || "Normal", remarks: rec.findingsRemarks.heart || null },
+    abdomen: { result: rec.findings.abdomen || "Normal", remarks: rec.findingsRemarks.abdomen || null },
+    extremities: { result: rec.findings.extremities || "Normal", remarks: rec.findingsRemarks.extremities || null },
+    other_findings: { result: rec.findings.others || "Normal", remarks: rec.findingsRemarks.others || null },
+  };
+}
+
+function buildLabPayload(rec) {
+  const otherResults =
+    rec.otherLabType && rec.otherLabDetails && Object.keys(rec.otherLabDetails).length
+      ? JSON.stringify({ type: rec.otherLabType, details: rec.otherLabDetails, extra: rec.extraLabOthers })
+      : rec.otherLabType || null;
+  return {
+    cbc_date: rec.cbc.date || null,
+    hemoglobin: parseNumberOrNull(rec.cbc.hemoglobin),
+    hematocrit: parseNumberOrNull(rec.cbc.hematocrit),
+    wbc: parseNumberOrNull(rec.cbc.wbc),
+    platelet_count: parseNumberOrNull(rec.cbc.plateletCount),
+    blood_type: rec.cbc.bloodType || null,
+    urinalysis_date: rec.urinalysis.date || null,
+    glucose: rec.urinalysis.glucose || null,
+    protein: rec.urinalysis.protein || null,
+    other_examination_type: rec.otherLabType || null,
+    other_results: otherResults,
+    chest_xray_date: rec.chestXray.date || null,
+    chest_xray_result: rec.chestXray.result || null,
+    chest_xray_notes: rec.chestXray.remarks || null,
+  };
+}
+
+function buildDiagnosisPayload(rec) {
+  return {
+    diagnosis: rec.diagnosis || null,
+    final_remark: rec.finalRemark || null,
+    essentially_normal: !!rec.diagnosisNormalFindingsChecked,
+    examined_by: rec.diagnosisExaminedBy || currentExaminer,
+  };
+}
+
 /* ---------- main panel ---------- */
 
 export default function StudentRecordPanel({ student }) {
@@ -244,6 +317,10 @@ export default function StudentRecordPanel({ student }) {
   const [records, setRecords] = useState(getStudentAnnualHistory);
   const [activeYear, setActiveYear] = useState("y1");
   const [savedSection, setSavedSection] = useState(null);
+  const [savingSection, setSavingSection] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [annualExamIds, setAnnualExamIds] = useState({ y1: null, y2: null, y3: null, y4: null });
+  const [hydrated, setHydrated] = useState({});
   const physicalExamRef = useRef(null);
 
   const history = useMemo(
@@ -253,6 +330,161 @@ export default function StudentRecordPanel({ student }) {
 
   const rec = records[activeYear];
   const age = computeAge(student.birthday);
+
+  // Fetch header on mount to discover existing annual_exam_ids
+  useEffect(() => {
+    const sid = student?.id;
+    if (!sid) return;
+    let cancelled = false;
+    async function fetchHeader() {
+      try {
+        const data = await recordsApi.header(sid);
+        if (cancelled) return;
+        const hist = data?.annual_exam_history;
+        if (Array.isArray(hist)) {
+          const labelToKey = Object.fromEntries(Object.entries(YEAR_LABEL_BY_KEY).map(([k, v]) => [v, k]));
+          const nextIds = { y1: null, y2: null, y3: null, y4: null };
+          const patch = {};
+          hist.forEach((row) => {
+            const key = labelToKey[row.year_label];
+            if (!key) return;
+            if (row.annual_exam_id) nextIds[key] = row.annual_exam_id;
+            // use backend date_examined to hydrate history status even before physical fetch
+            if (row.date_examined) {
+              patch[key] = row.date_examined;
+            }
+          });
+          setAnnualExamIds(nextIds);
+          if (Object.keys(patch).length) {
+            setRecords((prev) => {
+              const next = { ...prev };
+              for (const [k, d] of Object.entries(patch)) {
+                next[k] = { ...next[k], dateExamined: d ? String(d).slice(0, 10) : next[k].dateExamined };
+              }
+              return next;
+            });
+          }
+        }
+      } catch {
+        // keep sample fallback
+      }
+    }
+    fetchHeader();
+    return () => { cancelled = true; };
+  }, [student?.id]);
+
+  // Hydrate active year from backend when an exam id exists and not yet hydrated
+  useEffect(() => {
+    const examId = annualExamIds[activeYear];
+    if (!examId || hydrated[activeYear]) return;
+    let cancelled = false;
+    async function hydrate() {
+      try {
+        const [phys, lab, diag] = await Promise.all([
+          recordsApi.physicalExam(examId).catch(() => null),
+          recordsApi.labResults(examId).catch(() => null),
+          recordsApi.diagnosis(examId).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setRecords((prev) => {
+          const cur = prev[activeYear];
+          let next = { ...cur };
+
+          if (phys && typeof phys === "object" && !Array.isArray(phys) && Object.keys(phys).length) {
+            next = {
+              ...next,
+              dateExamined: phys.examined_at ? String(phys.examined_at).slice(0, 10) : next.dateExamined,
+              bp: phys.blood_pressure ?? next.bp,
+              cr: phys.cardiac_rate != null ? String(phys.cardiac_rate) : next.cr,
+              rr: phys.respiratory_rate != null ? String(phys.respiratory_rate) : next.rr,
+              temperature: phys.temperature != null ? String(phys.temperature) : next.temperature,
+              weight: phys.weight_kg != null ? String(phys.weight_kg) : next.weight,
+              height: phys.height_cm != null ? String(phys.height_cm) : next.height,
+              visualAcuity: phys.visual_acuity ?? next.visualAcuity,
+              othersSpecify: phys.other_findings_label ?? next.othersSpecify,
+              generalRemarks: phys.general_remarks ?? next.generalRemarks,
+              finalAssessment: phys.final_assessment ?? next.finalAssessment,
+              findings: {
+                skin: phys.skin_result ?? next.findings.skin,
+                heent: phys.heent_result ?? next.findings.heent,
+                heart: phys.heart_result ?? next.findings.heart,
+                abdomen: phys.abdomen_result ?? next.findings.abdomen,
+                extremities: phys.extremities_result ?? next.findings.extremities,
+                others: phys.other_findings_result ?? next.findings.others,
+              },
+              findingsRemarks: {
+                skin: phys.skin_remarks ?? next.findingsRemarks.skin,
+                heent: phys.heent_remarks ?? next.findingsRemarks.heent,
+                heart: phys.heart_remarks ?? next.findingsRemarks.heart,
+                abdomen: phys.abdomen_remarks ?? next.findingsRemarks.abdomen,
+                extremities: phys.extremities_remarks ?? next.findingsRemarks.extremities,
+                others: phys.other_findings_remarks ?? next.findingsRemarks.others,
+              },
+            };
+            if (phys.examined_at) {
+              next.dateExamined = String(phys.examined_at).slice(0, 10);
+            }
+          }
+
+          if (lab && typeof lab === "object" && !Array.isArray(lab) && Object.keys(lab).length) {
+            // lab may contain chest_xrays array via embedded relation
+            const chest = Array.isArray(lab.chest_xrays) ? lab.chest_xrays[0] : lab.chest_xray || lab.chest_xrays;
+            const chestRow = chest && typeof chest === "object" ? chest : null;
+            next = {
+              ...next,
+              cbc: {
+                date: lab.cbc_date ? String(lab.cbc_date).slice(0, 10) : next.cbc.date,
+                hemoglobin: lab.hemoglobin != null ? String(lab.hemoglobin) : next.cbc.hemoglobin,
+                hematocrit: lab.hematocrit != null ? String(lab.hematocrit) : next.cbc.hematocrit,
+                wbc: lab.wbc != null ? String(lab.wbc) : next.cbc.wbc,
+                plateletCount: lab.platelet_count != null ? String(lab.platelet_count) : next.cbc.plateletCount,
+                bloodType: lab.blood_type ?? next.cbc.bloodType,
+              },
+              urinalysis: {
+                date: lab.urinalysis_date ? String(lab.urinalysis_date).slice(0, 10) : next.urinalysis.date,
+                glucose: lab.glucose ?? next.urinalysis.glucose,
+                protein: lab.protein ?? next.urinalysis.protein,
+              },
+              otherLabType: lab.other_examination_type ?? next.otherLabType,
+              chestXray: {
+                date: chestRow?.chest_xray_date ? String(chestRow.chest_xray_date).slice(0, 10) : (lab.chest_xray_date ? String(lab.chest_xray_date).slice(0, 10) : next.chestXray.date),
+                result: chestRow?.chest_xray_result ?? lab.chest_xray_result ?? next.chestXray.result,
+                remarks: chestRow?.chest_xray_notes ?? lab.chest_xray_notes ?? next.chestXray.remarks,
+              },
+            };
+            // try to restore otherLabDetails if it was stored as JSON
+            if (lab.other_results) {
+              try {
+                const parsed = JSON.parse(lab.other_results);
+                if (parsed && parsed.details) {
+                  next.otherLabDetails = parsed.details;
+                  if (Array.isArray(parsed.extra)) next.extraLabOthers = parsed.extra;
+                }
+              } catch {
+                // plain text — keep as is
+              }
+            }
+          }
+
+          if (diag && typeof diag === "object" && !Array.isArray(diag) && Object.keys(diag).length) {
+            next = {
+              ...next,
+              diagnosis: diag.diagnosis ?? next.diagnosis,
+              finalRemark: diag.final_remark ?? next.finalRemark,
+              diagnosisNormalFindingsChecked: diag.is_essentially_normal ?? next.diagnosisNormalFindingsChecked,
+            };
+          }
+
+          return { ...prev, [activeYear]: next };
+        });
+        setHydrated((p) => ({ ...p, [activeYear]: true }));
+      } catch {
+        setHydrated((p) => ({ ...p, [activeYear]: true }));
+      }
+    }
+    hydrate();
+    return () => { cancelled = true; };
+  }, [activeYear, annualExamIds, hydrated]);
 
   function updateRecord(patch) {
     setRecords((prev) => ({ ...prev, [activeYear]: { ...prev[activeYear], ...patch } }));
@@ -266,10 +498,6 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ findingsRemarks: { ...rec.findingsRemarks, [key]: value } });
   }
 
-  // extra "Others" rows added via the "+ Add" button on the Physical
-  // Examinations findings table — kept separate from the single built-in
-  // "Others" row (othersSpecify / findings.others / findingsRemarks.others)
-  // so existing data/logic for that row is untouched.
   function addExtraOthersFinding() {
     updateRecord({
       extraOthersFindings: [
@@ -291,9 +519,6 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ extraOthersFindings: rec.extraOthersFindings.filter((row) => row.id !== id) });
   }
 
-  // extra "Others" rows added via the "+ Add" button on Laboratory Results —
-  // kept separate from the single built-in Examination Type field
-  // (otherLabType) for the same reason as above.
   function addExtraLabOther() {
     updateRecord({
       extraLabOthers: [
@@ -303,8 +528,6 @@ export default function StudentRecordPanel({ student }) {
     });
   }
 
-  // Changing the Examination Type resets that row's details, since the
-  // fields shown (and what they mean) are specific to the exam picked.
   function updateExtraLabOther(id, examType) {
     updateRecord({
       extraLabOthers: rec.extraLabOthers.map((row) =>
@@ -345,9 +568,91 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ urinalysis: { ...rec.urinalysis, ...patch } });
   }
 
-  function handleSave(section) {
+  async function ensureAnnualExamId(yearKey) {
+    const existing = annualExamIds[yearKey];
+    if (existing) return existing;
+    const year_label = YEAR_LABEL_BY_KEY[yearKey];
+    const school_year = schoolYearForKey(yearKey);
+    const created = await recordsApi.addAnnualExam(student.id, {
+      year_label,
+      school_year,
+      date_examined: records[yearKey]?.dateExamined || null,
+    });
+    const newId = created?.annual_exam_id ?? created?.annualExamId ?? created?.id;
+    if (!newId) throw new Error("Failed to create annual examination");
+    setAnnualExamIds((prev) => ({ ...prev, [yearKey]: newId }));
+    return newId;
+  }
+
+  function flashSaved(section) {
     setSavedSection(section);
+    setSaveError(null);
     window.setTimeout(() => setSavedSection((s) => (s === section ? null : s)), 2000);
+  }
+
+  async function handleSavePhysical() {
+    setSaveError(null);
+    setSavingSection("physical");
+    try {
+      const examId = await ensureAnnualExamId(activeYear);
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(records[activeYear]));
+      // lab requires physical first — keep hydrated so lab fetch works next time
+      setHydrated((p) => ({ ...p, [activeYear]: true }));
+      // ensure header reflects new exam
+      setRecords((prev) => {
+        const cur = prev[activeYear];
+        // if dateExamined was empty, backend will have stored provided date; reflect cleared status via date
+        return prev;
+      });
+      flashSaved("physical");
+    } catch (e) {
+      setSaveError(e.message || "Failed to save physical examination");
+    } finally {
+      setSavingSection(null);
+    }
+  }
+
+  async function handleSaveLab() {
+    setSaveError(null);
+    setSavingSection("lab");
+    try {
+      const examId = await ensureAnnualExamId(activeYear);
+      // lab endpoint requires physical_examinations to exist first
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(records[activeYear])).catch(() => {});
+      await recordsApi.saveLabResults(examId, buildLabPayload(records[activeYear]));
+      flashSaved("lab");
+    } catch (e) {
+      setSaveError(e.message || "Failed to save lab results");
+    } finally {
+      setSavingSection(null);
+    }
+  }
+
+  async function handleSaveDiagnosis() {
+    setSaveError(null);
+    setSavingSection("diagnosis");
+    try {
+      const cur = records[activeYear];
+      saveCertificateDefaults(student.id, {
+        diagnosis: cur.diagnosis,
+        finalRemark: cur.finalRemark,
+        normalFindingsChecked: cur.diagnosisNormalFindingsChecked,
+      });
+      const examId = await ensureAnnualExamId(activeYear);
+      // ensure physical exists for lab/diagnosis flow — no-op if already there
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(cur)).catch(() => {});
+      await recordsApi.saveDiagnosis(examId, buildDiagnosisPayload(cur));
+      // reflect cleared-ish status locally by ensuring dateExamined is set
+      if (!cur.dateExamined) {
+        const today = new Date().toISOString().slice(0, 10);
+        setRecords((prev) => ({ ...prev, [activeYear]: { ...prev[activeYear], dateExamined: today } }));
+      }
+      flashSaved("diagnosis");
+    } catch (e) {
+      setSaveError(e.message || "Failed to save diagnosis");
+    } finally {
+      setSavingSection(null);
+    }
   }
 
   function handleAddAnnualExamination() {
@@ -393,7 +698,7 @@ export default function StudentRecordPanel({ student }) {
         </div>
       </section>
 
-      {/* ---------- annual examination history (+ its own actions, outside the box) ---------- */}
+      {/* ---------- annual examination history ---------- */}
       <div className="flex flex-col md:flex-row gap-4 md:items-start">
         <section className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -456,7 +761,6 @@ export default function StudentRecordPanel({ student }) {
           </div>
         </section>
 
-        {/* Medical Certificate / Medical Summary — live outside the Annual Examination box */}
         <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
@@ -473,7 +777,7 @@ export default function StudentRecordPanel({ student }) {
         </div>
       </div>
 
-      {/* ---------- year tabs + view full record ---------- */}
+      {/* ---------- year tabs ---------- */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
           {academicYears.map((y) => (
@@ -498,6 +802,12 @@ export default function StudentRecordPanel({ student }) {
         </button>
       </div>
 
+      {saveError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+          {saveError}
+        </div>
+      )}
+
       {/* ---------- physical examinations ---------- */}
       <section ref={physicalExamRef} className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader
@@ -507,7 +817,6 @@ export default function StudentRecordPanel({ student }) {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* vital signs */}
           <div>
             <GroupBar>Vital Signs and Measurements</GroupBar>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -572,7 +881,6 @@ export default function StudentRecordPanel({ student }) {
             </div>
           </div>
 
-          {/* physical findings */}
           <div>
             <GroupBar>Physical Findings</GroupBar>
             <div className="border border-gray-300 rounded-lg overflow-hidden">
@@ -685,7 +993,7 @@ export default function StudentRecordPanel({ student }) {
         </div>
 
         <div className="mt-5 pt-4 border-t border-gray-200">
-          <SaveButton onClick={() => handleSave("physical")} saved={savedSection === "physical"}>
+          <SaveButton onClick={handleSavePhysical} saved={savedSection === "physical"} saving={savingSection === "physical"}>
             Save Physical Examination
           </SaveButton>
         </div>
@@ -829,7 +1137,7 @@ export default function StudentRecordPanel({ student }) {
         </div>
 
         <div className="mt-5 pt-4 border-t border-gray-200">
-          <SaveButton onClick={() => handleSave("lab")} saved={savedSection === "lab"}>
+          <SaveButton onClick={handleSaveLab} saved={savedSection === "lab"} saving={savingSection === "lab"}>
             Save Lab Results
           </SaveButton>
         </div>
@@ -876,10 +1184,6 @@ export default function StudentRecordPanel({ student }) {
           </label>
         </div>
 
-        {/* moved here from Physical Examinations, per request — sits at the end of
-            Diagnosis and Final Remark, right above the "essentially normal findings"
-            checkbox it's tied to (checking it is what auto-fills that same checkbox
-            on the Medical Certificate). */}
         <div className="mt-5 pt-4 border-t border-gray-200">
           <GroupBar>General Physical Examination Summary</GroupBar>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -919,19 +1223,9 @@ export default function StudentRecordPanel({ student }) {
             Essentially normal physical findings at the time of evaluation
           </label>
           <SaveButton
-            onClick={() => {
-              // Push Diagnosis, Final Remark, and the "Essentially normal
-              // findings" checkbox above (rec.diagnosisNormalFindingsChecked)
-              // so the Medical Certificate auto-fills with these instead of
-              // the nurse re-typing them there.
-              saveCertificateDefaults(student.id, {
-                diagnosis: rec.diagnosis,
-                finalRemark: rec.finalRemark,
-                normalFindingsChecked: rec.diagnosisNormalFindingsChecked,
-              });
-              handleSave("diagnosis");
-            }}
+            onClick={handleSaveDiagnosis}
             saved={savedSection === "diagnosis"}
+            saving={savingSection === "diagnosis"}
           >
             Save Record
           </SaveButton>
@@ -943,7 +1237,6 @@ export default function StudentRecordPanel({ student }) {
 
 /* ---------- helpers ---------- */
 
-// "Ramos, Joseph Daniel B." -> "Joseph Daniel B. Ramos" (matches the mockup header)
 function formatDisplayName(name = "") {
   const [last, rest] = name.split(",").map((p) => p.trim());
   if (!rest) return name;
