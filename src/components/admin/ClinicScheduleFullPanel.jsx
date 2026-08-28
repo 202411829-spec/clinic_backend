@@ -101,8 +101,14 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
   );
 }
 
+const DEFAULT_OPEN_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+
 export default function ClinicScheduleFullPanel() {
   const [selectedDates, setSelectedDates] = useState([new Date()]);
+  const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
+  const [calendarMode, setCalendarMode] = useState("specific");
+  const [bookingEnabledMap, setBookingEnabledMap] = useState({});
+  const [bookingSaving, setBookingSaving] = useState(false);
 
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("17:00");
@@ -113,7 +119,6 @@ export default function ClinicScheduleFullPanel() {
   const [blocks, setBlocks] = useState([]);
   const [openEditId, setOpenEditId] = useState(null);
   const [savedMessage, setSavedMessage] = useState("");
-  const [bookingOpenMessage, setBookingOpenMessage] = useState("");
 
   const computed = useMemo(
     () => generateTimeBlocks({ workStart, workEnd, breakStart, breakEnd, numStudents }),
@@ -142,6 +147,99 @@ export default function ClinicScheduleFullPanel() {
       .catch((err) => console.error("Failed to load clinic settings:", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch per-date is_enabled for selectedDates to drive booking pill + calendar closed styling.
+  // If no override exists, inherit weekday default (open if weekday is in selectedWeekdays).
+  useEffect(() => {
+    if (calendarMode !== "specific" || selectedDates.length === 0) {
+      setBookingEnabledMap({});
+      return;
+    }
+    let cancelled = false;
+    async function load() {
+      const next = {};
+      await Promise.all(
+        selectedDates.map(async (d) => {
+          const ymd = toYMDLocal(d);
+          try {
+            const res = await clinicScheduleApi.byDate(ymd);
+            const sched = res?.schedule;
+            if (sched && typeof sched.is_enabled === "boolean") {
+              next[ymd] = sched.is_enabled;
+            } else {
+              next[ymd] = selectedWeekdays.includes(d.getDay());
+            }
+          } catch {
+            next[ymd] = selectedWeekdays.includes(d.getDay());
+          }
+        })
+      );
+      if (!cancelled) setBookingEnabledMap(next);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDates, selectedWeekdays, calendarMode]);
+
+  function resolveBookingEnabled(date) {
+    const ymd = toYMDLocal(date);
+    if (ymd in bookingEnabledMap) return bookingEnabledMap[ymd];
+    return selectedWeekdays.includes(date.getDay());
+  }
+
+  const bookingValues = selectedDates.map(resolveBookingEnabled);
+  const allOpen = bookingValues.length > 0 && bookingValues.every((v) => v === true);
+  const allClosed = bookingValues.length > 0 && bookingValues.every((v) => v === false);
+  const mixed = !allOpen && !allClosed;
+
+  function getBookingLabel() {
+    if (selectedDates.length === 1) {
+      const label = selectedDates[0].toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      return `Booking for ${label}:`;
+    }
+    if (mixed) return `Booking for ${selectedDates.length} dates — Mixed:`;
+    if (allOpen) return `Booking for ${selectedDates.length} dates — all open:`;
+    if (allClosed) return `Booking for ${selectedDates.length} dates — all closed:`;
+    return `Booking for ${selectedDates.length} dates:`;
+  }
+
+  async function handleSetBooking(isEnabled) {
+    setBookingSaving(true);
+    try {
+      await Promise.all(
+        selectedDates.map((d) =>
+          clinicScheduleApi.createOverride({
+            working_date: toYMDLocal(d),
+            is_enabled: isEnabled,
+            slot_start: workStart,
+            slot_end: workEnd,
+            break_start: breakStart || null,
+            break_end: breakEnd || null,
+          })
+        )
+      );
+      const next = { ...bookingEnabledMap };
+      selectedDates.forEach((d) => {
+        next[toYMDLocal(d)] = isEnabled;
+      });
+      setBookingEnabledMap(next);
+      const dateLabel =
+        selectedDates.length > 1 ? `${selectedDates.length} dates` : formatMDY(selectedDates[0]);
+      setSavedMessage(`Booking ${isEnabled ? "open" : "closed"} for ${dateLabel}.`);
+      window.setTimeout(() => setSavedMessage(""), 3000);
+    } catch (err) {
+      console.error("Failed to set booking:", err);
+      setSavedMessage("Failed to update booking. Check console for details.");
+      window.setTimeout(() => setSavedMessage(""), 3000);
+    } finally {
+      setBookingSaving(false);
+    }
+  }
 
   function handleSaveBlock(blockId, data) {
     setBlocks((prev) =>
@@ -206,15 +304,6 @@ export default function ClinicScheduleFullPanel() {
     window.setTimeout(() => setSavedMessage(""), 3000);
   }
 
-  function handleOpenBooking() {
-    const dateLabel =
-      selectedDates.length > 1
-        ? `${selectedDates.length} dates`
-        : formatMDY(selectedDates[0]);
-    setBookingOpenMessage(`Booking is now open for ${dateLabel}.`);
-    window.setTimeout(() => setBookingOpenMessage(""), 3000);
-  }
-
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       {/* header */}
@@ -229,7 +318,15 @@ export default function ClinicScheduleFullPanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-stretch">
         {/* left: calendar */}
-        <ScheduleCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+        <ScheduleCalendar
+          selectedDates={selectedDates}
+          onChange={setSelectedDates}
+          selectedWeekdays={selectedWeekdays}
+          onWeekdaysChange={setSelectedWeekdays}
+          mode={calendarMode}
+          onModeChange={setCalendarMode}
+          bookingEnabledMap={bookingEnabledMap}
+        />
 
         {/* middle: working hours / break time / time block config — self-start
             so it hugs its own content instead of stretching to match the
@@ -359,22 +456,58 @@ export default function ClinicScheduleFullPanel() {
         </div>
       </div>
 
-      {/* footer: save + open booking actions */}
-      <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
-        {(savedMessage || bookingOpenMessage) && (
-          <p className="text-sm font-semibold text-gc-green">
-            {savedMessage || bookingOpenMessage}
-          </p>
-        )}
-        <button
-          onClick={handleOpenBooking}
-          className="w-full md:w-auto rounded-xl bg-gc-accent px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors"
-        >
-          Open Booking
-        </button>
+      {/* footer: persisted booking toggle (lowest part) + update schedule */}
+      <div className="mt-4 border-t border-gray-100 pt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          {calendarMode === "specific" && selectedDates.length >= 1 ? (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                {getBookingLabel()}
+              </span>
+              <div className="inline-flex rounded-full bg-gray-100 p-1 gap-1 self-start">
+                <button
+                  type="button"
+                  onClick={() => handleSetBooking(true)}
+                  disabled={bookingSaving}
+                  aria-pressed={allOpen}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    allOpen
+                      ? "bg-gc-green text-white shadow-sm"
+                      : mixed
+                        ? "bg-white text-gray-500 hover:bg-gray-50"
+                        : "bg-white text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {allOpen ? "● Open" : "Open"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetBooking(false)}
+                  disabled={bookingSaving}
+                  aria-pressed={allClosed}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    allClosed
+                      ? "bg-red-500 text-white shadow-sm"
+                      : mixed
+                        ? "bg-white text-gray-500 hover:bg-gray-50"
+                        : "bg-white text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {allClosed ? "● Closed" : "Closed"}
+                </button>
+              </div>
+              {mixed && (
+                <span className="text-[11px] text-gray-400">Mixed — tap to set all</span>
+              )}
+            </div>
+          ) : null}
+          {savedMessage && (
+            <p className="text-sm font-semibold text-gc-green mt-2">{savedMessage}</p>
+          )}
+        </div>
         <button
           onClick={handleUpdateSchedule}
-          className="w-full md:w-auto rounded-xl bg-gc-green px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
+          className="w-full md:w-auto shrink-0 rounded-xl bg-gc-green px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 transition-colors"
         >
           Update Schedule
         </button>

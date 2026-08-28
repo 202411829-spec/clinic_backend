@@ -29,12 +29,25 @@ export default function ScheduleCalendar({
   onChange,
   selectedWeekdays: selectedWeekdaysProp,
   onWeekdaysChange,
+  mode: modeProp,
+  onModeChange,
+  bookingEnabledMap,
 }) {
   const today = new Date();
   const primary = selectedDates[0] ?? today;
   const [viewYear, setViewYear] = useState(primary.getFullYear());
   const [viewMonth, setViewMonth] = useState(primary.getMonth());
-  const [mode, setMode] = useState("specific"); // "specific" | "default"
+  const [internalMode, setInternalMode] = useState("specific"); // "specific" | "default"
+  const isModeControlled = modeProp !== undefined;
+  const mode = isModeControlled ? modeProp : internalMode;
+
+  function setMode(next) {
+    if (isModeControlled) {
+      onModeChange?.(next);
+    } else {
+      setInternalMode(next);
+    }
+  }
 
   // Self-managed by default so the toggle works even when the parent
   // doesn't pass selectedWeekdays/onWeekdaysChange. If the parent does pass
@@ -51,12 +64,12 @@ export default function ScheduleCalendar({
     }
   }
 
-  // Specific individual dates the admin has closed (e.g. holidays), on top
-  // of the weekday defaults above. Turned on/off via the "Mark dates as
-  // unavailable" switch below the calendar — while that's on, clicking a
-  // date toggles it closed/open instead of selecting it for scheduling.
-  const [offDates, setOffDates] = useState([]);
-  const [offMode, setOffMode] = useState(false);
+  function toYMDLocal(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
 
   const weeks = getMonthMatrix(viewYear, viewMonth);
 
@@ -103,7 +116,12 @@ export default function ScheduleCalendar({
   }
 
   function isDateOff(date) {
-    return offDates.some((d) => isSameDate(d, date));
+    if (!date) return false;
+    const ymd = toYMDLocal(date);
+    if (bookingEnabledMap && ymd in bookingEnabledMap) {
+      return bookingEnabledMap[ymd] === false;
+    }
+    return false;
   }
 
   function isToday(date) {
@@ -115,17 +133,6 @@ export default function ScheduleCalendar({
     if (mode === "default") return;
     const date = new Date(viewYear, viewMonth, day);
     if (!isWeekdayOpen(date)) return; // that weekday is turned off — not pickable
-
-    // "Mark dates as unavailable" mode — clicking closes/reopens this exact
-    // date instead of selecting it.
-    if (offMode) {
-      setOffDates((prev) =>
-        prev.some((d) => isSameDate(d, date))
-          ? prev.filter((d) => !isSameDate(d, date))
-          : [...prev, date]
-      );
-      return;
-    }
 
     if (isDateOff(date)) return; // closed date — not pickable
 
@@ -149,8 +156,6 @@ export default function ScheduleCalendar({
     const now = new Date();
     setViewYear(now.getFullYear());
     setViewMonth(now.getMonth());
-    setOffDates([]);
-    setOffMode(false);
     setWeekdays(DEFAULT_OPEN_WEEKDAYS);
     onChange([now]);
   }
@@ -278,8 +283,6 @@ export default function ScheduleCalendar({
             stateClasses = "bg-gc-accent text-white shadow-sm";
           } else if (isTodayDate) {
             stateClasses = "text-gc-green font-bold border border-gc-accent/40 hover:bg-gray-100";
-          } else if (offMode) {
-            stateClasses = "text-gray-700 ring-1 ring-red-200 hover:bg-red-50";
           }
 
           return (
@@ -301,48 +304,9 @@ export default function ScheduleCalendar({
       </div>
 
       {mode === "specific" && (
-        <>
-          {/* on/off switch for marking specific individual dates unavailable —
-          sits right below the "days open by default" summary. While on,
-          tapping a date closes it (greyed + unclickable) instead of
-          selecting it. */}
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2.5">
-            <div>
-              <span className="block text-xs font-semibold text-gray-700">
-                Mark dates as unavailable
-              </span>
-              <span className="block text-[11px] text-gray-400">
-                {offMode ? "Tap a date to close it" : "Turn on to close specific dates"}
-              </span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={offMode}
-              aria-label="Toggle marking dates as unavailable"
-              onClick={() => setOffMode((v) => !v)}
-              className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${
-                offMode ? "bg-red-500" : "bg-gray-200"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                  offMode ? "translate-x-5" : ""
-                }`}
-              />
-            </button>
-          </div>
-
-          {offDates.length > 0 && (
-            <p className="mt-2 text-[11px] font-semibold text-red-400">
-              {offDates.length} date{offDates.length === 1 ? "" : "s"} marked unavailable
-            </p>
-          )}
-
-          <p className="mt-3 text-[11px] text-gray-400">
-            Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
-          </p>
-        </>
+        <p className="mt-3 text-[11px] text-gray-400">
+          Tip: hold <span className="font-semibold text-gray-500">Shift</span> and click dates to select multiple.
+        </p>
       )}
     </section>
   );
