@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 
+from concurrent.futures import ThreadPoolExecutor
+
 from postgrest import APIError as PostgrestAPIError
 
 from database import supabase
@@ -168,26 +170,33 @@ def get_all_reference_data():
     once, so repeated calls don't re-query per row.
     """
 
-    appointments_response = execute_with_retry(
-        supabase
-        .table("appointments")
-        .select("*")
-    )
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        appointments_fut = executor.submit(
+            execute_with_retry,
+            supabase
+            .table("appointments")
+            .select("*"),
+        )
+        students_fut = executor.submit(build_student_lookup)
+        reasons_fut = executor.submit(build_reason_lookup)
+        medicines_fut = executor.submit(build_medicine_lookup)
+        log_medicine_fut = executor.submit(
+            execute_with_retry,
+            supabase
+            .table("visit_log_medicines")
+            .select("*"),
+        )
+
+        appointments_response = appointments_fut.result()
+        students_by_id = students_fut.result()
+        reasons_by_id = reasons_fut.result()
+        medicines_by_id = medicines_fut.result()
+        log_medicine_response = log_medicine_fut.result()
 
     appointments_by_id = {
         row["appointment_id"]: row
         for row in (appointments_response.data or [])
     }
-
-    students_by_id = build_student_lookup()
-    reasons_by_id = build_reason_lookup()
-    medicines_by_id = build_medicine_lookup()
-
-    log_medicine_response = execute_with_retry(
-        supabase
-        .table("visit_log_medicines")
-        .select("*")
-    )
 
     log_medicine_rows = log_medicine_response.data or []
 

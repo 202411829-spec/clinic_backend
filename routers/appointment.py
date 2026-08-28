@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request, g
+from concurrent.futures import ThreadPoolExecutor
 from database import supabase
 from routers.helpers import (
     execute_with_retry,
@@ -573,13 +574,18 @@ def get_time_slots():
                     .select("*")
                     .eq("appointment_date", requested_date)
                 )
-                appointment_response = execute_with_retry(
-                    appointment_query
-                )
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    appointment_fut = executor.submit(
+                        execute_with_retry, appointment_query
+                    )
+                    students_fut = executor.submit(build_student_lookup)
+                    reasons_fut = executor.submit(build_reason_lookup)
+
+                    appointment_response = appointment_fut.result()
+                    students_by_id = students_fut.result()
+                    reasons_by_id = reasons_fut.result()
                 appointments = appointment_response.data or []
                 appointment_ids = [a["appointment_id"] for a in appointments]
-                students_by_id = build_student_lookup()
-                reasons_by_id = build_reason_lookup()
                 latest_status_by_appointment = (
                     get_latest_status_for_appointments(appointment_ids)
                 )
@@ -675,13 +681,6 @@ def get_time_slots():
                     _override.get("schedule_id")
                 )
 
-        slot_response = execute_with_retry(
-            slot_query
-            .order("slot_start", desc=False)
-        )
-
-        slots = slot_response.data or []
-
         # ----------------------------------------------------
         # Fetch appointments (optionally filtered by date),
         # since bookings are grouped by slot_id
@@ -699,9 +698,25 @@ def get_time_slots():
                 requested_date
             )
 
-        appointment_response = execute_with_retry(
-            appointment_query
-        )
+        # Fetch time slots, appointments, and the student/reason
+        # lookups concurrently — all independent queries.
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            slot_fut = executor.submit(
+                execute_with_retry,
+                slot_query.order("slot_start", desc=False),
+            )
+            appointment_fut = executor.submit(
+                execute_with_retry, appointment_query
+            )
+            students_fut = executor.submit(build_student_lookup)
+            reasons_fut = executor.submit(build_reason_lookup)
+
+            slot_response = slot_fut.result()
+            appointment_response = appointment_fut.result()
+            students_by_id = students_fut.result()
+            reasons_by_id = reasons_fut.result()
+
+        slots = slot_response.data or []
 
         appointments = appointment_response.data or []
 
@@ -713,8 +728,6 @@ def get_time_slots():
         # Build lookups for joining
         # ----------------------------------------------------
 
-        students_by_id = build_student_lookup()
-        reasons_by_id = build_reason_lookup()
         latest_status_by_appointment = (
             get_latest_status_for_appointments(appointment_ids)
         )
@@ -1214,13 +1227,21 @@ def create_appointment():
 
         slot_id = slot.get("slot_id")
 
-        existing_response = execute_with_retry(
-            supabase
-            .table("appointments")
-            .select("appointment_id, student_id")
-            .eq("time_slot_id", slot_id)
-            .eq("appointment_date", appointment_date)
-        )
+        # Existing appointments for this slot and the slot capacity
+        # setting are independent lookups — fetch them concurrently.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            existing_fut = executor.submit(
+                execute_with_retry,
+                supabase
+                .table("appointments")
+                .select("appointment_id, student_id")
+                .eq("time_slot_id", slot_id)
+                .eq("appointment_date", appointment_date),
+            )
+            capacity_fut = executor.submit(get_max_students_per_slot)
+
+            existing_response = existing_fut.result()
+            capacity = capacity_fut.result()
 
         existing_appointments = existing_response.data or []
 
@@ -1255,8 +1276,6 @@ def create_appointment():
                 "success": False,
                 "error": "You already have an appointment in this time slot"
             }), 409
-
-        capacity = get_max_students_per_slot()
 
         if len(active_appointments) >= capacity:
             return jsonify({

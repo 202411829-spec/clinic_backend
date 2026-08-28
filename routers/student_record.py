@@ -8,6 +8,7 @@ Converted from FastAPI to a Flask blueprint.
 """
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from flask import Blueprint, g, jsonify, request
 from datetime import date
@@ -97,20 +98,28 @@ def get_student_record_header(student_id):
     if not sid:
         return _error("Student not found", 404)
 
-    profile = execute_with_retry(
-        supabase.table("student_masterlist")
-        .select("*")
-        .eq("student_id", sid)
-        .maybe_single()
-    )
-    if not profile.data:
-        return _error("Student not found", 404)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        profile_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("student_masterlist")
+            .select("*")
+            .eq("student_id", sid)
+            .maybe_single(),
+        )
+        exams_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("annual_examinations")
+            .select("*")
+            .eq("student_id", sid),
+        )
 
-    exams_resp = execute_with_retry(
-        supabase.table("annual_examinations")
-        .select("*")
-        .eq("student_id", sid)
-    )
+        profile = profile_fut.result()
+        if not profile.data:
+            exams_fut.result()
+            return _error("Student not found", 404)
+
+        exams_resp = exams_fut.result()
+
     by_year = {row["year_label"]: row for row in exams_resp.data}
 
     history = []
@@ -479,33 +488,46 @@ def get_medical_summary(student_id):
     if not sid:
         return _error("Student not found", 404)
 
-    profile = execute_with_retry(
-        supabase.table("student_masterlist")
-        .select("*")
-        .eq("student_id", sid)
-        .maybe_single()
-    )
-    if not profile.data:
-        return _error("Student not found", 404)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        profile_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("student_masterlist")
+            .select("*")
+            .eq("student_id", sid)
+            .maybe_single(),
+        )
+        emergency_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("emergency_contacts")
+            .select("*")
+            .eq("student_id", sid)
+            .limit(1),
+        )
+        history_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("medical_histories")
+            .select("*")
+            .eq("student_id", sid)
+            .limit(1),
+        )
+        exams_fut = executor.submit(
+            execute_with_retry,
+            supabase.table("annual_examinations")
+            .select("*, physical_examinations(*, laboratory_results(*, chest_xrays(*))), medical_certificates(*)")
+            .eq("student_id", sid),
+        )
 
-    emergency_contact = execute_with_retry(
-        supabase.table("emergency_contacts")
-        .select("*")
-        .eq("student_id", sid)
-        .limit(1)
-    )
-    medical_history = execute_with_retry(
-        supabase.table("medical_histories")
-        .select("*")
-        .eq("student_id", sid)
-        .limit(1)
-    )
+        profile = profile_fut.result()
+        if not profile.data:
+            # Surface any failure from the sibling queries before returning.
+            for fut in (emergency_fut, history_fut, exams_fut):
+                fut.result()
+            return _error("Student not found", 404)
 
-    exams = execute_with_retry(
-        supabase.table("annual_examinations")
-        .select("*, physical_examinations(*, laboratory_results(*, chest_xrays(*))), medical_certificates(*)")
-        .eq("student_id", sid)
-    )
+        emergency_contact = emergency_fut.result()
+        medical_history = history_fut.result()
+        exams = exams_fut.result()
+
     by_year = {row["year_label"]: row for row in exams.data}
     years = by_year
 
