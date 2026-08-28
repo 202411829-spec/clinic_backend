@@ -4,8 +4,8 @@ import NavIcon from "./NavIcon";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
-import { reasonOptions } from "../../data/dashboardSample";
-import { appointmentsApi } from "../../lib/api.js";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { formatLongDate } from "../../lib/calendar";
 
 function toYMD(date) {
@@ -71,9 +71,6 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
         </div>
       )}
 
-      {/* Anchored to this same small wrapper (not the whole row) so it always
-          opens right under the "..." button instead of drifting to the row's
-          far edge on rows near the bottom of the list. */}
       {editing && (
         <TimeBlockEditPopover
           slot={slot}
@@ -202,7 +199,8 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   const [openEditId, setOpenEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Department");
-  const [reason, setReason] = useState("All Reason");
+  const [reasonFilter, setReasonFilter] = useState("All Reason");
+  const [reasonRecords, setReasonRecords] = useState([]);
 
   // Fetch real time slots + bookings for the selected date.
   useEffect(() => {
@@ -228,6 +226,20 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     };
   }, [selectedDate]);
 
+  // Fetch real reasons for the filter dropdown
+  useEffect(() => {
+    referenceApi
+      .reasons()
+      .then((res) => {
+        const list = (res?.reasons || [])
+          .filter((r) => r.description && r.description !== "-")
+          .sort((a, b) => a.description.localeCompare(b.description));
+        if (list.length) setReasonRecords(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Derive departments from the loaded slots/bookings
   const departments = useMemo(() => {
     const set = new Set();
     slots.forEach((s) => s.bookings.forEach((b) => set.add(b.dept)));
@@ -276,7 +288,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   }
 
   const filteredSlots = useMemo(() => {
-    if (!search && department === "All Department" && reason === "All Reason") {
+    if (!search && department === "All Department" && reasonFilter === "All Reason") {
       return slots;
     }
     return slots.map((slot) => ({
@@ -289,11 +301,11 @@ export default function AppointmentsFullPanel({ selectedDate }) {
           b.dept.toLowerCase().includes(q);
         const matchesDept =
           department === "All Department" || b.dept === department;
-        const matchesReason = reason === "All Reason" || b.reason === reason;
+        const matchesReason = reasonFilter === "All Reason" || b.reason === reasonFilter;
         return matchesSearch && matchesDept && matchesReason;
       }),
     }));
-  }, [slots, search, department, reason]);
+  }, [slots, search, department, reasonFilter]);
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
@@ -321,28 +333,12 @@ export default function AppointmentsFullPanel({ selectedDate }) {
             className="w-full outline-none placeholder:text-gray-400 text-gray-700"
           />
         </div>
-        <select
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-        >
-          {departments.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700">
-          <option>All Courses</option>
-        </select>
-        <select
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-        >
-          <option>All Reason</option>
-          {reasonOptions.map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
+        <UniversalDropdown value={department} onChange={setDepartment} options={departments} />
+        <UniversalDropdown
+          value={reasonFilter}
+          onChange={setReasonFilter}
+          options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecords.map((r) => ({ value: r.description, label: r.description }))]}
+        />
       </div>
 
       {loading && (

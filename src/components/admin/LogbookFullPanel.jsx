@@ -1,17 +1,20 @@
 // src/components/admin/LogbookFullPanel.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import NavIcon from "./NavIcon.jsx";
 import {
   logbookEntries as sampleEntries,
 } from "../../data/dashboardSample.js";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { logbookApi, referenceApi } from "../../lib/api.js";
 
 const PAGE_SIZE = 20;
 
 // Map a backend /logbook row onto the shape this panel renders.
 function mapEntry(r) {
-  // Backend deptCourse is built as "Course - Department".
-  const [course = "-", dept = "-"] = String(r.deptCourse || "-").split(" - ");
+  // Backend now returns separate dept and course fields.
+  const dept = r.dept || "-";
+  const course = r.course || "-";
+  const deptCourse = r.deptCourse || (course !== "-" && dept !== "-" ? `${course} - ${dept}` : course !== "-" ? course : dept);
   return {
     id: r.id ?? r.log_id,
     dateTime: r.dateTime || "-",
@@ -20,7 +23,7 @@ function mapEntry(r) {
     age: r.age ?? "-",
     dept,
     course,
-    deptCourse: r.deptCourse || "-",
+    deptCourse,
     sex: r.sex || "-",
     reason: r.reason || "-",
     complaint: r.complaint || "-",
@@ -99,371 +102,183 @@ export default function LogbookFullPanel() {
   const [entries, setEntries] = useState([]);
   const [reasonRecords, setReasonRecords] = useState([]);
   const [medicineRecords, setMedicineRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Derived for dropdowns
   const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
   const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
 
-  // Load real visit history + reference dropdowns.
-  useEffect(() => {
-    logbookApi
-      .list()
-      .then((res) => setEntries((res?.logbook || []).map(mapEntry)))
-      .catch((err) => console.error("Failed to load logbook:", err));
-    referenceApi
-      .reasons()
-      .then((res) => {
-        const list = (res?.reasons || []).filter((r) => r.description && r.description !== "-");
-        if (list.length) setReasonRecords(list);
-      })
-      .catch(() => {});
-    referenceApi
-      .medicines()
-      .then((res) => {
-        const list = (res?.medicines || []).filter((m) => m.medicine_name);
-        if (list.length) setMedicineRecords(list);
-      })
-      .catch(() => {});
-  }, []);
-
-  // search + filters
-  const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("All Departments");
-  const [course, setCourse] = useState("All Course");
-  const [reason, setReason] = useState("All Reason");
+  // Pagination & filters state
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [reasonFilter, setReasonFilter] = useState("");
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [pageSize] = useState(PAGE_SIZE);
 
-  // walk-in form visibility
-  const [showWalkInForm, setShowWalkInForm] = useState(false);
-
-  // walk-in visit form
-  const [regId, setRegId] = useState("");
-  const [walkInReasonId, setWalkInReasonId] = useState("");
-  const [complaint, setComplaint] = useState("");
-  const [medicineInput, setMedicineInput] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [medTags, setMedTags] = useState([]);
-
-  const departments = useMemo(() => {
-    const set = new Set(entries.map((e) => e.dept));
-    return ["All Departments", ...Array.from(set)];
-  }, [entries]);
-
-  const courses = useMemo(() => {
-    const set = new Set(entries.map((e) => e.course));
-    return ["All Course", ...Array.from(set)];
-  }, [entries]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return entries.filter((e) => {
-      const matchesSearch =
-        !q ||
-        e.name.toLowerCase().includes(q) ||
-        e.studentId.toLowerCase().includes(q) ||
-        e.course.toLowerCase().includes(q);
-      const matchesDept = department === "All Departments" || e.dept === department;
-      const matchesCourse = course === "All Course" || e.course === course;
-      const matchesReason = reason === "All Reason" || e.reason === reason;
-      return matchesSearch && matchesDept && matchesCourse && matchesReason;
-    });
-  }, [entries, search, department, course, reason]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-
-  function updateFilter(setter) {
-    return (e) => {
-      setter(e.target.value);
-      setPage(1);
-    };
-  }
-
-  function handleAddMedicine() {
-    if (!medicineInput.trim()) return;
-    const qty = quantity ? Number(quantity) : 1;
-    const match = medicineRecords.find((m) => m.medicine_name.toLowerCase() === medicineInput.trim().toLowerCase());
-    const medId = match?.medicine_id;
-    setMedTags((tags) => [
-      ...tags,
-      { name: medicineInput.trim(), quantity: qty, medicine_id: medId },
-    ]);
-    setMedicineInput("");
-    setQuantity("");
-  }
-
-  async function handleAddWalkIn() {
-    if (!regId.trim() || !walkInReasonId) return;
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:00`;
-
-    const medicinesPayload = medTags
-      .filter((t) => t.medicine_id)
-      .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
-
+  // Load data with server-side filtering
+  const loadData = useCallback(async () => {
     try {
-      await logbookApi.createWalkIn({
-        student_id: regId.trim(),
-        appointment_date: `${y}-${m}-${d}`,
-        appointment_time: time,
-        reason_id: Number(walkInReasonId),
-        complaint: complaint.trim() || undefined,
-        medicines: medicinesPayload.length > 0 ? medicinesPayload : undefined,
-      });
-      // Refresh the list from the backend so the new visit shows real data.
-      const res = await logbookApi.list();
-      setEntries((res?.logbook || []).map(mapEntry));
-    } catch (err) {
-      console.error("Walk-in failed:", err);
-      alert(`Couldn't save the walk-in visit: ${err.message}`);
-      return;
-    }
+      setLoading(true);
+      setError(null);
 
-    setRegId("");
-    setWalkInReasonId("");
-    setComplaint("");
-    setMedTags([]);
-    setPage(1);
-    setShowWalkInForm(false);
+      const params = {
+        page,
+        page_size: pageSize,
+        ...(search && { search }),
+        ...(dateFrom && { date_from: dateFrom }),
+        ...(dateTo && { date_to: dateTo }),
+        ...(reasonFilter && { reason_id: reasonFilter }),
+      };
+
+      const [logbookRes, reasonsRes, medicinesRes] = await Promise.all([
+        logbookApi.list(params),
+        referenceApi.reasons(),
+        referenceApi.medicines(),
+      ]);
+
+      if (!cancelled) {
+        setEntries((logbookRes?.logbook || []).map(mapEntry));
+        setTotalEntries(logbookRes?.total || 0);
+        const reasonsList = (reasonsRes?.reasons || []).filter((r) => r.description && r.description !== "-");
+        if (reasonsList.length) setReasonRecords(reasonsList);
+        const medicinesList = (medicinesRes?.medicines || []).filter((m) => m.medicine_name);
+        if (medicinesList.length) setMedicineRecords(medicinesList);
+      }
+    } catch (err) {
+      if (!cancelled) setError(err.message || "Failed to load logbook");
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }, [page, search, dateFrom, dateTo, reasonFilter, pageSize]);
+
+  // Reload when filters change
+  useEffect(() => {
+    let cancelled = false;
+
+    const doLoad = async () => {
+      await loadData();
+    };
+
+    doLoad();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gc-green-700 font-semibold">Loading logbook…</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">
+        <p className="font-semibold">Failed to load logbook</p>
+        <p className="text-sm mt-1">{error}</p>
+      </div>
+    );
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-      {/* header */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-            <NavIcon name="book" className="w-4 h-4" />
-          </span>
-          <div>
-            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
-              Logbook
-            </h1>
-            <p className="text-xs text-gray-400 leading-tight">
-              View history of completed clinic visits.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* search + filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
-        <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
-          <NavIcon name="search" className="w-4 h-4 shrink-0 text-gray-400" />
+    <div className="flex flex-col gap-4">
+      {/* Search + Filters */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
           <input
+            type="text"
+            placeholder="Search student ID, name, complaint, medicine…"
             value={search}
-            onChange={updateFilter(setSearch)}
-            placeholder="Search by surname, name, student ID, or course..."
-            className="w-full outline-none placeholder:text-gray-400 text-gray-700"
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
           />
         </div>
-        <select
-          value={department}
-          onChange={updateFilter(setDepartment)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-        >
-          {departments.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-        <select
-          value={course}
-          onChange={updateFilter(setCourse)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-        >
-          {courses.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          value={reason}
-          onChange={updateFilter(setReason)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-        >
-          <option>All Reason</option>
-          {reasons.map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
+        <div className="flex flex-wrap gap-2 md:w-[500px]">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
+            placeholder="From date"
+          />
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 focus:outline:none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
+            placeholder="To date"
+          />
+          <UniversalDropdown
+            value={reasonFilter}
+            onChange={setReasonFilter}
+            options={reasons}
+            placeholder="All Reasons"
+            className="min-w-[180px]"
+          />
+        </div>
       </div>
 
-      {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
-      <div className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 border-y md:border border-gray-200 md:rounded-xl">
-        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse">
-          <thead>
-            <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2.5 px-4 font-semibold border border-gray-300 whitespace-nowrap">Date / Time</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Name</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300">Age</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept &amp; Course</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Reason</th>
-              <th className="py-2.5 px-3 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Complaint</th>
-              <th className="py-2.5 px-4 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Medicine</th>
+      {/* Table */}
+      <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Student ID</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Age</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Dept / Course</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Sex</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Complaint</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider">Medicine</th>
             </tr>
           </thead>
-          <tbody>
-            {pageRows.map((row) => (
-              <tr key={row.id} className="hover:bg-gray-50/60">
-                <td className="py-3 px-4 text-gray-700 border border-gray-300 whitespace-nowrap">{row.dateTime}</td>
-                <td className="py-3 px-3 text-gray-800 font-medium border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.name}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.age}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.deptCourse}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap">{row.sex}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.reason}</td>
-                <td className="py-3 px-3 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.complaint}</td>
-                <td className="py-3 px-4 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.medicine}</td>
-              </tr>
-            ))}
-            {pageRows.length === 0 && (
+          <tbody className="divide-y divide-gray-100">
+            {entries.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
-                  No visits match your search or filters.
+                <td colSpan={9} className="px-4 py-12 text-center text-gray-400">
+                  No logbook entries found
                 </td>
               </tr>
+            ) : (
+              entries.map((entry) => (
+                <tr key={entry.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{entry.dateTime}</td>
+                  <td className="px-4 py-3 text-gray-700 font-medium">{entry.studentId}</td>
+                  <td className="px-4 py-3 text-gray-700">{entry.name}</td>
+                  <td className="px-4 py-3 text-gray-700">{entry.age}</td>
+                  <td className="px-4 py-3 text-gray-700">
+                    <div className="font-medium">{entry.dept}</div>
+                    <div className="text-xs text-gray-500">{entry.course}</div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">{entry.sex}</td>
+                  <td className="px-4 py-3 text-gray-700">{entry.reason}</td>
+                  <td className="px-4 py-3 text-gray-700 max-w-xs truncate">{entry.complaint}</td>
+                  <td className="px-4 py-3 text-gray-700">{entry.medicine}</td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* pagination */}
-      <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-        <p className="text-xs text-gray-400">
-          {filtered.length} search result{filtered.length === 1 ? "" : "s"}
-        </p>
-        <Pagination page={currentPage} pageCount={pageCount} onChange={setPage} />
-      </div>
-
-      {/* bottom trigger — the single Add Walk-in Visit entry point (Add Medicine only lives on the Dashboard widget) */}
-      {!showWalkInForm && (
-        <div className="mt-6 pt-5 border-t border-gray-200 flex justify-end">
-          <button
-            onClick={() => setShowWalkInForm(true)}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            + Add Walk-in Visit
-          </button>
+      {/* Pagination */}
+      {totalEntries > pageSize && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalEntries)} of{" "}
+            {totalEntries} entries
+          </p>
+          <Pagination page={page} pageCount={Math.ceil(totalEntries / pageSize)} onChange={setPage} />
         </div>
       )}
-
-      {/* walk-in visit form — expands directly below the button, closes back into it */}
-      {showWalkInForm && (
-        <div className="mt-6 pt-5 border-t border-gray-200">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
-            <button
-              onClick={() => setShowWalkInForm(false)}
-              aria-label="Close"
-              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            >
-              <span aria-hidden className="text-base leading-none">×</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500">
-                ID / Registration Number
-              </label>
-              <input
-                value={regId}
-                onChange={(e) => setRegId(e.target.value)}
-                placeholder="Student ID"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Reason</label>
-              <select
-                value={walkInReasonId}
-                onChange={(e) => setWalkInReasonId(e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
-              >
-                <option value="">Select Reason</option>
-                {reasonRecords.map((r) => (
-                  <option key={r.reason_id} value={r.reason_id}>
-                    {r.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Complaint</label>
-              <input
-                value={complaint}
-                onChange={(e) => setComplaint(e.target.value)}
-                placeholder="E.g. Headache"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Medicine</label>
-                <input
-                  value={medicineInput}
-                  onChange={(e) => setMedicineInput(e.target.value)}
-                  placeholder="E.g. Paracetamol"
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                />
-                {medTags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {medTags.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
-                      >
-                        {tag.name} x{tag.quantity}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Quantity</label>
-                <div className="mt-1 flex gap-1.5">
-                  <input
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    type="number"
-                    min="0"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                  />
-                  <button
-                    onClick={handleAddMedicine}
-                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
-                  >
-                    + Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
-            <button
-              onClick={() => setShowWalkInForm(false)}
-              className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddWalkIn}
-              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-            >
-              + Add Walk-in Visit
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
+    </div>
   );
 }

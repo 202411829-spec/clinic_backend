@@ -10,6 +10,7 @@ import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample";
 import { masterlistApi } from "../../lib/api.js";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 // Fallback (only used if the masterlist API lists fail to load) so the
 // modal still renders. IDs are the names themselves here — persistence won't
@@ -449,35 +450,21 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
               />
             </Field>
             <Field label="Department" required error={err("departmentId")}>
-              <select
-                className={`${inputClass} bg-white`}
-                value={form.departmentId || ""}
-                onChange={(e) => onDepartmentChange(e.target.value)}
-              >
-                <option value="">Select Department</option>
-                {departments.map((d) => (
-                  <option key={d.department_id} value={d.department_id}>
-                    {d.department_name}
-                  </option>
-                ))}
-              </select>
+              <UniversalDropdown
+                value={form.departmentId ? String(form.departmentId) : ""}
+                onChange={(v) => onDepartmentChange(v)}
+                options={departments.map((d) => ({ value: String(d.department_id), label: d.department_name }))}
+                placeholder="Select Department"
+              />
             </Field>
             <Field label="Course" required error={err("courseId")}>
-              <select
-                className={`${inputClass} bg-white`}
-                value={form.courseId || ""}
-                onChange={(e) => update({ courseId: e.target.value })}
+              <UniversalDropdown
+                value={form.courseId ? String(form.courseId) : ""}
+                onChange={(v) => update({ courseId: v })}
+                options={courses.map((c) => ({ value: String(c.course_id), label: c.course_name }))}
+                placeholder={form.departmentId ? "Select Course" : "Select a Department first"}
                 disabled={!form.departmentId}
-              >
-                <option value="">
-                  {form.departmentId ? "Select Course" : "Select a Department first"}
-                </option>
-                {courses.map((c) => (
-                  <option key={c.course_id} value={c.course_id}>
-                    {c.course_name}
-                  </option>
-                ))}
-              </select>
+              />
             </Field>
           </SectionBlock>
 

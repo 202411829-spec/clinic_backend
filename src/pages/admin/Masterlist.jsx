@@ -5,12 +5,12 @@ import { masterlistApi } from '../../lib/api.js'
 import {
   MasterlistIcon,
   SearchIcon,
-  ChevronDownIcon,
   SortIcon,
   DotsIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '../../components/icons.jsx'
+import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
 
 const COLUMNS = [
   { key: 'name', label: 'Name', sortable: true },
@@ -368,21 +368,13 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
 
 function FilterSelect({ value, onChange, placeholder, options }) {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="appearance-none rounded-xl border border-gray-200 py-2.5 pl-4 pr-9 text-sm text-gray-700 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-    </div>
+    <UniversalDropdown
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      className="min-w-[160px]"
+    />
   )
 }
 

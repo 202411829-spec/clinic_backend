@@ -5,6 +5,7 @@
 // school year is prefilled from the previous year and editable.
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 const SCHOOL_YEAR_RE = /^\d{4}\s*-\s*(\d{4}|\d{2})$/;
 
@@ -69,13 +70,12 @@ export default function AddAnnualExamModal({
             <label className="block text-xs font-semibold text-gray-500 mb-1">
               Year Label
             </label>
-            <select
+            <UniversalDropdown
               value={nextYearLabel}
+              onChange={() => {}}
+              options={[nextYearLabel]}
               disabled
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none bg-gray-50"
-            >
-              <option value={nextYearLabel}>{nextYearLabel}</option>
-            </select>
+            />
             <p className="mt-1 text-xs text-gray-400">
               The next academic year this student doesn't have yet.
             </p>

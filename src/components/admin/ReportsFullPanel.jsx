@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import PeriodDropdown from "./PeriodDropdown";
 import SelectDateCalendar from "./SelectDateCalendar";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { masterlistApi, reportsApi } from "../../lib/api.js";
 import { formatMDY, getPeriodLabel, shiftByPeriod } from "../../lib/calendar";
 
@@ -299,16 +300,12 @@ export default function ReportsFullPanel() {
 
           <div className="flex flex-col sm:flex-row gap-2">
             <PeriodDropdown value={period} onChange={setPeriod} />
-            <select
+            <UniversalDropdown
               value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 md:w-56"
-            >
-              <option>All Departments</option>
-              {departments.map((d) => (
-                <option key={d.id}>{d.name}</option>
-              ))}
-            </select>
+              onChange={setDepartment}
+              options={["All Departments", ...departments.map((d) => d.name)]}
+              className="md:w-56"
+            />
           </div>
         </div>
 

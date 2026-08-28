@@ -18,6 +18,7 @@ import {
 import { saveCertificateDefaults } from "../../lib/certificateSync";
 import { recordsApi } from "../../lib/api";
 import { yearIndexFromLabel, formatYearLabel } from "../../lib/yearLabel";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
 // once auth is wired up — matches the placeholder used in AdminLayout.
@@ -124,21 +125,24 @@ function DateInput({ label, ...props }) {
   );
 }
 
-function SelectInput({ label, options, placeholder, ...props }) {
+function SelectInput({ label, options, placeholder, value, onChange, disabled }) {
+  // normalize onChange to accept either event or value; UniversalDropdown passes value directly
+  const handleChange = (v) => {
+    if (typeof onChange === "function") {
+      // support legacy (e) => ... by checking if caller expects event? we pass value, and wrappers updated to (v)
+      onChange(v);
+    }
+  };
   return (
     <div>
       {label && <FieldLabel>{label}</FieldLabel>}
-      <select
-        {...props}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20 bg-white"
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+      <UniversalDropdown
+        value={value ?? ""}
+        onChange={handleChange}
+        options={options}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
     </div>
   );
 }
@@ -157,7 +161,7 @@ function LabOtherDynamicFields({ examType, details, onChange }) {
             placeholder="Select"
             options={f.options}
             value={details?.[f.key] ?? ""}
-            onChange={(e) => onChange({ [f.key]: e.target.value })}
+            onChange={(v) => onChange({ [f.key]: v })}
           />
         ) : (
           <TextInput
@@ -173,25 +177,15 @@ function LabOtherDynamicFields({ examType, details, onChange }) {
 }
 
 function ResultSelect({ value, onChange }) {
+  const handleChange = (v) => {
+    if (typeof onChange === "function") {
+      // support legacy event-style caller: if caller expects e.target.value, we send value; call sites updated below
+      onChange(v);
+    }
+  };
   return (
-    <div className="relative inline-block w-full max-w-[150px]">
-      <select
-        value={value}
-        onChange={onChange}
-        className={`w-full appearance-none rounded-full pl-3 pr-7 py-1.5 text-xs font-semibold outline-none cursor-pointer ${
-          RESULT_STYLES[value] ?? "bg-gray-100 text-gray-600"
-        }`}
-      >
-        {resultOptions.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-      <NavIcon
-        name="chevron-right"
-        className="w-3 h-3 rotate-90 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-      />
+    <div className="w-full max-w-[150px]">
+      <UniversalDropdown value={value} onChange={handleChange} options={resultOptions} />
     </div>
   );
 }
@@ -978,7 +972,7 @@ export default function StudentRecordPanel({ student }) {
                     <tr key={key} className="border-b border-gray-200 last:border-b-0">
                       <td className="py-2 px-3 text-gray-700 whitespace-nowrap">{label}</td>
                       <td className="py-2 px-3">
-                        <ResultSelect value={rec.findings[key]} onChange={(e) => updateFinding(key, e.target.value)} />
+                        <ResultSelect value={rec.findings[key]} onChange={(v) => updateFinding(key, v)} />
                       </td>
                       <td className="py-2 px-3">
                         <input
@@ -1002,7 +996,7 @@ export default function StudentRecordPanel({ student }) {
                       </div>
                     </td>
                     <td className="py-2 px-3">
-                      <ResultSelect value={rec.findings.others} onChange={(e) => updateFinding("others", e.target.value)} />
+                      <ResultSelect value={rec.findings.others} onChange={(v) => updateFinding("others", v)} />
                     </td>
                     <td className="py-2 px-3">
                       <input
@@ -1028,7 +1022,7 @@ export default function StudentRecordPanel({ student }) {
                       <td className="py-2 px-3">
                         <ResultSelect
                           value={row.result}
-                          onChange={(e) => updateExtraOthersFinding(row.id, { result: e.target.value })}
+                          onChange={(v) => updateExtraOthersFinding(row.id, { result: v })}
                         />
                       </td>
                       <td className="py-2 px-3">
@@ -1089,7 +1083,7 @@ export default function StudentRecordPanel({ student }) {
               <DateInput label="Date" value={rec.chestXray.date} onChange={(e) => updateChestXray({ date: e.target.value })} />
               <div>
                 <FieldLabel>Result</FieldLabel>
-                <ResultSelect value={rec.chestXray.result} onChange={(e) => updateChestXray({ result: e.target.value })} />
+                <ResultSelect value={rec.chestXray.result} onChange={(v) => updateChestXray({ result: v })} />
               </div>
               <TextInput
                 label="Findings / Remarks"
@@ -1124,7 +1118,7 @@ export default function StudentRecordPanel({ student }) {
                 placeholder="Select"
                 options={bloodTypeOptions}
                 value={rec.cbc.bloodType}
-                onChange={(e) => updateCbc({ bloodType: e.target.value })}
+                onChange={(v) => updateCbc({ bloodType: v })}
               />
             </div>
           </div>
@@ -1142,14 +1136,14 @@ export default function StudentRecordPanel({ student }) {
                 placeholder="Select"
                 options={glucoseOptions}
                 value={rec.urinalysis.glucose}
-                onChange={(e) => updateUrinalysis({ glucose: e.target.value })}
+                onChange={(v) => updateUrinalysis({ glucose: v })}
               />
               <SelectInput
                 label="Protein"
                 placeholder="Select"
                 options={proteinOptions}
                 value={rec.urinalysis.protein}
-                onChange={(e) => updateUrinalysis({ protein: e.target.value })}
+                onChange={(v) => updateUrinalysis({ protein: v })}
               />
             </div>
           </div>
@@ -1163,7 +1157,7 @@ export default function StudentRecordPanel({ student }) {
                 placeholder="Select"
                 options={labExamTypeOptions}
                 value={rec.otherLabType}
-                onChange={(e) => updateOtherLabType(e.target.value)}
+                onChange={(v) => updateOtherLabType(v)}
               />
             </div>
             <LabOtherDynamicFields
@@ -1181,7 +1175,7 @@ export default function StudentRecordPanel({ student }) {
                       placeholder="Select"
                       options={labExamTypeOptions}
                       value={row.examType}
-                      onChange={(e) => updateExtraLabOther(row.id, e.target.value)}
+                      onChange={(v) => updateExtraLabOther(row.id, v)}
                     />
                   </div>
                   <button

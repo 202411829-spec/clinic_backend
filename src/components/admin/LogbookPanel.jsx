@@ -5,6 +5,7 @@ import NavIcon from "./NavIcon.jsx";
 import {
   recentLogbookEntries as sampleEntries,
 } from "../../data/dashboardSample.js";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { logbookApi } from "../../lib/api.js";
 
 function mapEntry(r) {
@@ -194,34 +195,9 @@ export default function LogbookPanel({
             className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
-        <select
-          value={department}
-          onChange={updateFilter(setDepartment)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-sm text-gray-600"
-        >
-          {departments.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-        <select
-          value={course}
-          onChange={updateFilter(setCourse)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
-        >
-          {courses.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          value={reasonFilter}
-          onChange={updateFilter(setReasonFilter)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
-        >
-          <option value="All Reason">All Reason</option>
-          {reasons.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+        <UniversalDropdown value={department} onChange={(v) => { setDepartment(v); setPage(1); }} options={departments} />
+        <UniversalDropdown value={course} onChange={(v) => { setCourse(v); setPage(1); }} options={courses} />
+        <UniversalDropdown value={reasonFilter} onChange={(v) => { setReasonFilter(v); setPage(1); }} options={["All Reason", ...reasons]} />
       </div>
 
       {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
@@ -348,18 +324,13 @@ export default function LogbookPanel({
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500">Reason</label>
-              <select
+              <UniversalDropdown
                 value={walkInReasonId}
-                onChange={(e) => setWalkInReasonId(e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 outline-none focus:border-gc-accent"
-              >
-                <option value="">Select Reason</option>
-                {reasonRecords.map((r) => (
-                  <option key={r.reason_id} value={r.reason_id}>
-                    {r.description}
-                  </option>
-                ))}
-              </select>
+                onChange={setWalkInReasonId}
+                options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
+                placeholder="Select Reason"
+                className="mt-1"
+              />
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500">Complaint</label>

@@ -1,5 +1,6 @@
 // src/components/student/SelectReasonPanel.jsx
 import { useEffect, useState } from "react";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 /**
  * reasons: array of { reason_id, description }
@@ -27,23 +28,12 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
         Select Reason
       </h2>
 
-      <select
-        value={reasonId || ""}
-        onChange={(e) => onSelectReason(e.target.value ? Number(e.target.value) : "")}
-        className={[
-          "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent",
-          reasonId ? "text-gray-700 font-semibold" : "text-gray-400",
-        ].join(" ")}
-      >
-        <option value="" disabled>
-          Choose a reason for your visit
-        </option>
-        {reasons.map((r) => (
-          <option key={r.reason_id} value={r.reason_id} className="text-gray-700">
-            {r.description}
-          </option>
-        ))}
-      </select>
+      <UniversalDropdown
+        value={reasonId ? String(reasonId) : ""}
+        onChange={(v) => onSelectReason(v ? Number(v) : "")}
+        options={reasons.map((r) => ({ value: String(r.reason_id), label: r.description }))}
+        placeholder="Choose a reason for your visit"
+      />
     </section>
   );
 }

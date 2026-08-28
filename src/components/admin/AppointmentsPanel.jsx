@@ -4,6 +4,7 @@ import NavIcon from "./NavIcon.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { appointmentsApi } from "../../lib/api.js";
 
 function todayYMD() {
@@ -314,30 +315,17 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
             className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
-        <select
+        <UniversalDropdown
           value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
-        >
-          {departments.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-        <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600">
-          <option>All Courses</option>
-        </select>
-        <select
+          onChange={setDepartment}
+          options={departments}
+        />
+        <UniversalDropdown value="All Courses" onChange={() => {}} options={["All Courses"]} />
+        <UniversalDropdown
           value={reasonFilter}
-          onChange={(e) => setReasonFilter(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600"
-        >
-          <option value="All Reason">All Reason</option>
-          {reasonRecordsForDropdown.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+          onChange={setReasonFilter}
+          options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecordsForDropdown]}
+        />
       </div>
 
       {slots.length === 0 && (

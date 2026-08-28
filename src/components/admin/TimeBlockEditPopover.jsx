@@ -1,6 +1,8 @@
 // src/components/admin/TimeBlockEditPopover.jsx
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import NavIcon from "./NavIcon";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 const UNITS = ["Minute", "Hour"];
 
@@ -8,20 +10,31 @@ const UNITS = ["Minute", "Hour"];
  * slot: { time, capacity }
  * onClose: () => void
  * onSave: ({ time, slots }) => void
+ *
+ * Renders as a portal to document.body so it escapes any overflow:hidden /
+ * max-height ancestor (e.g. Time Block Preview panel). Centered on viewport
+ * with a full-screen backdrop, high z-index, Escape + backdrop click to close,
+ * and body scroll lock while open.
  */
 export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
-  const ref = useRef(null);
+  const cardRef = useRef(null);
   const [timeRange, setTimeRange] = useState(slot.time);
   const [intervalValue, setIntervalValue] = useState(1);
   const [intervalUnit, setIntervalUnit] = useState("Hour");
   const [slotsValue, setSlotsValue] = useState(slot.capacity);
 
+  // Escape key + body scroll lock
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+    function handleKeyDown(e) {
+      if (e.key === "Escape") onClose();
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
   function handleSave() {
@@ -30,97 +43,110 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
     onClose();
   }
 
-  return (
+  const modal = (
     <div
-      ref={ref}
-      className="absolute right-0 top-full mt-2 z-20 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Time Block Edit"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold tracking-wide text-gray-800">
-          TIME BLOCK EDIT
-        </h3>
-        <button
-          onClick={onClose}
-          className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          aria-label="Close"
-        >
-          <NavIcon name="x" className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      {/* Backdrop — covers entire viewport, click to close */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      <label className="block mb-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-500">Time</span>
-          <span className="text-xs font-semibold text-gray-700">
-            {slot.time}
-          </span>
+      {/* Centered card — not constrained by any parent overflow/max-height */}
+      <div
+        ref={cardRef}
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100 p-4"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-bold tracking-wide text-gray-800">
+            TIME BLOCK EDIT
+          </h3>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Close"
+          >
+            <NavIcon name="x" className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <input
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
-        />
-      </label>
 
-      <div className="mb-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-500">Interval</span>
-          <span className="text-xs font-semibold text-gray-700">
-            {intervalValue} {intervalUnit}
-          </span>
+        <label className="block mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-gray-500">Time</span>
+            <span className="text-xs font-semibold text-gray-700">
+              {slot.time}
+            </span>
+          </div>
+          <input
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
+          />
+        </label>
+
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-gray-500">Interval</span>
+            <span className="text-xs font-semibold text-gray-700">
+              {intervalValue} {intervalUnit}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={intervalValue}
+              onChange={(e) => setIntervalValue(e.target.value)}
+              className="w-16 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
+            />
+            <UniversalDropdown
+              value={intervalUnit}
+              onChange={setIntervalUnit}
+              options={UNITS}
+              className="flex-1"
+            />
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        <label className="block mb-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-gray-500">Slots</span>
+            <span className="text-xs font-semibold text-gray-700">
+              {slotsValue}
+            </span>
+          </div>
           <input
             type="number"
             min={1}
-            value={intervalValue}
-            onChange={(e) => setIntervalValue(e.target.value)}
-            className="w-16 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
+            value={slotsValue}
+            onChange={(e) => setSlotsValue(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
           />
-          <select
-            value={intervalUnit}
-            onChange={(e) => setIntervalUnit(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
+        </label>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
           >
-            {UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 rounded-lg bg-gc-green py-2 text-sm font-semibold text-white hover:bg-gc-green-600"
+          >
+            Save
+          </button>
         </div>
-      </div>
-
-      <label className="block mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-gray-500">Slots</span>
-          <span className="text-xs font-semibold text-gray-700">
-            {slotsValue}
-          </span>
-        </div>
-        <input
-          type="number"
-          min={1}
-          value={slotsValue}
-          onChange={(e) => setSlotsValue(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
-        />
-      </label>
-
-      <div className="flex gap-2">
-        <button
-          onClick={onClose}
-          className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSave}
-          className="flex-1 rounded-lg bg-gc-green py-2 text-sm font-semibold text-white hover:bg-gc-green-600"
-        >
-          Save
-        </button>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
