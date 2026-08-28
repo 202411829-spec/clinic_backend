@@ -4,9 +4,8 @@ Backs the Masterlist page: search bar (surname/name/student ID/course),
 Department/Course/Year filters, sortable columns, and pagination over
 ~7,000 students.
 
-Reads from the `student_masterlist` view (see Supabase migration
-`student_masterlist_view`), which flattens personal_information +
-student_name + department + course_dept into one row per student.
+Reads from the `student_masterlist` view (see clean schema spec §2.8),
+which flattens students + departments + courses into one row per student.
 """
 
 from flask import Blueprint, jsonify, request
@@ -99,7 +98,7 @@ def get_student_summary(student_id: str):
 @require_auth
 def list_departments():
     response = execute_with_retry(
-        supabase.table("department")
+        supabase.table("departments")
         .select("department_id, department_name")
         .order("department_name")
     )
@@ -110,7 +109,7 @@ def list_departments():
 @require_auth
 def list_courses():
     department_id = request.args.get("department_id", type=int)
-    query = supabase.table("course_dept").select("course_id, course_name, department_id")
+    query = supabase.table("courses").select("course_id, course_name, department_id")
     if department_id is not None:
         query = query.eq("department_id", department_id)
     response = execute_with_retry(query.order("course_name"))

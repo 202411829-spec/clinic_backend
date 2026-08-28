@@ -3,15 +3,14 @@
 Backs the Reports page: totals + breakdowns by status, reason, department,
 complaint, sex, and age for a given date.
 
-IMPORTANT: status.new_status and reason.description are free-text columns
-in this schema (no enum, no CHECK constraint) — whoever's building the
-Appointments/Logbook module controls what strings actually get written
-there. Rather than hardcode assumed category names (e.g. "Completed" /
-"Medical Certificate") that might not match what's really in the DB, every
-breakdown here is computed generically from whatever distinct values
-actually exist for the given date. If a category comes back oddly named,
-that's a signal to sync with whoever owns Appointments/Logbook on their
-naming convention — not something to patch around here.
+Reads from the `report_appointment_rows` view (clean schema spec §2.8).
+`current_status` is the four-value appointment-status enum
+(pending/completed/no_show/cancelled) sourced from
+`appointment_status_history.new_status` — values are constrained, not
+free-text. `visit_reason` comes from `appointment_reasons.description`
+(canned reasons, not free-text categories). Every breakdown is computed
+generically from whatever distinct values actually exist for the given
+date.
 """
 
 from flask import Blueprint, jsonify, request
@@ -72,7 +71,7 @@ def get_report():
         "total_appointments": len(rows),
         "total_students": total_students,
         "status_breakdown": _breakdown(rows, "current_status", missing_label="No status yet"),
-        "reason_breakdown": _breakdown(rows, "reason", missing_label="No reason given"),
+        "reason_breakdown": _breakdown(rows, "visit_reason", missing_label="No reason given"),
         "department_breakdown": _breakdown(rows, "department_name", missing_label="Unknown dept"),
         "complaint_breakdown": _breakdown(rows, "complaint", missing_label="No complaint logged"),
         "sex_breakdown": _breakdown(rows, "gender", missing_label="Not set"),
@@ -85,7 +84,7 @@ def get_report():
 def list_departments_for_filter():
     """Reuses the same department list as the Masterlist filter dropdown."""
     response = execute_with_retry(
-        supabase.table("department")
+        supabase.table("departments")
         .select("department_id, department_name")
         .order("department_name")
     )

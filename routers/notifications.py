@@ -3,8 +3,9 @@ Notifications endpoints.
 
 Derives a student's notification history from existing schema tables —
 no dedicated notifications table required. Every status change recorded
-in the `status` table for one of the student's appointments becomes a
-notification ("Your appointment on ... is now Confirmed"), newest first.
+in the `appointment_status_history` table for one of the student's
+appointments becomes a notification ("Your appointment on ...
+is now Pending"), newest first.
 """
 
 from flask import Blueprint, jsonify
@@ -14,6 +15,16 @@ from routers.helpers import execute_with_retry
 from routers.auth_guard import require_auth
 
 notifications_bp = Blueprint("notifications", __name__)
+
+# Appointment status enum -> display label (enum is lowercase:
+# pending/completed/no_show/cancelled). Kept here so the message
+# text reads naturally. There is no "Confirmed" status.
+_STATUS_LABELS = {
+    "pending": "Pending",
+    "completed": "Completed",
+    "no_show": "No Show",
+    "cancelled": "Cancelled",
+}
 
 
 def _format_changed_at(changed_at):
@@ -50,7 +61,7 @@ def get_notifications(student_id):
         # Step 1: this student's appointments.
         appt_response = execute_with_retry(
             supabase
-            .table("appointment")
+            .table("appointments")
             .select("appointment_id, appointment_date, appointment_time")
             .eq("student_id", student_id)
         )
@@ -75,7 +86,7 @@ def get_notifications(student_id):
         # Step 2: every status change on those appointments.
         status_response = execute_with_retry(
             supabase
-            .table("status")
+            .table("appointment_status_history")
             .select("*")
             .in_("appointment_id", appointment_ids)
             .order("changed_at", desc=True)
@@ -88,14 +99,15 @@ def get_notifications(student_id):
         for row in statuses:
 
             appt = by_id.get(row.get("appointment_id"), {})
-            new_status = row.get("new_status") or "updated"
+            new_status = row.get("new_status") or ""
+            status_label = _STATUS_LABELS.get(new_status, new_status) or "Updated"
             remarks = row.get("remarks")
 
             date_part = str(appt.get("appointment_date") or "")[:10]
 
             message = (
                 f"Your appointment on {date_part} "
-                f"is now {new_status}."
+                f"is now {status_label}."
             )
 
             if remarks:

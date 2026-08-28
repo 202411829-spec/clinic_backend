@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from database import supabase
 from routers.auth_guard import require_auth, sanitize_search
+from routers.helpers import execute_with_retry
 
 student_bp = Blueprint(
     "student",
@@ -17,8 +18,8 @@ student_bp = Blueprint(
 # GET /students?search=ramos&page=1&page_size=50
 #
 # Reads from the `student_masterlist` view — the same flattened
-# personal_information + name + department + course source the
-# masterlist module uses — instead of the raw `student` table,
+# students + departments + courses source the masterlist module uses —
+# instead of the raw `students` table,
 # so every consumer sees consistent joined fields.
 # ============================================================
 
@@ -55,11 +56,10 @@ def get_students():
         start = (page - 1) * page_size
         end = start + page_size - 1
 
-        response = (
+        response = execute_with_retry(
             query
             .order("last_name", desc=False)
             .range(start, end)
-            .execute()
         )
 
         data = response.data or []
@@ -101,13 +101,12 @@ def get_students():
 def get_student(student_id):
 
     try:
-        response = (
+        response = execute_with_retry(
             supabase
             .table("student_masterlist")
             .select("*")
             .eq("student_id", student_id)
             .maybe_single()
-            .execute()
         )
 
         if not response.data:
