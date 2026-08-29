@@ -1,9 +1,13 @@
+import logging
+
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 
 from database import supabase
 from routers.auth_guard import require_auth, require_admin
-from routers.helpers import execute_with_retry
+from routers.helpers import execute_with_retry, handle_errors
+
+logger = logging.getLogger(__name__)
 
 
 clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
@@ -11,6 +15,11 @@ clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
 
 SETTINGS_TABLE = "clinic_appointment_settings"
 SCHEDULE_TABLE = "clinic_schedules"
+
+
+# Defaults used when the global settings row lacks a value.
+DEFAULT_SLOT_INTERVAL_MINUTES = 30
+DEFAULT_MAX_STUDENTS_PER_SLOT = 10
 
 
 # ============================================================
@@ -113,20 +122,24 @@ def resolve_day_config(override):
 
     try:
         slot_interval = int(
-            (settings or {}).get("slot_interval_minutes", 30)
+            (settings or {}).get(
+                "slot_interval_minutes", DEFAULT_SLOT_INTERVAL_MINUTES
+            )
         )
     except (TypeError, ValueError):
-        slot_interval = 30
+        slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
 
     if slot_interval <= 0:
-        slot_interval = 30
+        slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
 
     try:
         max_students = int(
-            (settings or {}).get("max_students_per_slot", 10)
+            (settings or {}).get(
+                "max_students_per_slot", DEFAULT_MAX_STUDENTS_PER_SLOT
+            )
         )
     except (TypeError, ValueError):
-        max_students = 10
+        max_students = DEFAULT_MAX_STUDENTS_PER_SLOT
 
     return {
         "work_start": work_start,
@@ -321,32 +334,22 @@ def materialize_time_slots(schedule_row):
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Get settings error")
 def get_clinic_settings():
 
-    try:
+    settings = get_default_settings()
 
-        settings = get_default_settings()
-
-        if not settings:
-
-            return jsonify({
-                "success": False,
-                "error": "Clinic settings not found"
-            }), 404
-
-        return jsonify({
-            "success": True,
-            "settings": settings
-        })
-
-    except Exception as e:
-
-        print("Get settings error:", repr(e))
+    if not settings:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Clinic settings not found"
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "settings": settings
+    })
 
 
 # ============================================================
@@ -371,72 +374,62 @@ def get_clinic_settings():
     methods=["PUT"]
 )
 @require_admin
+@handle_errors("Update settings error")
 def update_clinic_settings():
 
-    try:
+    data = request.get_json()
 
-        data = request.get_json()
-
-        if not data:
-
-            return jsonify({
-                "success": False,
-                "error": "Request body is required"
-            }), 400
-
-        existing = get_default_settings()
-
-        if not existing:
-
-            return jsonify({
-                "success": False,
-                "error": "Clinic settings not found"
-            }), 404
-
-        allowed_fields = [
-            "slot_interval_minutes",
-            "max_students_per_slot",
-            "work_start",
-            "work_end",
-            "break_start",
-            "break_end",
-            "updated_by_admin_id"
-        ]
-
-        update_data = {
-            field: data[field]
-            for field in allowed_fields
-            if field in data
-        }
-
-        if not update_data:
-
-            return jsonify({
-                "success": False,
-                "error": "No valid fields provided to update"
-            }), 400
-
-        response = execute_with_retry(
-            supabase
-            .table(SETTINGS_TABLE)
-            .update(update_data)
-            .eq("setting_id", existing["setting_id"])
-        )
-
-        return jsonify({
-            "success": True,
-            "message": "Clinic settings updated",
-            "settings": response.data[0] if response.data else None
-        })
-
-    except Exception as e:
-
-        print("Update settings error:", repr(e))
+    if not data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Request body is required"
+        }), 400
+
+    existing = get_default_settings()
+
+    if not existing:
+
+        return jsonify({
+            "success": False,
+            "error": "Clinic settings not found"
+        }), 404
+
+    allowed_fields = [
+        "slot_interval_minutes",
+        "max_students_per_slot",
+        "work_start",
+        "work_end",
+        "break_start",
+        "break_end",
+        "updated_by_admin_id"
+    ]
+
+    update_data = {
+        field: data[field]
+        for field in allowed_fields
+        if field in data
+    }
+
+    if not update_data:
+
+        return jsonify({
+            "success": False,
+            "error": "No valid fields provided to update"
+        }), 400
+
+    response = execute_with_retry(
+        supabase
+        .table(SETTINGS_TABLE)
+        .update(update_data)
+        .eq("setting_id", existing["setting_id"])
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Clinic settings updated",
+        "settings": response.data[0] if response.data else None
+    })
 
 
 # ============================================================
@@ -453,46 +446,36 @@ def update_clinic_settings():
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Get schedule error")
 def get_clinic_schedule():
 
-    try:
+    start_date = request.args.get("start")
+    end_date = request.args.get("end")
 
-        start_date = request.args.get("start")
-        end_date = request.args.get("end")
+    query = (
+        supabase
+        .table(SCHEDULE_TABLE)
+        .select("*")
+    )
 
-        query = (
-            supabase
-            .table(SCHEDULE_TABLE)
-            .select("*")
-        )
+    if start_date:
+        query = query.gte("working_date", start_date)
 
-        if start_date:
-            query = query.gte("working_date", start_date)
+    if end_date:
+        query = query.lte("working_date", end_date)
 
-        if end_date:
-            query = query.lte("working_date", end_date)
+    response = execute_with_retry(
+        query
+        .order("working_date", desc=False)
+    )
 
-        response = execute_with_retry(
-            query
-            .order("working_date", desc=False)
-        )
+    schedule = response.data or []
 
-        schedule = response.data or []
-
-        return jsonify({
-            "success": True,
-            "count": len(schedule),
-            "schedule": schedule
-        })
-
-    except Exception as e:
-
-        print("Get schedule error:", repr(e))
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "count": len(schedule),
+        "schedule": schedule
+    })
 
 
 # ============================================================
@@ -508,32 +491,22 @@ def get_clinic_schedule():
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Get schedule by date error")
 def get_clinic_schedule_by_date(working_date):
 
-    try:
+    schedule = get_schedule_for_date(working_date)
 
-        schedule = get_schedule_for_date(working_date)
-
-        if not schedule:
-
-            return jsonify({
-                "success": False,
-                "error": "No schedule override found for this date"
-            }), 404
-
-        return jsonify({
-            "success": True,
-            "schedule": schedule
-        })
-
-    except Exception as e:
-
-        print("Get schedule by date error:", repr(e))
+    if not schedule:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "No schedule override found for this date"
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "schedule": schedule
+    })
 
 
 # ============================================================
@@ -561,126 +534,116 @@ def get_clinic_schedule_by_date(working_date):
     methods=["POST"]
 )
 @require_admin
+@handle_errors("Create schedule error")
 def create_clinic_schedule():
 
-    try:
+    data = request.get_json()
 
-        data = request.get_json()
-
-        if not data:
-
-            return jsonify({
-                "success": False,
-                "error": "Request body is required"
-            }), 400
-
-        working_date = data.get("working_date")
-        slot_start = data.get("slot_start")
-        slot_end = data.get("slot_end")
-
-        missing = [
-            field
-            for field, value in [
-                ("working_date", working_date),
-                ("slot_start", slot_start),
-                ("slot_end", slot_end)
-            ]
-            if not value
-        ]
-
-        if missing:
-
-            return jsonify({
-                "success": False,
-                "error": f"Missing required fields: {', '.join(missing)}"
-            }), 400
-
-        schedule_data = {
-            "working_date": working_date,
-            "work_start": slot_start,
-            "work_end": slot_end,
-            "break_start": data.get("break_start"),
-            "break_end": data.get("break_end"),
-            "is_enabled": data.get("is_enabled", True),
-            "closure_reason": data.get("closure_reason")
-        }
-
-        # ----------------------------------------------------
-        # UPSERT by working_date: if clinic_schedule rows already
-        # exist for this date, UPDATE the oldest and COLLAPSE any
-        # duplicates (legacy saves stacked multiple childless
-        # overrides per date; resolution then picked a childless
-        # one and students saw zero slots). Children of removed
-        # duplicates are purged too.
-        # ----------------------------------------------------
-
-        existing_rows = (
-            execute_with_retry(
-                supabase
-                .table(SCHEDULE_TABLE)
-                .select("schedule_id")
-                .eq("working_date", working_date)
-                .order("schedule_id", desc=False)
-            ).data
-            or []
-        )
-
-        if existing_rows:
-
-            target = existing_rows[0]
-
-            response = execute_with_retry(
-                supabase
-                .table(SCHEDULE_TABLE)
-                .update(schedule_data)
-                .eq("schedule_id", target["schedule_id"])
-            )
-
-            for duplicate in existing_rows[1:]:
-                delete_time_slot_children(duplicate["schedule_id"])
-
-                execute_with_retry(
-                    supabase.table(SCHEDULE_TABLE).delete().eq(
-                        "schedule_id", duplicate["schedule_id"]
-                    )
-                )
-
-        else:
-            response = execute_with_retry(
-                supabase
-                .table(SCHEDULE_TABLE)
-                .insert(schedule_data)
-            )
-
-        if not response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Failed to create schedule entry"
-            }), 500
-
-        schedule_row = response.data[0]
-
-        # Materialize the time_slot children so students actually see
-        # bookable slots for this date. Deletes stale children first,
-        # then regenerates when the row is enabled (no-op children-wise
-        # for disabled/closed days).
-        materialize_time_slots(schedule_row)
-
-        return jsonify({
-            "success": True,
-            "message": "Schedule entry created",
-            "schedule": schedule_row
-        }), 201
-
-    except Exception as e:
-
-        print("Create schedule error:", repr(e))
+    if not data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Request body is required"
+        }), 400
+
+    working_date = data.get("working_date")
+    slot_start = data.get("slot_start")
+    slot_end = data.get("slot_end")
+
+    missing = [
+        field
+        for field, value in [
+            ("working_date", working_date),
+            ("slot_start", slot_start),
+            ("slot_end", slot_end)
+        ]
+        if not value
+    ]
+
+    if missing:
+
+        return jsonify({
+            "success": False,
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
+
+    schedule_data = {
+        "working_date": working_date,
+        "work_start": slot_start,
+        "work_end": slot_end,
+        "break_start": data.get("break_start"),
+        "break_end": data.get("break_end"),
+        "is_enabled": data.get("is_enabled", True),
+        "closure_reason": data.get("closure_reason")
+    }
+
+    # ----------------------------------------------------
+    # UPSERT by working_date: if clinic_schedule rows already
+    # exist for this date, UPDATE the oldest and COLLAPSE any
+    # duplicates (legacy saves stacked multiple childless
+    # overrides per date; resolution then picked a childless
+    # one and students saw zero slots). Children of removed
+    # duplicates are purged too.
+    # ----------------------------------------------------
+
+    existing_rows = (
+        execute_with_retry(
+            supabase
+            .table(SCHEDULE_TABLE)
+            .select("schedule_id")
+            .eq("working_date", working_date)
+            .order("schedule_id", desc=False)
+        ).data
+        or []
+    )
+
+    if existing_rows:
+
+        target = existing_rows[0]
+
+        response = execute_with_retry(
+            supabase
+            .table(SCHEDULE_TABLE)
+            .update(schedule_data)
+            .eq("schedule_id", target["schedule_id"])
+        )
+
+        for duplicate in existing_rows[1:]:
+            delete_time_slot_children(duplicate["schedule_id"])
+
+            execute_with_retry(
+                supabase.table(SCHEDULE_TABLE).delete().eq(
+                    "schedule_id", duplicate["schedule_id"]
+                )
+            )
+
+    else:
+        response = execute_with_retry(
+            supabase
+            .table(SCHEDULE_TABLE)
+            .insert(schedule_data)
+        )
+
+    if not response.data:
+
+        return jsonify({
+            "success": False,
+            "error": "Failed to create schedule entry"
         }), 500
+
+    schedule_row = response.data[0]
+
+    # Materialize the time_slot children so students actually see
+    # bookable slots for this date. Deletes stale children first,
+    # then regenerates when the row is enabled (no-op children-wise
+    # for disabled/closed days).
+    materialize_time_slots(schedule_row)
+
+    return jsonify({
+        "success": True,
+        "message": "Schedule entry created",
+        "schedule": schedule_row
+    }), 201
 
 
 # ============================================================
@@ -704,70 +667,60 @@ def create_clinic_schedule():
     methods=["PUT"]
 )
 @require_admin
+@handle_errors("Update schedule error")
 def update_clinic_schedule(schedule_id):
 
-    try:
+    data = request.get_json()
 
-        data = request.get_json()
-
-        if not data:
-
-            return jsonify({
-                "success": False,
-                "error": "Request body is required"
-            }), 400
-
-        allowed_fields = [
-            "working_date",
-            "work_start",
-            "work_end",
-            "break_start",
-            "break_end",
-            "is_enabled",
-            "closure_reason"
-        ]
-
-        update_data = {
-            field: data[field]
-            for field in allowed_fields
-            if field in data
-        }
-
-        if not update_data:
-
-            return jsonify({
-                "success": False,
-                "error": "No valid fields provided to update"
-            }), 400
-
-        response = execute_with_retry(
-            supabase
-            .table(SCHEDULE_TABLE)
-            .update(update_data)
-            .eq("schedule_id", schedule_id)
-        )
-
-        if not response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Schedule entry not found"
-            }), 404
-
-        return jsonify({
-            "success": True,
-            "message": "Schedule entry updated",
-            "schedule": response.data[0]
-        })
-
-    except Exception as e:
-
-        print("Update schedule error:", repr(e))
+    if not data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Request body is required"
+        }), 400
+
+    allowed_fields = [
+        "working_date",
+        "work_start",
+        "work_end",
+        "break_start",
+        "break_end",
+        "is_enabled",
+        "closure_reason"
+    ]
+
+    update_data = {
+        field: data[field]
+        for field in allowed_fields
+        if field in data
+    }
+
+    if not update_data:
+
+        return jsonify({
+            "success": False,
+            "error": "No valid fields provided to update"
+        }), 400
+
+    response = execute_with_retry(
+        supabase
+        .table(SCHEDULE_TABLE)
+        .update(update_data)
+        .eq("schedule_id", schedule_id)
+    )
+
+    if not response.data:
+
+        return jsonify({
+            "success": False,
+            "error": "Schedule entry not found"
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "message": "Schedule entry updated",
+        "schedule": response.data[0]
+    })
 
 
 # ============================================================
@@ -781,37 +734,27 @@ def update_clinic_schedule(schedule_id):
     methods=["DELETE"]
 )
 @require_admin
+@handle_errors("Delete schedule error")
 def delete_clinic_schedule(schedule_id):
 
-    try:
+    response = execute_with_retry(
+        supabase
+        .table(SCHEDULE_TABLE)
+        .delete()
+        .eq("schedule_id", schedule_id)
+    )
 
-        response = execute_with_retry(
-            supabase
-            .table(SCHEDULE_TABLE)
-            .delete()
-            .eq("schedule_id", schedule_id)
-        )
-
-        if not response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Schedule entry not found"
-            }), 404
-
-        return jsonify({
-            "success": True,
-            "message": "Schedule entry deleted"
-        })
-
-    except Exception as e:
-
-        print("Delete schedule error:", repr(e))
+    if not response.data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Schedule entry not found"
+        }), 404
+
+    return jsonify({
+        "success": True,
+        "message": "Schedule entry deleted"
+    })
 
 
 # ============================================================
@@ -829,131 +772,131 @@ def delete_clinic_schedule(schedule_id):
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Preview error")
 def preview_time_blocks():
 
-    try:
+    requested_date = request.args.get("date")
 
-        requested_date = request.args.get("date")
+    if not requested_date:
 
-        if not requested_date:
+        return jsonify({
+            "success": False,
+            "error": "date parameter is required"
+        }), 400
 
-            return jsonify({
-                "success": False,
-                "error": "date parameter is required"
-            }), 400
+    override = get_schedule_for_date(requested_date)
 
-        override = get_schedule_for_date(requested_date)
+    # ----------------------------------------------------
+    # If clinic is explicitly disabled for this date
+    # ----------------------------------------------------
 
-        # ----------------------------------------------------
-        # If clinic is explicitly disabled for this date
-        # ----------------------------------------------------
-
-        if override and override.get("is_enabled") is False:
-
-            return jsonify({
-                "success": True,
-                "date": requested_date,
-                "is_enabled": False,
-                "reason": override.get("closure_reason"),
-                "blocks": []
-            })
-
-        # ----------------------------------------------------
-        # Determine which config to use: override or default
-        # ----------------------------------------------------
-
-        if override:
-
-            work_start = override.get("work_start")
-            work_end = override.get("work_end")
-            break_start = override.get("break_start")
-            break_end = override.get("break_end")
-            settings = get_default_settings()
-            slot_interval = int(
-                (settings or {}).get("slot_interval_minutes", 30)
-            )
-            max_students = int(
-                (settings or {}).get("max_students_per_slot", 10)
-            )
-
-        else:
-
-            settings = get_default_settings()
-
-            if not settings:
-
-                return jsonify({
-                    "success": False,
-                    "error": "Clinic settings not found"
-                }), 404
-
-            work_start = settings.get("work_start")
-            work_end = settings.get("work_end")
-            break_start = settings.get("break_start")
-            break_end = settings.get("break_end")
-            slot_interval = int(settings.get("slot_interval_minutes", 30))
-            max_students = int(
-                settings.get("max_students_per_slot", 10)
-            )
-
-        # ----------------------------------------------------
-        # Convert times
-        # ----------------------------------------------------
-
-        start = datetime.strptime(
-            normalize_time(work_start),
-            "%H:%M"
-        )
-
-        end = datetime.strptime(
-            normalize_time(work_end),
-            "%H:%M"
-        )
-
-        break_start_dt = None
-        break_end_dt = None
-
-        if break_start and break_end:
-
-            break_start_dt = datetime.strptime(
-                normalize_time(break_start),
-                "%H:%M"
-            )
-
-            break_end_dt = datetime.strptime(
-                normalize_time(break_end),
-                "%H:%M"
-            )
-
-        # ----------------------------------------------------
-        # Generate time blocks using the single canonical function
-        # ----------------------------------------------------
-
-        config = {
-            "work_start": work_start,
-            "work_end": work_end,
-            "break_start": break_start,
-            "break_end": break_end,
-            "slot_interval": slot_interval,
-            "max_students": max_students,
-        }
-
-        blocks = generate_time_blocks(config)
+    if override and override.get("is_enabled") is False:
 
         return jsonify({
             "success": True,
             "date": requested_date,
-            "is_enabled": True,
-            "slot_interval": slot_interval,
-            "capacity": max_students,
-            "blocks": blocks
+            "is_enabled": False,
+            "reason": override.get("closure_reason"),
+            "blocks": []
         })
 
-    except Exception as e:
+    # ----------------------------------------------------
+    # Determine which config to use: override or default
+    # ----------------------------------------------------
 
-        print("Preview error:", repr(e))
+    if override:
 
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        work_start = override.get("work_start")
+        work_end = override.get("work_end")
+        break_start = override.get("break_start")
+        break_end = override.get("break_end")
+        settings = get_default_settings()
+        slot_interval = int(
+            (settings or {}).get(
+                "slot_interval_minutes", DEFAULT_SLOT_INTERVAL_MINUTES
+            )
+        )
+        max_students = int(
+            (settings or {}).get(
+                "max_students_per_slot", DEFAULT_MAX_STUDENTS_PER_SLOT
+            )
+        )
+
+    else:
+
+        settings = get_default_settings()
+
+        if not settings:
+
+            return jsonify({
+                "success": False,
+                "error": "Clinic settings not found"
+            }), 404
+
+        work_start = settings.get("work_start")
+        work_end = settings.get("work_end")
+        break_start = settings.get("break_start")
+        break_end = settings.get("break_end")
+        slot_interval = int(
+            settings.get(
+                "slot_interval_minutes", DEFAULT_SLOT_INTERVAL_MINUTES
+            )
+        )
+        max_students = int(
+            settings.get(
+                "max_students_per_slot", DEFAULT_MAX_STUDENTS_PER_SLOT
+            )
+        )
+
+    # ----------------------------------------------------
+    # Convert times
+    # ----------------------------------------------------
+
+    start = datetime.strptime(
+        normalize_time(work_start),
+        "%H:%M"
+    )
+
+    end = datetime.strptime(
+        normalize_time(work_end),
+        "%H:%M"
+    )
+
+    break_start_dt = None
+    break_end_dt = None
+
+    if break_start and break_end:
+
+        break_start_dt = datetime.strptime(
+            normalize_time(break_start),
+            "%H:%M"
+        )
+
+        break_end_dt = datetime.strptime(
+            normalize_time(break_end),
+            "%H:%M"
+        )
+
+    # ----------------------------------------------------
+    # Generate time blocks using the single canonical function
+    # ----------------------------------------------------
+
+    config = {
+        "work_start": work_start,
+        "work_end": work_end,
+        "break_start": break_start,
+        "break_end": break_end,
+        "slot_interval": slot_interval,
+        "max_students": max_students,
+    }
+
+    blocks = generate_time_blocks(config)
+
+    return jsonify({
+        "success": True,
+        "date": requested_date,
+        "is_enabled": True,
+        "slot_interval": slot_interval,
+        "capacity": max_students,
+        "blocks": blocks
+    })

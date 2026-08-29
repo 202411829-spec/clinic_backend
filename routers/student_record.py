@@ -7,6 +7,7 @@ forms, plus the Medical Certificate and Medical Summary views.
 Converted from FastAPI to a Flask blueprint.
 """
 
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -14,8 +15,11 @@ from flask import Blueprint, g, jsonify, request
 from datetime import date
 
 from database import supabase
-from routers.auth_guard import require_auth, require_admin, resolve_student_id, _is_admin_user
+from routers.auth_guard import require_auth, require_admin, resolve_student_id, is_admin_user
 from routers.helpers import execute_with_retry, normalize_student_id
+
+logger = logging.getLogger(__name__)
+
 
 student_record_bp = Blueprint("student-record", __name__, url_prefix="/api/records")
 
@@ -32,6 +36,16 @@ _YEAR_LABEL_RE = re.compile(r"^Year\s+(?:[IVXLCDM]+|[0-9]+)$", re.IGNORECASE)
 
 def _error(message, status):
     return jsonify({"success": False, "error": message}), status
+
+
+def _parse_admin_id(value):
+    """Parse an admin id from request JSON; None for empty/invalid input."""
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _get_annual_exam_or_404(annual_exam_id):
@@ -232,11 +246,7 @@ def save_physical_examination(annual_exam_id):
             return value.get("remarks")
         return None
 
-    examined_by_raw = body.get("examined_by")
-    try:
-        examined_by_id = int(examined_by_raw) if examined_by_raw not in (None, "") else None
-    except (ValueError, TypeError):
-        examined_by_id = None
+    examined_by_id = _parse_admin_id(body.get("examined_by"))
     row = {
         "annual_exam_id": annual_exam_id,
         "blood_pressure": body.get("blood_pressure"),
@@ -255,9 +265,8 @@ def save_physical_examination(annual_exam_id):
     }
 
     for key in FINDING_FIELDS:
-        column = key if key != "other_findings" else "other_findings"
-        row[f"{column}_result"] = finding_result(key)
-        row[f"{column}_remarks"] = finding_remarks(key)
+        row[f"{key}_result"] = finding_result(key)
+        row[f"{key}_remarks"] = finding_remarks(key)
 
     existing = execute_with_retry(
         supabase.table("physical_examinations")
@@ -407,11 +416,7 @@ def save_diagnosis(annual_exam_id):
 
     body = request.get_json(silent=True) or {}
 
-    examined_by_raw = body.get("examined_by")
-    try:
-        prepared_by_admin_id = int(examined_by_raw) if examined_by_raw not in (None, "") else None
-    except (ValueError, TypeError):
-        prepared_by_admin_id = None
+    prepared_by_admin_id = _parse_admin_id(body.get("examined_by"))
     row = {
         "annual_exam_id": annual_exam_id,
         "diagnosis": body.get("diagnosis"),
@@ -529,13 +534,12 @@ def get_medical_summary(student_id):
         exams = exams_fut.result()
 
     by_year = {row["year_label"]: row for row in exams.data}
-    years = by_year
 
     return jsonify({
         "profile": profile.data,
         "emergency_contact": emergency_contact.data[0] if emergency_contact.data else None,
         "medical_history": medical_history.data[0] if medical_history.data else None,
-        "years": years,
+        "years": by_year,
     })
 
 
@@ -620,7 +624,7 @@ def update_student_profile(student_id):
     # Admin can edit any student — check first so the student-id
     # resolver's email-local-part fallback doesn't misclassify an admin
     # (e.g. "admin@gordoncollege.edu.ph" -> "ADMIN") as a foreign student.
-    if _is_admin_user(auth_user):
+    if is_admin_user(auth_user):
         pass  # allowed
     else:
         caller_student_id = resolve_student_id(auth_user)

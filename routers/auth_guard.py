@@ -19,12 +19,15 @@ with an admin_id), which links the authenticated auth user to their
 admin identity (Blockers B/C).
 """
 
+import logging
 from functools import wraps
 
 from flask import g, jsonify, request
 
 from database import supabase
 from routers.helpers import execute_with_retry
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -112,7 +115,7 @@ def _verify_token(token):
     return user if user else None
 
 
-def _is_admin_user(user):
+def is_admin_user(user):
     """
     Check whether the verified auth user is an admin.
 
@@ -155,7 +158,7 @@ def _is_admin_user(user):
         return False
 
     except Exception as e:
-        print("Admin check error:", repr(e))
+        logger.error("Admin check error: %r", e)
         return False
 
 
@@ -197,7 +200,7 @@ def resolve_student_id(user):
                 return response.data[0]["student_id"]
 
     except Exception as e:
-        print("Student id resolution error:", repr(e))
+        logger.error("Student id resolution error: %r", e)
 
     # LAST-RESORT fallback only — never the primary path (Blockers C).
     if email and "@" in email:
@@ -268,7 +271,7 @@ def require_admin(f):
             "email": getattr(user, "email", None),
         }
 
-        if not _is_admin_user(user):
+        if not is_admin_user(user):
             return _forbidden("Admin privileges required")
 
         return f(*args, **kwargs)

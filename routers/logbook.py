@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, jsonify, request
 
 from concurrent.futures import ThreadPoolExecutor
@@ -16,12 +18,39 @@ from routers.helpers import (
     build_student_lookup,
     build_reason_lookup,
     build_medicine_lookup,
-    get_medicines_for_log
+    get_medicines_for_log,
+    format_date_time,
+    handle_errors,
+    _SEARCH_SCAN_CAP,
 )
 from routers.auth_guard import require_auth, require_admin
 
+logger = logging.getLogger(__name__)
+
 
 logbook_bp = Blueprint("logbook", __name__)
+
+
+# Separators accepted between "Course" and "Department" in combined
+# dept/course text (registered students' deptCourse, or the walk-in
+# form's walk_in_department_course). Tried in order — the first match
+# wins.
+_DEPT_COURSE_SEPARATORS = [" - ", " — ", " – ", " -", "- "]
+
+
+def _split_dept_course(text):
+    """
+    Split combined "Course - Department" text on the first recognized
+    separator. Returns (course, dept); dept is None when no separator
+    is present, in which case the whole text is treated as the course.
+    """
+    for sep in _DEPT_COURSE_SEPARATORS:
+        if sep in text:
+            parts = text.split(sep)
+            course = parts[0].strip()
+            dept = parts[1].strip() if len(parts) > 1 else None
+            return course, dept
+    return text, None
 
 
 def format_appointment_date_time(appointment):
@@ -85,20 +114,7 @@ def format_log_entry(log, appointments_by_id, students_by_id,
     date_time = format_appointment_date_time(appointment)
 
     if date_time is None:
-
-        created_at = log.get("created_at") or ""
-        date_time = created_at
-
-        if created_at:
-
-            try:
-                date_part = created_at[:10]
-                time_part = created_at[11:16]
-                year, month, day = date_part.split("-")
-                date_time = f"{month}/{day}/{year} {time_part}"
-
-            except Exception:
-                date_time = created_at
+        date_time = format_date_time(log.get("created_at"))
 
     medicine_string = get_medicines_for_log(
         log.get("visit_log_id"),
@@ -120,27 +136,17 @@ def format_log_entry(log, appointments_by_id, students_by_id,
     if is_registered:
         display_dept = student.get("dept") or "-"
         # student lookup has deptCourse as "Course - Department"
-        # extract course from it - handle different dash types
-        dept_course = student.get("deptCourse") or "-"
-        # Try multiple separators: " - ", " — ", " -", "- "
-        display_course = dept_course
-        for sep in [" - ", " — ", " – ", " -", "- "]:
-            if sep in dept_course:
-                parts = dept_course.split(sep)
-                display_course = parts[0].strip()
-                display_dept = parts[1].strip() if len(parts) > 1 else display_dept
-                break
+        display_course, parsed_dept = _split_dept_course(
+            student.get("deptCourse") or "-"
+        )
+        if parsed_dept is not None:
+            display_dept = parsed_dept
     else:
         # walk-in: walk_in_department_course is "Course - Department"
-        walk_in_department_course = log.get("walk_in_department_course") or "-"
-        display_course = walk_in_department_course
-        display_dept = "-"
-        for sep in [" - ", " — ", " – ", " -", "- "]:
-            if sep in walk_in_department_course:
-                parts = walk_in_department_course.split(sep)
-                display_course = parts[0].strip()
-                display_dept = parts[1].strip() if len(parts) > 1 else "-"
-                break
+        display_course, parsed_dept = _split_dept_course(
+            log.get("walk_in_department_course") or "-"
+        )
+        display_dept = parsed_dept if parsed_dept is not None else "-"
 
     display_sex = student.get("sex") or log.get("walk_in_sex") or "-"
 
@@ -243,7 +249,8 @@ def get_all_reference_data(appointment_ids, visit_log_ids):
 # Max rows a single free-text search leg may read. Search results feed a
 # paginated list, so a term that matches this many rows is already a
 # degenerate query — capping keeps the ilike from being a full scan.
-_SEARCH_SCAN_CAP = 500
+# The cap itself lives in routers.helpers (shared with the
+# student-lookup fallback leg) and is imported above.
 
 
 def _collected_ids(query):
@@ -462,137 +469,128 @@ def _count_scoped_logs(select_str, embedded_filters, appointment_ids):
 
 @logbook_bp.route("/logbook", methods=["GET"])
 @require_auth
+@handle_errors("Logbook error")
 def get_logbook():
 
+    # --- Parse query params (same contract as before) ---
+    search = request.args.get("search", "").strip()
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+    reason_id = request.args.get("reason_id", type=int)
+    department_id = request.args.get("department_id", type=int)
+    course_id = request.args.get("course_id", type=int)
+    page = max(1, request.args.get("page", default=1, type=int))
+    page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
+
+    # --- Free-text search resolves to a bounded appointment set ---
+    # (date/reason/department/course are NOT materialized here — they
+    # are pushed into the page query below as relationship filters.)
+    appointment_ids = None
+    if search:
+        appointment_ids = _search_appointment_ids(search)
+
+    # Nothing matched the free-text search — short-circuit.
+    if appointment_ids == []:
+        return jsonify({
+            "success": True,
+            "count": 0,
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "logbook": []
+        })
+
+    # --- Fetch only the requested page of logs (exact count) ---
+    # date/reason/department/course filters are applied here as
+    # PostgREST relationship filters (no student_id / appointment_id
+    # IN list, no full-table ilike), and this same query embeds the
+    # page's visit_log_medicines rows so no extra round-trip is needed.
+    select_str, embedded_filters = _logbook_page_query_params(
+        date_from, date_to, reason_id, department_id, course_id
+    )
+
+    start = (page - 1) * page_size
+    end = start + page_size - 1
+
+    logs_query = _apply_logbook_filters(
+        (
+            supabase.table("visit_logs")
+            .select(select_str, count="exact")
+            .order("created_at", desc=True)
+            .order("visit_log_id", desc=True)
+            .range(start, end)
+        ),
+        embedded_filters
+    )
+    if appointment_ids is not None:
+        logs_query = logs_query.in_("appointment_id", appointment_ids)
+
     try:
-        # --- Parse query params (same contract as before) ---
-        search = request.args.get("search", "").strip()
-        date_from = request.args.get("date_from")
-        date_to = request.args.get("date_to")
-        reason_id = request.args.get("reason_id", type=int)
-        department_id = request.args.get("department_id", type=int)
-        course_id = request.args.get("course_id", type=int)
-        page = max(1, request.args.get("page", default=1, type=int))
-        page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
-
-        # --- Free-text search resolves to a bounded appointment set ---
-        # (date/reason/department/course are NOT materialized here — they
-        # are pushed into the page query below as relationship filters.)
-        appointment_ids = None
-        if search:
-            appointment_ids = _search_appointment_ids(search)
-
-        # Nothing matched the free-text search — short-circuit.
-        if appointment_ids == []:
+        response = execute_with_retry(logs_query)
+    except PostgrestAPIError as e:
+        # PostgREST rejects an out-of-range page with PGRST103
+        # ("range not satisfiable"). The old in-Python slice just
+        # returned an empty list, so replicate that here instead of
+        # surfacing a 500 — keeping the exact response contract.
+        code = getattr(e, "code", "") or ""
+        if code == "PGRST103" or "not satisfiable" in str(e):
+            total = _count_scoped_logs(
+                select_str, embedded_filters, appointment_ids
+            )
             return jsonify({
                 "success": True,
                 "count": 0,
-                "total": 0,
+                "total": total,
                 "page": page,
                 "page_size": page_size,
                 "logbook": []
             })
+        raise
+    logs = response.data or []
+    total = response.count if response.count is not None else len(logs)
 
-        # --- Fetch only the requested page of logs (exact count) ---
-        # date/reason/department/course filters are applied here as
-        # PostgREST relationship filters (no student_id / appointment_id
-        # IN list, no full-table ilike), and this same query embeds the
-        # page's visit_log_medicines rows so no extra round-trip is needed.
-        select_str, embedded_filters = _logbook_page_query_params(
-            date_from, date_to, reason_id, department_id, course_id
-        )
+    # --- Resolve display names from cache + per-page reads ---
+    page_appointment_ids = [log.get("appointment_id") for log in logs]
+    appointments_by_id = _fetch_appointments_by_id(page_appointment_ids)
 
-        start = (page - 1) * page_size
-        end = start + page_size - 1
-
-        logs_query = _apply_logbook_filters(
-            (
-                supabase.table("visit_logs")
-                .select(select_str, count="exact")
-                .order("created_at", desc=True)
-                .order("visit_log_id", desc=True)
-                .range(start, end)
-            ),
-            embedded_filters
-        )
-        if appointment_ids is not None:
-            logs_query = logs_query.in_("appointment_id", appointment_ids)
-
-        try:
-            response = execute_with_retry(logs_query)
-        except PostgrestAPIError as e:
-            # PostgREST rejects an out-of-range page with PGRST103
-            # ("range not satisfiable"). The old in-Python slice just
-            # returned an empty list, so replicate that here instead of
-            # surfacing a 500 — keeping the exact response contract.
-            code = getattr(e, "code", "") or ""
-            if code == "PGRST103" or "not satisfiable" in str(e):
-                total = _count_scoped_logs(
-                    select_str, embedded_filters, appointment_ids
-                )
-                return jsonify({
-                    "success": True,
-                    "count": 0,
-                    "total": total,
-                    "page": page,
-                    "page_size": page_size,
-                    "logbook": []
-                })
-            raise
-        logs = response.data or []
-        total = response.count if response.count is not None else len(logs)
-
-        # --- Resolve display names from cache + per-page reads ---
-        page_appointment_ids = [log.get("appointment_id") for log in logs]
-        appointments_by_id = _fetch_appointments_by_id(page_appointment_ids)
-
-        # Scope the student lookup to this page's appointment student ids
-        # instead of the old whole-table TTL dict (perf migration).
-        students_by_id = build_student_lookup(
-            [
-                row.get("student_id")
-                for row in appointments_by_id.values()
-                if row.get("student_id") is not None
-            ]
-        )
-        reasons_by_id = build_reason_lookup()
-        medicines_by_id = build_medicine_lookup()
-
-        log_medicine_rows = [
-            medicine_row
-            for log in logs
-            for medicine_row in (log.get("visit_log_medicines") or [])
+    # Scope the student lookup to this page's appointment student ids
+    # instead of the old whole-table TTL dict (perf migration).
+    students_by_id = build_student_lookup(
+        [
+            row.get("student_id")
+            for row in appointments_by_id.values()
+            if row.get("student_id") is not None
         ]
+    )
+    reasons_by_id = build_reason_lookup()
+    medicines_by_id = build_medicine_lookup()
 
-        formatted = [
-            format_log_entry(
-                log,
-                appointments_by_id,
-                students_by_id,
-                reasons_by_id,
-                log_medicine_rows,
-                medicines_by_id
-            )
-            for log in logs
-        ]
+    log_medicine_rows = [
+        medicine_row
+        for log in logs
+        for medicine_row in (log.get("visit_log_medicines") or [])
+    ]
 
-        return jsonify({
-            "success": True,
-            "count": len(formatted),
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "logbook": formatted
-        })
+    formatted = [
+        format_log_entry(
+            log,
+            appointments_by_id,
+            students_by_id,
+            reasons_by_id,
+            log_medicine_rows,
+            medicines_by_id
+        )
+        for log in logs
+    ]
 
-    except Exception as e:
-
-        print("Logbook error:", repr(e))
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "count": len(formatted),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "logbook": formatted
+    })
 
 
 # ============================================================
@@ -606,90 +604,80 @@ def get_logbook():
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Logbook student error")
 def get_logbook_by_student(student_id):
 
-    try:
+    sid = normalize_student_id(student_id)
+    if not sid:
+        return jsonify({
+            "success": True,
+            "student_id": student_id,
+            "count": 0,
+            "logbook": []
+        })
 
-        sid = normalize_student_id(student_id)
-        if not sid:
-            return jsonify({
-                "success": True,
-                "student_id": student_id,
-                "count": 0,
-                "logbook": []
-            })
+    appointment_response = execute_with_retry(
+        supabase
+        .table("appointments")
+        .select("appointment_id")
+        .eq("student_id", sid)
+    )
 
-        appointment_response = execute_with_retry(
-            supabase
-            .table("appointments")
-            .select("appointment_id")
-            .eq("student_id", sid)
-        )
+    appointments = appointment_response.data or []
 
-        appointments = appointment_response.data or []
+    appointment_ids = [
+        appointment["appointment_id"]
+        for appointment in appointments
+    ]
 
-        appointment_ids = [
-            appointment["appointment_id"]
-            for appointment in appointments
-        ]
+    if not appointment_ids:
 
-        if not appointment_ids:
+        return jsonify({
+            "success": True,
+            "student_id": student_id,
+            "count": 0,
+            "logbook": []
+        })
 
-            return jsonify({
-                "success": True,
-                "student_id": student_id,
-                "count": 0,
-                "logbook": []
-            })
+    logs_response = execute_with_retry(
+        supabase
+        .table("visit_logs")
+        .select("*")
+        .in_("appointment_id", appointment_ids)
+        .order("created_at", desc=True)
+    )
 
-        logs_response = execute_with_retry(
-            supabase
-            .table("visit_logs")
-            .select("*")
-            .in_("appointment_id", appointment_ids)
-            .order("created_at", desc=True)
-        )
+    logs = logs_response.data or []
 
-        logs = logs_response.data or []
+    (
+        appointments_by_id,
+        students_by_id,
+        reasons_by_id,
+        log_medicine_rows,
+        medicines_by_id
+    ) = get_all_reference_data(
+        appointment_ids,
+        [log.get("visit_log_id") for log in logs]
+    )
 
-        (
+    formatted = [
+        format_log_entry(
+            log,
             appointments_by_id,
             students_by_id,
             reasons_by_id,
             log_medicine_rows,
             medicines_by_id
-        ) = get_all_reference_data(
-            appointment_ids,
-            [log.get("visit_log_id") for log in logs]
         )
+        for log in logs
+    ]
 
-        formatted = [
-            format_log_entry(
-                log,
-                appointments_by_id,
-                students_by_id,
-                reasons_by_id,
-                log_medicine_rows,
-                medicines_by_id
-            )
-            for log in logs
-        ]
-
-        return jsonify({
-            "success": True,
-            "student_id": student_id,
-            "count": len(formatted),
-            "logbook": formatted
-        })
-
-    except Exception as e:
-
-        print("Logbook student error:", repr(e))
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "student_id": student_id,
+        "count": len(formatted),
+        "logbook": formatted
+    })
 
 
 # ============================================================
@@ -703,60 +691,50 @@ def get_logbook_by_student(student_id):
     methods=["GET"]
 )
 @require_auth
+@handle_errors("Logbook entry error")
 def get_logbook_entry(log_id):
 
-    try:
+    response = execute_with_retry(
+        supabase
+        .table("visit_logs")
+        .select("*")
+        .eq("visit_log_id", log_id)
+    )
 
-        response = execute_with_retry(
-            supabase
-            .table("visit_logs")
-            .select("*")
-            .eq("visit_log_id", log_id)
-        )
+    logs = response.data or []
 
-        logs = response.data or []
-
-        if not logs:
-
-            return jsonify({
-                "success": False,
-                "error": "Logbook entry not found"
-            }), 404
-
-        log_row = logs[0]
-        (
-            appointments_by_id,
-            students_by_id,
-            reasons_by_id,
-            log_medicine_rows,
-            medicines_by_id
-        ) = get_all_reference_data(
-            [log_row["appointment_id"]] if log_row.get("appointment_id") else [],
-            [log_row["visit_log_id"]]
-        )
-
-        formatted = format_log_entry(
-            log_row,
-            appointments_by_id,
-            students_by_id,
-            reasons_by_id,
-            log_medicine_rows,
-            medicines_by_id
-        )
-
-        return jsonify({
-            "success": True,
-            "log": formatted
-        })
-
-    except Exception as e:
-
-        print("Logbook entry error:", repr(e))
+    if not logs:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Logbook entry not found"
+        }), 404
+
+    log_row = logs[0]
+    (
+        appointments_by_id,
+        students_by_id,
+        reasons_by_id,
+        log_medicine_rows,
+        medicines_by_id
+    ) = get_all_reference_data(
+        [log_row["appointment_id"]] if log_row.get("appointment_id") else [],
+        [log_row["visit_log_id"]]
+    )
+
+    formatted = format_log_entry(
+        log_row,
+        appointments_by_id,
+        students_by_id,
+        reasons_by_id,
+        log_medicine_rows,
+        medicines_by_id
+    )
+
+    return jsonify({
+        "success": True,
+        "log": formatted
+    })
 
 
 # ============================================================
@@ -793,167 +771,157 @@ def get_logbook_entry(log_id):
     methods=["POST"]
 )
 @require_admin
+@handle_errors("Walk-in error")
 def create_walk_in():
 
-    try:
+    data = request.get_json()
 
-        data = request.get_json()
-
-        if not data:
-
-            return jsonify({
-                "success": False,
-                "error": "Request body is required"
-            }), 400
-
-        student_id = data.get("student_id")
-        appointment_date = data.get("appointment_date")
-        appointment_time = data.get("appointment_time")
-        # slot_id is optional now — the walk-in form lets staff type any
-        # time, which won't always line up with a pre-defined time_slot
-        # row. When the frontend does find a matching slot it still sends
-        # slot_id, and we use it; otherwise we log the visit without one.
-        slot_id = data.get("slot_id")
-
-        # student_id is OPTIONAL for walk-ins — an unregistered patient
-        # may provide only walk_in_* fields (Decision D). appointment_date
-        # and appointment_time remain required (Decision E).
-        missing = [
-            field
-            for field, value in [
-                ("appointment_date", appointment_date),
-                ("appointment_time", appointment_time)
-            ]
-            if not value
-        ]
-
-        if missing:
-
-            return jsonify({
-                "success": False,
-                "error": f"Missing required fields: {', '.join(missing)}"
-            }), 400
-
-        # ----------------------------------------------------
-        # Step 1: Create the appointment record
-        # ----------------------------------------------------
-
-        appointment_data = {
-            "student_id": student_id,
-            "time_slot_id": slot_id,
-            "appointment_date": appointment_date,
-            "appointment_time": appointment_time,
-            "reason_id": data.get("reason_id"),
-            "appointment_purpose": data.get("purpose"),
-            "is_walk_in": True
-        }
-
-        appointment_response = execute_with_retry(
-            supabase
-            .table("appointments")
-            .insert(appointment_data)
-        )
-
-        if not appointment_response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Failed to create walk-in appointment"
-            }), 500
-
-        new_appointment = appointment_response.data[0]
-        new_appointment_id = new_appointment.get("appointment_id")
-
-        # ----------------------------------------------------
-        # Step 2: Create the matching logbook entry
-        # ----------------------------------------------------
-
-        log_data = {
-            "appointment_id": new_appointment_id,
-            "complaint": data.get("complaint"),
-            "attending_admin_id": data.get("admin_id"),
-            "is_walk_in": True,
-            # Manual fallback fields — only meaningful when the typed
-            # student_id has no matching student_masterlist record.
-            # Left as None for registered students; the frontend can
-            # send them regardless and this just won't be used for
-            # display when a real profile match exists.
-            "walk_in_name": data.get("walk_in_name") or None,
-            "walk_in_age": data.get("walk_in_age") or None,
-            "walk_in_sex": data.get("walk_in_sex") or None,
-            "walk_in_department_course": data.get("walk_in_department_course") or None,
-            "walk_in_contact": data.get("walk_in_contact") or None,
-        }
-
-        log_response = execute_with_retry(
-            supabase
-            .table("visit_logs")
-            .insert(log_data)
-        )
-
-        if not log_response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Appointment created, but failed to create logbook entry",
-                "appointment": new_appointment
-            }), 500
-
-        new_log = log_response.data[0]
-        new_log_id = new_log.get("visit_log_id")
-
-        # ----------------------------------------------------
-        # Step 3: Create medicine rows, if any were given
-        # ----------------------------------------------------
-
-        # Look up medicine names so each row stores its own
-        # medicine_name SNAPSHOT (Decision F / Blockers L) —
-        # historical prescriptions survive later medicines edits.
-        medicines_by_id = build_medicine_lookup()
-
-        medicines = data.get("medicines") or []
-        created_medicines = []
-
-        for medicine_entry in medicines:
-
-            medicine_id = medicine_entry.get("medicine_id")
-            quantity = medicine_entry.get("quantity", 1)
-
-            if not medicine_id:
-                continue
-
-            medicine = medicines_by_id.get(medicine_id, {})
-
-            medicine_row = execute_with_retry(
-                supabase
-                .table("visit_log_medicines")
-                .insert({
-                    "visit_log_id": new_log_id,
-                    "medicine_id": medicine_id,
-                    "medicine_name": medicine.get("medicine_name") or "Unknown",
-                    "quantity_dispensed": quantity
-                })
-            )
-
-            if medicine_row.data:
-                created_medicines.extend(medicine_row.data)
-
-        return jsonify({
-            "success": True,
-            "message": "Walk-in visit created",
-            "appointment": new_appointment,
-            "log": new_log, 
-            "medicines": created_medicines
-        }), 201
-
-    except Exception as e:
-
-        print("Walk-in error:", repr(e))
+    if not data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Request body is required"
+        }), 400
+
+    student_id = data.get("student_id")
+    appointment_date = data.get("appointment_date")
+    appointment_time = data.get("appointment_time")
+    # slot_id is optional now — the walk-in form lets staff type any
+    # time, which won't always line up with a pre-defined time_slot
+    # row. When the frontend does find a matching slot it still sends
+    # slot_id, and we use it; otherwise we log the visit without one.
+    slot_id = data.get("slot_id")
+
+    # student_id is OPTIONAL for walk-ins — an unregistered patient
+    # may provide only walk_in_* fields (Decision D). appointment_date
+    # and appointment_time remain required (Decision E).
+    missing = [
+        field
+        for field, value in [
+            ("appointment_date", appointment_date),
+            ("appointment_time", appointment_time)
+        ]
+        if not value
+    ]
+
+    if missing:
+
+        return jsonify({
+            "success": False,
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
+
+    # ----------------------------------------------------
+    # Step 1: Create the appointment record
+    # ----------------------------------------------------
+
+    appointment_data = {
+        "student_id": student_id,
+        "time_slot_id": slot_id,
+        "appointment_date": appointment_date,
+        "appointment_time": appointment_time,
+        "reason_id": data.get("reason_id"),
+        "appointment_purpose": data.get("purpose"),
+        "is_walk_in": True
+    }
+
+    appointment_response = execute_with_retry(
+        supabase
+        .table("appointments")
+        .insert(appointment_data)
+    )
+
+    if not appointment_response.data:
+
+        return jsonify({
+            "success": False,
+            "error": "Failed to create walk-in appointment"
         }), 500
+
+    new_appointment = appointment_response.data[0]
+    new_appointment_id = new_appointment.get("appointment_id")
+
+    # ----------------------------------------------------
+    # Step 2: Create the matching logbook entry
+    # ----------------------------------------------------
+
+    log_data = {
+        "appointment_id": new_appointment_id,
+        "complaint": data.get("complaint"),
+        "attending_admin_id": data.get("admin_id"),
+        "is_walk_in": True,
+        # Manual fallback fields — only meaningful when the typed
+        # student_id has no matching student_masterlist record.
+        # Left as None for registered students; the frontend can
+        # send them regardless and this just won't be used for
+        # display when a real profile match exists.
+        "walk_in_name": data.get("walk_in_name") or None,
+        "walk_in_age": data.get("walk_in_age") or None,
+        "walk_in_sex": data.get("walk_in_sex") or None,
+        "walk_in_department_course": data.get("walk_in_department_course") or None,
+        "walk_in_contact": data.get("walk_in_contact") or None,
+    }
+
+    log_response = execute_with_retry(
+        supabase
+        .table("visit_logs")
+        .insert(log_data)
+    )
+
+    if not log_response.data:
+
+        return jsonify({
+            "success": False,
+            "error": "Appointment created, but failed to create logbook entry",
+            "appointment": new_appointment
+        }), 500
+
+    new_log = log_response.data[0]
+    new_log_id = new_log.get("visit_log_id")
+
+    # ----------------------------------------------------
+    # Step 3: Create medicine rows, if any were given
+    # ----------------------------------------------------
+
+    # Look up medicine names so each row stores its own
+    # medicine_name SNAPSHOT (Decision F / Blockers L) —
+    # historical prescriptions survive later medicines edits.
+    medicines_by_id = build_medicine_lookup()
+
+    medicines = data.get("medicines") or []
+    created_medicines = []
+
+    for medicine_entry in medicines:
+
+        medicine_id = medicine_entry.get("medicine_id")
+        quantity = medicine_entry.get("quantity", 1)
+
+        if not medicine_id:
+            continue
+
+        medicine = medicines_by_id.get(medicine_id, {})
+
+        medicine_row = execute_with_retry(
+            supabase
+            .table("visit_log_medicines")
+            .insert({
+                "visit_log_id": new_log_id,
+                "medicine_id": medicine_id,
+                "medicine_name": medicine.get("medicine_name") or "Unknown",
+                "quantity_dispensed": quantity
+            })
+        )
+
+        if medicine_row.data:
+            created_medicines.extend(medicine_row.data)
+
+    return jsonify({
+        "success": True,
+        "message": "Walk-in visit created",
+        "appointment": new_appointment,
+        "log": new_log, 
+        "medicines": created_medicines
+    }), 201
 
 
 # ============================================================
@@ -980,96 +948,86 @@ def create_walk_in():
     methods=["POST"]
 )
 @require_admin
+@handle_errors("Add medicine error")
 def add_medicine_to_log(log_id):
 
-    try:
+    data = request.get_json()
 
-        data = request.get_json()
-
-        if not data:
-
-            return jsonify({
-                "success": False,
-                "error": "Request body is required"
-            }), 400
-
-        medicines = data.get("medicines") or []
-
-        if not medicines:
-
-            return jsonify({
-                "success": False,
-                "error": "At least one medicine is required"
-            }), 400
-
-        # Make sure the logbook entry actually exists first,
-        # so we don't silently create orphaned medicine rows.
-        log_response = execute_with_retry(
-            supabase
-            .table("visit_logs")
-            .select("visit_log_id")
-            .eq("visit_log_id", log_id)
-        )
-
-        if not log_response.data:
-
-            return jsonify({
-                "success": False,
-                "error": "Logbook entry not found"
-            }), 404
-
-        # Look up medicine names so each row stores its own
-        # medicine_name SNAPSHOT (Decision F / Blockers L).
-        medicines_by_id = build_medicine_lookup()
-
-        created_medicines = []
-
-        for medicine_entry in medicines:
-
-            medicine_id = medicine_entry.get("medicine_id")
-            quantity = medicine_entry.get("quantity", 1)
-
-            if not medicine_id:
-                continue
-
-            medicine = medicines_by_id.get(medicine_id, {})
-
-            medicine_row = execute_with_retry(
-                supabase
-                .table("visit_log_medicines")
-                .insert({
-                    "visit_log_id": log_id,
-                    "medicine_id": medicine_id,
-                    "medicine_name": medicine.get("medicine_name") or "Unknown",
-                    "quantity_dispensed": quantity
-                })
-            )
-
-            if medicine_row.data:
-                created_medicines.extend(medicine_row.data)
-
-        if not created_medicines:
-
-            return jsonify({
-                "success": False,
-                "error": "No valid medicines were provided"
-            }), 400
-
-        return jsonify({
-            "success": True,
-            "message": "Medicine added to logbook entry",
-            "log_id": log_id,
-            "medicines": created_medicines
-        }), 201
-
-    except Exception as e:
-
-        print("Add medicine error:", repr(e))
+    if not data:
 
         return jsonify({
             "success": False,
-            "error": str(e)
-        }), 500
+            "error": "Request body is required"
+        }), 400
+
+    medicines = data.get("medicines") or []
+
+    if not medicines:
+
+        return jsonify({
+            "success": False,
+            "error": "At least one medicine is required"
+        }), 400
+
+    # Make sure the logbook entry actually exists first,
+    # so we don't silently create orphaned medicine rows.
+    log_response = execute_with_retry(
+        supabase
+        .table("visit_logs")
+        .select("visit_log_id")
+        .eq("visit_log_id", log_id)
+    )
+
+    if not log_response.data:
+
+        return jsonify({
+            "success": False,
+            "error": "Logbook entry not found"
+        }), 404
+
+    # Look up medicine names so each row stores its own
+    # medicine_name SNAPSHOT (Decision F / Blockers L).
+    medicines_by_id = build_medicine_lookup()
+
+    created_medicines = []
+
+    for medicine_entry in medicines:
+
+        medicine_id = medicine_entry.get("medicine_id")
+        quantity = medicine_entry.get("quantity", 1)
+
+        if not medicine_id:
+            continue
+
+        medicine = medicines_by_id.get(medicine_id, {})
+
+        medicine_row = execute_with_retry(
+            supabase
+            .table("visit_log_medicines")
+            .insert({
+                "visit_log_id": log_id,
+                "medicine_id": medicine_id,
+                "medicine_name": medicine.get("medicine_name") or "Unknown",
+                "quantity_dispensed": quantity
+            })
+        )
+
+        if medicine_row.data:
+            created_medicines.extend(medicine_row.data)
+
+    if not created_medicines:
+
+        return jsonify({
+            "success": False,
+            "error": "No valid medicines were provided"
+        }), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Medicine added to logbook entry",
+        "log_id": log_id,
+        "medicines": created_medicines
+    }), 201
 
 
 # ============================================================
@@ -1080,37 +1038,27 @@ def add_medicine_to_log(log_id):
 
 @logbook_bp.route("/reasons", methods=["GET"])
 @require_auth
+@handle_errors("Reasons error")
 def get_reasons():
 
-    try:
+    reasons_by_id = build_reason_lookup()
 
-        reasons_by_id = build_reason_lookup()
+    reasons = [
+        {
+            "reason_id": reason_id,
+            "description": row.get("description") or "-",
+        }
+        for reason_id, row in sorted(
+            reasons_by_id.items(),
+            key=lambda kv: str(kv[1].get("description") or "")
+        )
+    ]
 
-        reasons = [
-            {
-                "reason_id": reason_id,
-                "description": row.get("description") or "-",
-            }
-            for reason_id, row in sorted(
-                reasons_by_id.items(),
-                key=lambda kv: str(kv[1].get("description") or "")
-            )
-        ]
-
-        return jsonify({
-            "success": True,
-            "count": len(reasons),
-            "reasons": reasons
-        })
-
-    except Exception as e:
-
-        print("Reasons error:", repr(e))
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "count": len(reasons),
+        "reasons": reasons
+    })
 
 
 # ============================================================
@@ -1121,34 +1069,24 @@ def get_reasons():
 
 @logbook_bp.route("/medicines", methods=["GET"])
 @require_auth
+@handle_errors("Medicines error")
 def get_medicines():
 
-    try:
+    medicines_by_id = build_medicine_lookup()
 
-        medicines_by_id = build_medicine_lookup()
+    medicines = [
+        {
+            "medicine_id": medicine_id,
+            "medicine_name": row.get("medicine_name") or "-",
+        }
+        for medicine_id, row in sorted(
+            medicines_by_id.items(),
+            key=lambda kv: str(kv[1].get("medicine_name") or "")
+        )
+    ]
 
-        medicines = [
-            {
-                "medicine_id": medicine_id,
-                "medicine_name": row.get("medicine_name") or "-",
-            }
-            for medicine_id, row in sorted(
-                medicines_by_id.items(),
-                key=lambda kv: str(kv[1].get("medicine_name") or "")
-            )
-        ]
-
-        return jsonify({
-            "success": True,
-            "count": len(medicines),
-            "medicines": medicines
-        })
-
-    except Exception as e:
-
-        print("Medicines error:", repr(e))
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "count": len(medicines),
+        "medicines": medicines
+    })

@@ -1,9 +1,18 @@
+import logging
 import time
 import socket
 import threading
 
 from datetime import date
+from functools import wraps
 from types import SimpleNamespace
+
+from flask import jsonify
+
+# Configure the app-wide logger once at startup (see logging_setup.py).
+import routers.logging_setup  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 try:
     import httpx
@@ -131,9 +140,10 @@ def execute_with_retry(query, retries=5, delay=0.3):
         except TRANSIENT_ERRORS as e:
 
             last_error = e
-            print(
-                f"Supabase query attempt {attempt + 1}/{retries} "
-                f"failed with transient error: {repr(e)} — retrying..."
+            logger.warning(
+                "Supabase query attempt %s/%s "
+                "failed with transient error: %r — retrying...",
+                attempt + 1, retries, e
             )
             time.sleep(delay * (attempt + 1))  # small backoff
 
@@ -149,9 +159,10 @@ def execute_with_retry(query, retries=5, delay=0.3):
 
             if _looks_transient(e):
                 last_error = e
-                print(
-                    f"Supabase query attempt {attempt + 1}/{retries} "
-                    f"failed with transient-looking error: {repr(e)} — retrying..."
+                logger.warning(
+                    "Supabase query attempt %s/%s "
+                    "failed with transient-looking error: %r — retrying...",
+                    attempt + 1, retries, e
                 )
                 time.sleep(delay * (attempt + 1))
                 continue
@@ -163,6 +174,44 @@ def execute_with_retry(query, retries=5, delay=0.3):
     # All retries exhausted — raise the last transient error so the
     # calling route's except block can format a normal error response.
     raise last_error
+
+
+# ============================================================
+# ERROR ENVELOPE HELPERS
+#
+# Uniform 500 envelopes + route decorator so routes don't each
+# re-implement `except Exception -> jsonify({"success": False,
+# "error": ...}), 500`.
+# ============================================================
+
+def error_response(message, status=500):
+    """Uniform error envelope: ({"success": False, "error": message}, status)."""
+    return jsonify({"success": False, "error": message}), status
+
+
+def handle_errors(log_message):
+    """
+    Route decorator: catch any exception raised by the route body, log
+    it under `log_message`, and return the standard 500 error envelope.
+    The route itself needs no try/except.
+
+    Usage:
+        @blueprint.route("/path")
+        @require_auth
+        @handle_errors("My route error")
+        def my_route():
+            ...
+    """
+    def decorator(route_func):
+        @wraps(route_func)
+        def wrapper(*args, **kwargs):
+            try:
+                return route_func(*args, **kwargs)
+            except Exception as e:
+                logger.error("%s: %r", log_message, e)
+                return error_response(str(e))
+        return wrapper
+    return decorator
 
 
 # ============================================================
@@ -275,10 +324,11 @@ def _merge_student_row(students, row):
     }
 
 
-# Cap the fallback ilike leg (mirrors logbook.py's _SEARCH_SCAN_CAP):
-# a wildcard- or whitespace-heavy id list must never pull back a
-# scan-sized result set.
-_STUDENT_LOOKUP_FALLBACK_CAP = 500
+# Cap for scan-style ilike legs (shared with logbook.py's free-text
+# search): a wildcard- or whitespace-heavy id list (student lookup) or
+# a broad search term (logbook) must never pull back a scan-sized
+# result set.
+_SEARCH_SCAN_CAP = 500
 
 
 def build_student_lookup(ids=None):
@@ -374,7 +424,7 @@ def build_student_lookup(ids=None):
             .table("student_masterlist")
             .select("*")
             .or_(",".join(or_legs))
-            .range(0, _STUDENT_LOOKUP_FALLBACK_CAP - 1)
+            .range(0, _SEARCH_SCAN_CAP - 1)
         )
 
         missing_set = set(missing_keys)

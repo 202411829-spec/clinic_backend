@@ -27,6 +27,8 @@ sorted by descending count, and percents are count/total*100 rounded to
 1 dp — unchanged from the pre-Sprint-2 contract.
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request
 from collections import Counter
 from datetime import date as date_type
@@ -34,7 +36,10 @@ from typing import Optional
 
 from supabase_client import supabase
 from routers.auth_guard import require_auth
-from routers.helpers import execute_with_retry
+from routers.helpers import execute_with_retry, handle_errors
+
+logger = logging.getLogger(__name__)
+
 
 blueprint = Blueprint("reports", __name__, url_prefix="/api/reports")
 
@@ -121,8 +126,7 @@ def get_report():
         except Exception:
             return jsonify({"error": "Invalid date format, expected YYYY-MM-DD"}), 400
     else:
-        from datetime import datetime
-        report_date = datetime.now().date()
+        report_date = date_type.today()
 
     department_id: Optional[int] = request.args.get("department_id", type=int)
 
@@ -185,6 +189,7 @@ def get_report():
 
 @blueprint.route("/departments", methods=["GET"])
 @require_auth
+@handle_errors("List departments error")
 def list_departments_for_filter():
     """Reuses the same department list as the Masterlist filter dropdown."""
     response = execute_with_retry(
