@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { masterlistApi } from '../../lib/api.js'
+import { useDebouncedValue } from '../../lib/hooks.js'
 import {
   MasterlistIcon,
   SearchIcon,
   SortIcon,
-  DotsIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '../../components/icons.jsx'
+import NavIcon from '../../components/admin/NavIcon.jsx'
 import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
 
 const COLUMNS = [
@@ -24,15 +25,6 @@ const COLUMNS = [
 ]
 
 const PAGE_SIZE = 15
-
-function useDebouncedValue(value, delayMs) {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs)
-    return () => clearTimeout(timer)
-  }, [value, delayMs])
-  return debounced
-}
 
 function initialsOf(firstName, lastName) {
   return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase()
@@ -347,7 +339,7 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
   return (
     <div className="relative inline-block">
       <button ref={buttonRef} onClick={onToggle} className="text-gc-green-700" aria-label="Row actions">
-        <DotsIcon className="h-5 w-5" />
+        <NavIcon name="dots" className="h-5 w-5" />
       </button>
 
       {open &&

@@ -11,6 +11,7 @@ import EditStudentInfoModal from "./EditStudentInfoModal";
 import { recordsApi, masterlistApi } from "../../lib/api.js";
 import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
 import { isStudentProfileComplete } from "../../lib/profileCompleteness.js";
+import { formatDisplayName } from "../../lib/format.js";
 
 function SectionHeader({ icon, title }) {
   return (
@@ -47,13 +48,6 @@ function InfoField({ label, value }) {
       <p className="text-sm font-semibold text-gray-800 break-words">{v(value)}</p>
     </div>
   );
-}
-
-// "Ramos, Joseph Daniel B." -> "Joseph Daniel B. Ramos"
-function formatDisplayName(name = "") {
-  const [last, rest] = name.split(",").map((p) => p.trim());
-  if (!rest) return name;
-  return `${rest} ${last}`;
 }
 
 export default function StudentRecordPanel({ student: initialStudent, studentId, error }) {

@@ -1,6 +1,7 @@
 // src/components/admin/StatusMenu.jsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import NavIcon from "./NavIcon";
 import { statusOptions } from "../../data/dashboardSample";
 
 const MENU_WIDTH = 160; // matches w-40
@@ -59,7 +60,7 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
         className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
         aria-label="Row actions"
       >
-        &#8942;
+        <NavIcon name="dots" />
       </button>
 
       {open &&

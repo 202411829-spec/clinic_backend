@@ -5,6 +5,7 @@ import {
   getMonthMatrix,
   isSameDate,
   formatMDY,
+  toYMD,
   WEEKDAY_LABELS,
 } from "../../lib/calendar";
 
@@ -70,7 +71,7 @@ export default function ScheduleCalendar({
     }
   }
 
-  function toYMDLocal(date) {
+  function toYMD(date) {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
@@ -123,7 +124,7 @@ export default function ScheduleCalendar({
 
   function isDateOff(date) {
     if (!date) return false;
-    const ymd = toYMDLocal(date);
+    const ymd = toYMD(date);
     if (bookingEnabledMap && ymd in bookingEnabledMap) {
       return bookingEnabledMap[ymd] === false;
     }

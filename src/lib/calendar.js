@@ -137,6 +137,14 @@ export function toYMD(date) {
   return `${y}-${m}-${d}`;
 }
 
+/** "YYYY-MM-DD" -> "MM/DD/YYYY" (string-based, timezone-safe). */
+export function isoToMDY(iso) {
+  if (!iso) return "All";
+  const parts = String(iso).split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
 /** Monday of the week containing `date` (ISO week start). */
 export function getWeekStart(date) {
   const start = new Date(date);

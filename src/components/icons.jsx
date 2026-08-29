@@ -68,15 +68,6 @@ export function InfoIcon(props) {
   )
 }
 
-export function LogoutIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M15 17l5-5-5-5M20 12H9" />
-      <path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
-    </svg>
-  )
-}
-
 export function SearchIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
@@ -86,28 +77,10 @@ export function SearchIcon(props) {
   )
 }
 
-export function ChevronDownIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export function SortIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
       <path d="M8 4l4 5H4l4-5ZM8 20l-4-5h8l-4 5Z" />
-    </svg>
-  )
-}
-
-export function DotsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <circle cx="12" cy="5" r="2" />
-      <circle cx="12" cy="12" r="2" />
-      <circle cx="12" cy="19" r="2" />
     </svg>
   )
 }

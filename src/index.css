@@ -50,11 +50,6 @@
     margin: 0 auto;
   }
 
-  .print-a4-portrait-cert {
-    width: 190mm;
-    margin: 0 auto;
-  }
-
   /* Medical Certificate only: let the 3 stacked copies size themselves
      naturally (their real content is short — well under a third of a page
      each) instead of forcing each into an exact fraction of the sheet.

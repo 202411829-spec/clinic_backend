@@ -3,13 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
 import PeriodDropdown from "./PeriodDropdown";
 import SelectDateCalendar from "./SelectDateCalendar";
+import Letterhead from "./Letterhead.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { masterlistApi, reportsApi } from "../../lib/api.js";
-import { formatMDY, getPeriodLabel, shiftByPeriod } from "../../lib/calendar";
-
-import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
-import oswsSeal from "../../assets/certificate/osws-seal.png";
-import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+import { formatMDY, getPeriodLabel, shiftByPeriod, toYMD } from "../../lib/calendar";
+import { pdfLetterhead } from "../../lib/pdf.js";
 
 // Shape the panel renders; filled in from GET /api/reports/?date=...
 const EMPTY_DATA = {
@@ -20,13 +18,6 @@ const EMPTY_DATA = {
   sex: { title: "Sex", rows: [] },
   age: { title: "Age", rows: [] },
 };
-
-function toYMD(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 function pct(breakdown) {
   return `${breakdown.count} (${breakdown.percent}% of total)`;
@@ -140,14 +131,7 @@ export default function ReportsFullPanel() {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       let y = 18;
 
-      doc.setFontSize(14);
-      doc.setFont(undefined, "bold");
-      doc.text("GORDON COLLEGE", 105, y, { align: "center" });
-      y += 5;
-      doc.setFontSize(9);
-      doc.setFont(undefined, "normal");
-      doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
-      y += 10;
+      y = pdfLetterhead(doc, y);
 
       doc.setFontSize(16);
       doc.setFont(undefined, "bold");
@@ -194,24 +178,8 @@ export default function ReportsFullPanel() {
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:shadow-none print:border-none print-a4-portrait">
-      {/* print-only formal letterhead, matching the Medical Certificate header */}
-      <div className="hidden print:flex items-center gap-3 mb-4 pb-4 border-b border-gray-300">
-        <div className="flex-1 flex items-center gap-2">
-          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
-          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
-        </div>
-        <div className="flex-1 text-center px-2">
-          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
-          <p className="text-xs text-gray-600 leading-snug">
-            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
-          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
-        </div>
-        <div className="flex-1 flex items-center justify-end">
-          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
-        </div>
-      </div>
+      {/* print-only formal letterhead — shared component */}
+      <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
         CLINIC REPORT
       </h2>

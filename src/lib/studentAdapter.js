@@ -2,6 +2,8 @@
 // Adapts raw backend payloads into the shape the admin record panels
 // render (the same shape src/data/masterlistSample.js used as a placeholder).
 
+import { yearIndexFromLabel } from "./yearLabel.js";
+
 function joinName(profile = {}) {
   const middle = profile.middle_initial ? ` ${profile.middle_initial}.` : "";
   return `${profile.last_name ?? ""}, ${profile.first_name ?? ""}${middle}`.trim();
@@ -209,22 +211,7 @@ export function latestAnnualExamId(medSummaryOrHeader) {
   for (const label of Object.keys(years)) {
     if (years[label]?.annual_exam_id) available.push(years[label]);
   }
-  available.sort((a, b) => yearIndexOf(a.year_label) - yearIndexOf(b.year_label));
+  available.sort((a, b) => yearIndexFromLabel(a.year_label) - yearIndexFromLabel(b.year_label));
   const latest = available[available.length - 1];
   return latest?.annual_exam_id ?? null;
-}
-
-function yearIndexOf(label) {
-  const m = String(label || "").match(/^Year\s+([IVXLCDM]+|[0-9]+)$/i);
-  if (!m) return 0;
-  const part = m[1].toUpperCase();
-  if (/^[0-9]+$/.test(part)) return parseInt(part, 10);
-  const vals = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
-  let total = 0;
-  for (let i = 0; i < part.length; i++) {
-    const cur = vals[part[i]];
-    const next = vals[part[i + 1]] ?? 0;
-    total += cur < next ? -cur : cur;
-  }
-  return total;
 }

@@ -5,13 +5,7 @@ import NavIcon from "../admin/NavIcon";
 import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";
-
-function toYMD(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { toYMD } from "../../lib/calendar";
 
 function formatTime(value) {
   if (!value) return "-";

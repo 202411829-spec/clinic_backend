@@ -5,7 +5,7 @@ import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
 import { clinicScheduleApi } from "../../lib/api.js";
-import { formatMDY } from "../../lib/calendar.js";
+import { formatMDY, toYMD } from "../../lib/calendar.js";
 
 function InfoDot({ label }) {
   return (
@@ -18,13 +18,6 @@ function InfoDot({ label }) {
       i
     </span>
   );
-}
-
-function toYMDLocal(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
@@ -66,7 +59,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
               aria-expanded={menuOpen}
               className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
             >
-              &#8942;
+              <NavIcon name="dots" />
             </button>
 
             {menuOpen && (
@@ -201,7 +194,7 @@ export default function ClinicScheduleFullPanel() {
       const next = {};
       await Promise.all(
         selectedDates.map(async (d) => {
-          const ymd = toYMDLocal(d);
+          const ymd = toYMD(d);
           try {
             const res = await clinicScheduleApi.byDate(ymd);
             const sched = res?.schedule;
@@ -224,7 +217,7 @@ export default function ClinicScheduleFullPanel() {
   }, [selectedDates, selectedWeekdays, calendarMode]);
 
   function resolveBookingEnabled(date) {
-    const ymd = toYMDLocal(date);
+    const ymd = toYMD(date);
     if (ymd in bookingEnabledMap) return bookingEnabledMap[ymd];
     return selectedWeekdays.includes(date.getDay());
   }
@@ -255,7 +248,7 @@ export default function ClinicScheduleFullPanel() {
       await Promise.all(
         selectedDates.map((d) =>
           clinicScheduleApi.createOverride({
-            working_date: toYMDLocal(d),
+            working_date: toYMD(d),
             is_enabled: isEnabled,
             slot_start: workStart,
             slot_end: workEnd,
@@ -266,7 +259,7 @@ export default function ClinicScheduleFullPanel() {
       );
       const next = { ...bookingEnabledMap };
       selectedDates.forEach((d) => {
-        next[toYMDLocal(d)] = isEnabled;
+        next[toYMD(d)] = isEnabled;
       });
       setBookingEnabledMap(next);
       const dateLabel =
@@ -313,7 +306,7 @@ export default function ClinicScheduleFullPanel() {
     const results = await Promise.allSettled(
       selectedDates.map((d) =>
         clinicScheduleApi.createOverride({
-          working_date: toYMDLocal(d),
+          working_date: toYMD(d),
           slot_start: workStart,
           slot_end: workEnd,
           break_start: breakStart || null,
@@ -326,7 +319,7 @@ export default function ClinicScheduleFullPanel() {
     results.forEach((result, i) => {
       if (result.status === "rejected") {
         console.error(`Failed to save override for ${selectedDates[i]}:`, result.reason);
-        failures.push(`Date ${toYMDLocal(selectedDates[i])}`);
+        failures.push(`Date ${toYMD(selectedDates[i])}`);
       }
     });
 

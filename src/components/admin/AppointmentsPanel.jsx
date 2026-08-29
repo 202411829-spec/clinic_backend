@@ -6,13 +6,7 @@ import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { appointmentsApi } from "../../lib/api.js";
-
-function todayYMD() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate()
-  ).padStart(2, "0")}`;
-}
+import { toYMD } from "../../lib/calendar.js";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -39,7 +33,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
         aria-expanded={open}
         className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
       >
-        &#8942;
+        <NavIcon name="dots" />
       </button>
 
       {open && (
@@ -206,7 +200,7 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   // Dashboard via props (fetched once, shared).
   useEffect(() => {
     appointmentsApi
-      .slots(todayYMD())
+      .slots(toYMD(new Date()))
       .then((res) => setSlots(res?.slots || []))
       .catch((err) => console.error("Failed to load slots:", err));
   }, []);

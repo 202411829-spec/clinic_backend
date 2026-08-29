@@ -6,16 +6,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon.jsx";
 import { ChevronLeftIcon } from "../icons.jsx";
+import Letterhead from "./Letterhead.jsx";
 import {
   academicYears,
   computeAge,
-  formatLongDate,
+  formatLongDateISO,
 } from "../../data/studentRecordSample.js";
 import { adaptMedicalSummaryYear } from "../../lib/studentAdapter.js";
-
-import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
-import oswsSeal from "../../assets/certificate/osws-seal.png";
-import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+import { formatDisplayName, computeBmi } from "../../lib/format.js";
 
 const RESULT_STYLES = {
   Normal: "bg-green-100 text-green-700",
@@ -232,7 +230,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       y += 5;
       doc.setFont(undefined, "normal");
       [
-        ["Date", (r) => (r.dateExamined ? formatLongDate(r.dateExamined) : "-")],
+        ["Date", (r) => (r.dateExamined ? formatLongDateISO(r.dateExamined) : "-")],
         ["BP (mmHg)", (r) => r.bp || "-"],
         ["CR (bpm)", (r) => r.cr || "-"],
         ["RR (breaths/min)", (r) => r.rr || "-"],
@@ -265,7 +263,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       y += 5;
       doc.setFont(undefined, "normal");
       [
-        ["Date", (r) => (r.chestXray.date ? formatLongDate(r.chestXray.date) : "-")],
+        ["Date", (r) => (r.chestXray.date ? formatLongDateISO(r.chestXray.date) : "-")],
         ["Result", (r) => (r.chestXray.date ? r.chestXray.result : "-")],
         ["Findings", (r) => r.chestXray.remarks || "-"],
       ].forEach(([label, getVal]) => {
@@ -279,7 +277,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       y += 5.5;
       doc.setFont(undefined, "normal");
       [
-        ["Date", (r) => (r.cbc.date ? formatLongDate(r.cbc.date) : "-")],
+        ["Date", (r) => (r.cbc.date ? formatLongDateISO(r.cbc.date) : "-")],
         ["Hemoglobin (g/dL)", (r) => r.cbc.hemoglobin || "-"],
         ["Hematocrit (%)", (r) => r.cbc.hematocrit || "-"],
         ["WBC", (r) => r.cbc.wbc || "-"],
@@ -299,7 +297,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       y += 5.5;
       doc.setFont(undefined, "normal");
       [
-        ["Date", (r) => (r.urinalysis.date ? formatLongDate(r.urinalysis.date) : "-")],
+        ["Date", (r) => (r.urinalysis.date ? formatLongDateISO(r.urinalysis.date) : "-")],
         ["Glucose / Sugar", (r) => r.urinalysis.glucose || "-"],
         ["Protein", (r) => r.urinalysis.protein || "-"],
       ].forEach(([label, getVal]) => {
@@ -342,25 +340,8 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
 
   return (
     <div className="flex flex-col gap-5 pb-10 print:pb-0 print-a4-portrait">
-      {/* ---------- print-only formal letterhead, matching the Medical
-          Certificate / Reports header ---------- */}
-      <div className="hidden print:flex items-center gap-3 pb-4 border-b border-gray-300">
-        <div className="flex-1 flex items-center gap-2">
-          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
-          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
-        </div>
-        <div className="flex-1 text-center px-2">
-          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
-          <p className="text-xs text-gray-600 leading-snug">
-            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
-          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
-        </div>
-        <div className="flex-1 flex items-center justify-end">
-          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
-        </div>
-      </div>
+      {/* ---------- print-only formal letterhead — shared component ---------- */}
+      <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4">
         MEDICAL SUMMARY
       </h2>
@@ -501,7 +482,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                 </thead>
                 <tbody>
                   {[
-                    ["Date", (r) => (r.dateExamined ? formatLongDate(r.dateExamined) : "-")],
+                    ["Date", (r) => (r.dateExamined ? formatLongDateISO(r.dateExamined) : "-")],
                     ["BP (mmHg)", (r) => v(r.bp)],
                     ["CR (bpm)", (r) => v(r.cr)],
                     ["RR (breaths/min)", (r) => v(r.rr)],
@@ -583,7 +564,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   <Td>Date</Td>
                   {yearLabels.map((label) => (
                     <Td key={label}>
-                      {records[label].chestXray.date ? formatLongDate(records[label].chestXray.date) : "-"}
+                      {records[label].chestXray.date ? formatLongDateISO(records[label].chestXray.date) : "-"}
                     </Td>
                   ))}
                 </tr>
@@ -604,7 +585,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
 
                 <GroupRow label="CBC" span={yearLabels.length + 1} />
                 {[
-                  ["Date", (r) => (r.cbc.date ? formatLongDate(r.cbc.date) : "-")],
+                  ["Date", (r) => (r.cbc.date ? formatLongDateISO(r.cbc.date) : "-")],
                   ["Hemoglobin (g/dL)", (r) => v(r.cbc.hemoglobin)],
                   ["Hematocrit (%)", (r) => v(r.cbc.hematocrit)],
                   ["WBC", (r) => v(r.cbc.wbc)],
@@ -623,7 +604,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   <Td>Date</Td>
                   {yearLabels.map((label) => (
                     <Td key={label}>
-                      {records[label].urinalysis.date ? formatLongDate(records[label].urinalysis.date) : "-"}
+                      {records[label].urinalysis.date ? formatLongDateISO(records[label].urinalysis.date) : "-"}
                     </Td>
                   ))}
                 </tr>
@@ -711,21 +692,4 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       </section>
     </div>
   );
-}
-
-/* ---------- helpers ---------- */
-
-// "Ramos, Joseph Daniel B." -> "Joseph Daniel B. Ramos"
-function formatDisplayName(name = "") {
-  const [last, rest] = name.split(",").map((p) => p.trim());
-  if (!rest) return name;
-  return `${rest} ${last}`;
-}
-
-function computeBmi(weightKg, heightCm) {
-  const w = parseFloat(weightKg);
-  const h = parseFloat(heightCm);
-  if (!w || !h) return null;
-  const meters = h / 100;
-  return (w / (meters * meters)).toFixed(1);
 }

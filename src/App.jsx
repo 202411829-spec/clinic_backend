@@ -45,13 +45,7 @@ function ProtectedRoute({ loginPath, children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Suspense
-        fallback={
-          <div className="flex min-h-screen items-center justify-center bg-white">
-            <p className="text-sm font-semibold text-gc-green-700">Loading…</p>
-          </div>
-        }
-      >
+      <Suspense fallback={<SessionLoader />}>
         <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
 

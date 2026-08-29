@@ -2,22 +2,15 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import NavIcon from "./NavIcon.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import Letterhead from "./Letterhead.jsx";
+import Pagination from "../Pagination.jsx";
+import WalkInVisitForm from "./WalkInVisitForm.jsx";
+import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
-import { formatMDY } from "../../lib/calendar.js";
-
-import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
-import oswsSeal from "../../assets/certificate/osws-seal.png";
-import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+import { formatMDY, isoToMDY } from "../../lib/calendar.js";
+import { pdfLetterhead } from "../../lib/pdf.js";
 
 const PAGE_SIZE = 20;
-
-// "YYYY-MM-DD" (from <input type="date">) -> "MM/DD/YYYY" for print/PDF labels.
-function fmtDate(iso) {
-  if (!iso) return "All";
-  const parts = String(iso).split("-");
-  if (parts.length !== 3) return iso;
-  return `${parts[1]}/${parts[2]}/${parts[0]}`;
-}
 
 // Map a backend /logbook row onto the shape this panel renders.
 function mapEntry(r) {
@@ -39,73 +32,6 @@ function mapEntry(r) {
     complaint: r.complaint || "-",
     medicine: r.medicine || "-",
   };
-}
-
-function Pagination({ page, pageCount, onChange }) {
-  // Show up to 10 page numbers to match the design, even if there isn't
-  // enough data yet to actually fill them all — those extra numbers are
-  // just visual placeholders and stay inactive until real data reaches them.
-  const displayCount = Math.max(pageCount, 10);
-  const pages = [];
-  const window = 1;
-  for (let p = 1; p <= displayCount; p++) {
-    if (
-      p === 1 ||
-      p === displayCount ||
-      (p >= page - window && p <= page + window)
-    ) {
-      pages.push(p);
-    } else if (pages[pages.length - 1] !== "…") {
-      pages.push("…");
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page === 1}
-        aria-label="Previous page"
-        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 hover:bg-gray-50"
-      >
-        <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
-          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {pages.map((p, i) =>
-        p === "…" ? (
-          <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">
-            …
-          </span>
-        ) : (
-          <button
-            key={p}
-            onClick={() => p <= pageCount && onChange(p)}
-            aria-current={p === page ? "page" : undefined}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
-              p === page
-                ? "bg-gc-green text-white"
-                : "text-gray-600 border border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            {p}
-          </button>
-        )
-      )}
-
-      <button
-        onClick={() => onChange(Math.min(pageCount, page + 1))}
-        disabled={page === pageCount}
-        aria-label="Next page"
-        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40 hover:bg-gray-50"
-      >
-        <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4">
-          <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-    </div>
-  );
 }
 
 export default function LogbookFullPanel() {
@@ -216,72 +142,12 @@ export default function LogbookFullPanel() {
   function changeDepartment(v) { setDepartmentFilter(v); setPage(1); }
   function changeCourse(v) { setCourseFilter(v); setPage(1); }
 
-  // Walk-in visit form — hidden by default, opened by the "+ Add Walk-in
-  // Visit" button, same pattern as the dashboard Logbook widget.
-  const [showWalkInForm, setShowWalkInForm] = useState(false);
-  const [regId, setRegId] = useState("");
-  const [walkInName, setWalkInName] = useState("");
-  const [walkInReasonId, setWalkInReasonId] = useState("");
-  const [complaint, setComplaint] = useState("");
-  const [medicineInput, setMedicineInput] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [medTags, setMedTags] = useState([]);
-  const [walkInError, setWalkInError] = useState(null);
-
-  function resetWalkInForm() {
-    setRegId("");
-    setWalkInName("");
-    setWalkInReasonId("");
-    setComplaint("");
-    setMedicineInput("");
-    setQuantity("");
-    setMedTags([]);
-    setWalkInError(null);
-  }
-
-  function handleAddMedicine() {
-    if (!medicineInput.trim()) return;
-    const qty = quantity ? Number(quantity) : 1;
-    const match = medicineRecords.find(
-      (m) => m.medicine_name.toLowerCase() === medicineInput.trim().toLowerCase()
-    );
-    const medId = match?.medicine_id;
-    setMedTags((tags) => [
-      ...tags,
-      { name: medicineInput.trim(), quantity: qty, medicine_id: medId },
-    ]);
-    setMedicineInput("");
-    setQuantity("");
-  }
-
-  async function handleAddWalkIn() {
-    if ((!regId.trim() && !walkInName.trim()) || !walkInReasonId) return;
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:00`;
-
-    const medicinesPayload = medTags
-      .filter((t) => t.medicine_id)
-      .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
-
-    try {
-      setWalkInError(null);
-      await logbookApi.createWalkIn({
-        student_id: regId.trim() || undefined,
-        walk_in_name: walkInName.trim() || undefined,
-        appointment_date: `${y}-${m}-${d}`,
-        appointment_time: time,
-        reason_id: Number(walkInReasonId),
-        complaint: complaint.trim() || undefined,
-        medicines: medicinesPayload.length > 0 ? medicinesPayload : undefined,
-      });
-      // Refresh straight from the API with explicit page=1 params (rather
-      // than going through loadData(), which would otherwise close over
-      // whatever page the admin was on before this async call resolves).
+  // Walk-in form — shared hook encapsulates all walk-in state + handlers
+  const walkIn = useWalkInForm({
+    reasonRecords,
+    medicineRecords,
+    onSubmit: async (payload) => {
+      await logbookApi.createWalkIn(payload);
       const res = await logbookApi.list({
         page: 1,
         page_size: pageSize,
@@ -295,22 +161,15 @@ export default function LogbookFullPanel() {
       setEntries((res?.logbook || []).map(mapEntry));
       setTotalEntries(res?.total || 0);
       setPage(1);
-    } catch (err) {
-      console.error("Walk-in failed:", err);
-      setWalkInError(err.message || "Couldn't save the walk-in visit.");
-      return;
-    }
-
-    resetWalkInForm();
-    setShowWalkInForm(false);
-  }
+    },
+  });
 
   // Labels for the active filters, used for the print/PDF summary metadata line
   // (mirrors Reports' "period — department" convention).
   const departmentLabel = departments.find((d) => String(d.value) === String(departmentFilter))?.label;
   const courseLabel = courses.find((c) => String(c.value) === String(courseFilter))?.label;
   const reasonLabel = reasonRecords.find((r) => String(r.reason_id) === String(reasonFilter))?.description;
-  const dateSummary = dateFrom || dateTo ? `${fmtDate(dateFrom)} to ${fmtDate(dateTo)}` : "All Dates";
+  const dateSummary = dateFrom || dateTo ? `${isoToMDY(dateFrom)} to ${isoToMDY(dateTo)}` : "All Dates";
   const printSummary = `${dateSummary} — ${departmentLabel || "All Departments"} — ${courseLabel || "All Course"} — ${reasonLabel || "All Reasons"}${search ? ` — Search: "${search}"` : ""} — Total: ${totalEntries} entries`;
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -329,15 +188,8 @@ export default function LogbookFullPanel() {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       let y = 18;
 
-      // Letterhead — mirrors ReportsFullPanel's PDF header block.
-      doc.setFontSize(14);
-      doc.setFont(undefined, "bold");
-      doc.text("GORDON COLLEGE", 105, y, { align: "center" });
-      y += 5;
-      doc.setFontSize(9);
-      doc.setFont(undefined, "normal");
-      doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
-      y += 10;
+      // Letterhead — shared helper.
+      y = pdfLetterhead(doc, y);
 
       // Title — mirrors Reports' "Clinic Report" line.
       doc.setFontSize(16);
@@ -349,7 +201,7 @@ export default function LogbookFullPanel() {
       doc.setFontSize(10);
       doc.setFont(undefined, "normal");
       doc.setTextColor("#000000");
-      doc.text(`Date: ${dateFrom ? fmtDate(dateFrom) : "All"} to ${dateTo ? fmtDate(dateTo) : "All"}`, 14, y);
+      doc.text(`Date: ${dateFrom ? isoToMDY(dateFrom) : "All"} to ${dateTo ? isoToMDY(dateTo) : "All"}`, 14, y);
       y += 5;
       doc.text(`Department: ${departmentLabel || "All"}`, 14, y);
       y += 5;
@@ -477,24 +329,8 @@ export default function LogbookFullPanel() {
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
-      {/* print-only formal letterhead — same structure as ReportsFullPanel */}
-      <div className="hidden print:flex items-center gap-3 mb-4 pb-4 border-b border-gray-300">
-        <div className="flex-1 flex items-center gap-2">
-          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
-          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
-        </div>
-        <div className="flex-1 text-center px-2">
-          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
-          <p className="text-xs text-gray-600 leading-snug">
-            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
-          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
-        </div>
-        <div className="flex-1 flex items-center justify-end">
-          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
-        </div>
-      </div>
+      {/* print-only formal letterhead — shared component */}
+      <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
         CLINIC LOGBOOK
       </h2>
@@ -643,10 +479,10 @@ export default function LogbookFullPanel() {
       )}
 
       {/* bottom trigger — hidden once the form is open, same as the dashboard widget */}
-      {!showWalkInForm && (
+      {!walkIn.showWalkInForm && (
         <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
           <button
-            onClick={() => setShowWalkInForm(true)}
+            onClick={() => walkIn.setShowWalkInForm(true)}
             className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             + Add Walk-in Visit
@@ -654,131 +490,22 @@ export default function LogbookFullPanel() {
         </div>
       )}
 
-      {/* walk-in visit form — expands directly below the button, closes back into it */}
-      {showWalkInForm && (
-        <div className="mt-4 pt-4 border-t-2 border-gray-300 print:hidden">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
-            <button
-              onClick={() => {
-                setShowWalkInForm(false);
-                resetWalkInForm();
-              }}
-              aria-label="Close"
-              className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            >
-              <span aria-hidden className="text-base leading-none">×</span>
-            </button>
-          </div>
-
-          {walkInError && (
-            <p className="mb-3 text-sm font-semibold text-red-600">{walkInError}</p>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500">
-                ID / Registration Number
-              </label>
-              <input
-                value={regId}
-                onChange={(e) => setRegId(e.target.value)}
-                placeholder="Student ID"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Patient Name</label>
-              <input
-                value={walkInName}
-                onChange={(e) => {
-                  setWalkInName(e.target.value);
-                  if (walkInError) setWalkInError(null);
-                }}
-                placeholder="Full name (required if not registered)"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Reason</label>
-              <UniversalDropdown
-                value={walkInReasonId}
-                onChange={setWalkInReasonId}
-                options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
-                placeholder="Select Reason"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500">Complaint</label>
-              <input
-                value={complaint}
-                onChange={(e) => setComplaint(e.target.value)}
-                placeholder="E.g. Headache"
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Medicine</label>
-                <input
-                  value={medicineInput}
-                  onChange={(e) => setMedicineInput(e.target.value)}
-                  placeholder="E.g. Paracetamol"
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                />
-                {medTags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {medTags.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
-                      >
-                        {tag.name} x{tag.quantity}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Quantity</label>
-                <div className="mt-1 flex gap-1.5">
-                  <input
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    type="number"
-                    min="0"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
-                  />
-                  <button
-                    onClick={handleAddMedicine}
-                    className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
-                  >
-                    + Add
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
-            <button
-              onClick={() => {
-                setShowWalkInForm(false);
-                resetWalkInForm();
-              }}
-              className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddWalkIn}
-              className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-            >
-              + Add Walk-in Visit
-            </button>
-          </div>
-        </div>
+      {/* walk-in visit form */}
+      {walkIn.showWalkInForm && (
+        <WalkInVisitForm
+          regId={walkIn.regId} setRegId={walkIn.setRegId}
+          walkInName={walkIn.walkInName} setWalkInName={walkIn.setWalkInName}
+          walkInReasonId={walkIn.walkInReasonId} setWalkInReasonId={walkIn.setWalkInReasonId}
+          complaint={walkIn.complaint} setComplaint={walkIn.setComplaint}
+          medicineInput={walkIn.medicineInput} setMedicineInput={walkIn.setMedicineInput}
+          quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
+          medTags={walkIn.medTags}
+          walkInError={walkIn.walkInError}
+          handleAddMedicine={walkIn.handleAddMedicine}
+          handleAddWalkIn={walkIn.handleAddWalkIn}
+          handleClose={walkIn.handleClose}
+          reasonRecords={reasonRecords}
+        />
       )}
     </section>
   );

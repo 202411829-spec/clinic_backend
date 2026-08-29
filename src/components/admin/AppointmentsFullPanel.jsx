@@ -6,14 +6,7 @@ import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
-import { formatLongDate } from "../../lib/calendar";
-
-function toYMD(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { formatLongDate, toYMD } from "../../lib/calendar";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -40,7 +33,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        &#8942;
+        <NavIcon name="dots" />
       </button>
 
       {open && (

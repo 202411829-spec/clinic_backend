@@ -19,6 +19,7 @@ import { saveCertificateDefaults } from "../../lib/certificateSync";
 import { recordsApi } from "../../lib/api";
 import { yearIndexFromLabel, formatYearLabel } from "../../lib/yearLabel";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import { formatDisplayName, computeBmi } from "../../lib/format.js";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
 // once auth is wired up — matches the placeholder used in AdminLayout.
@@ -653,11 +654,6 @@ export default function StudentRecordPanel({ student }) {
       // lab requires physical first — keep hydrated so lab fetch works next time
       setHydrated((p) => ({ ...p, [activeYear]: true }));
       // ensure header reflects new exam
-      setRecords((prev) => {
-        const cur = prev[activeYear];
-        // if dateExamined was empty, backend will have stored provided date; reflect cleared status via date
-        return prev;
-      });
       flashSaved("physical");
     } catch (e) {
       setSaveError(e.message || "Failed to save physical examination");
@@ -1274,20 +1270,4 @@ export default function StudentRecordPanel({ student }) {
       )}
     </div>
   );
-}
-
-/* ---------- helpers ---------- */
-
-function formatDisplayName(name = "") {
-  const [last, rest] = name.split(",").map((p) => p.trim());
-  if (!rest) return name;
-  return `${rest} ${last}`;
-}
-
-function computeBmi(weightKg, heightCm) {
-  const w = parseFloat(weightKg);
-  const h = parseFloat(heightCm);
-  if (!w || !h) return null;
-  const meters = h / 100;
-  return (w / (meters * meters)).toFixed(1);
 }

@@ -10,17 +10,10 @@ import { Link } from "react-router-dom";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { addDays, startOfDay } from "../../lib/calendar.js";
+import { addDays, startOfDay, toYMD } from "../../lib/calendar.js";
 
 function getTomorrow() {
   return addDays(startOfDay(new Date()), 1);
-}
-
-function toYMD(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 // TODO: once the backend exposes an identity mapping endpoint, resolve the

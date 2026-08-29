@@ -13,6 +13,7 @@ import { ChevronLeftIcon } from "../icons.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { formatMDY } from "../../lib/calendar.js";
 import { getCertificateDefaults } from "../../lib/certificateSync.js";
+import { formatDisplayName } from "../../lib/format.js";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
@@ -20,13 +21,6 @@ import healthServicesSeal from "../../assets/certificate/health-services-seal.pn
 
 const PURPOSE_OPTIONS = ["Enrollment", "OJT Internship", "R.L.E"];
 const COPY_LABELS = ["Student's Copy", "Coordinator's Copy", "Registrar's Copy"];
-
-// "Ramos, Joseph Daniel B." -> "Joseph Daniel B. Ramos"
-function formatDisplayName(name = "") {
-  const [last, rest] = name.split(",").map((p) => p.trim());
-  if (!rest) return name;
-  return `${rest} ${last}`;
-}
 
 function pronounFor(sex) {
   return sex?.toLowerCase() === "female" ? "Ms" : "Mr";
@@ -168,7 +162,11 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
   function togglePurpose(label) {
     setPurpose((prev) => {
       const next = new Set(prev);
-      next.has(label) ? next.delete(label) : next.add(label);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
       return next;
     });
   }
@@ -382,7 +380,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           "Download PDF" button — display:none elements have no layout box to snapshot. */}
       <div
         ref={printRef}
-        className="flex flex-col gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait-cert print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
+        className="flex flex-col gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
       >
         {COPY_LABELS.map((label, i) => (
           <CertificateCopy key={label} {...copyProps} copyLabel={label} copyNumber={i + 1} />
