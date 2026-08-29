@@ -164,41 +164,34 @@ def format_log_entry(log, appointments_by_id, students_by_id,
     }
 
 
-def get_all_reference_data():
+def get_all_reference_data(appointment_ids, visit_log_ids):
     """
-    Fetch every table needed to build fully joined log entries,
-    once, so repeated calls don't re-query per row.
+    Fetch the reference data needed to build fully joined log
+    entries for a SPECIFIC set of logs.
+
+    Only the appointments and visit_log_medicines rows the caller
+    already knows it needs are read (via the caller's
+    appointment_ids / visit_log_ids) — never a whole-table pull.
+    students / reasons / medicines come from the shared TTL-cached
+    lookup builders in routers.helpers.
     """
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         appointments_fut = executor.submit(
-            execute_with_retry,
-            supabase
-            .table("appointments")
-            .select("*"),
+            _fetch_appointments_by_id, appointment_ids
         )
         students_fut = executor.submit(build_student_lookup)
         reasons_fut = executor.submit(build_reason_lookup)
         medicines_fut = executor.submit(build_medicine_lookup)
         log_medicine_fut = executor.submit(
-            execute_with_retry,
-            supabase
-            .table("visit_log_medicines")
-            .select("*"),
+            _fetch_log_medicines, visit_log_ids
         )
 
-        appointments_response = appointments_fut.result()
+        appointments_by_id = appointments_fut.result()
         students_by_id = students_fut.result()
         reasons_by_id = reasons_fut.result()
         medicines_by_id = medicines_fut.result()
-        log_medicine_response = log_medicine_fut.result()
-
-    appointments_by_id = {
-        row["appointment_id"]: row
-        for row in (appointments_response.data or [])
-    }
-
-    log_medicine_rows = log_medicine_response.data or []
+        log_medicine_rows = log_medicine_fut.result()
 
     return (
         appointments_by_id,
@@ -613,7 +606,10 @@ def get_logbook_by_student(student_id):
             reasons_by_id,
             log_medicine_rows,
             medicines_by_id
-        ) = get_all_reference_data()
+        ) = get_all_reference_data(
+            appointment_ids,
+            [log.get("visit_log_id") for log in logs]
+        )
 
         formatted = [
             format_log_entry(
@@ -675,16 +671,20 @@ def get_logbook_entry(log_id):
                 "error": "Logbook entry not found"
             }), 404
 
+        log_row = logs[0]
         (
             appointments_by_id,
             students_by_id,
             reasons_by_id,
             log_medicine_rows,
             medicines_by_id
-        ) = get_all_reference_data()
+        ) = get_all_reference_data(
+            [log_row["appointment_id"]] if log_row.get("appointment_id") else [],
+            [log_row["visit_log_id"]]
+        )
 
         formatted = format_log_entry(
-            logs[0],
+            log_row,
             appointments_by_id,
             students_by_id,
             reasons_by_id,

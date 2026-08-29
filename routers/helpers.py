@@ -364,8 +364,23 @@ def format_date_time(created_at):
 
 def get_latest_status_for_appointments(appointment_ids):
     """
-    Returns a dict keyed by appointment_id, with that
-    appointment's most recent status row (or None).
+    Returns a dict keyed by appointment_id, mapping to a
+    {"new_status": ...} row-like dict holding that appointment's
+    CURRENT status.
+
+    Since the perf migration (2026-08-29_perf_current_status.sql)
+    added the denormalized appointments.current_status column — kept
+    in sync by a single SQL write next to every
+    appointment_status_history insert, and backfilled from the latest
+    history row — this is now ONE narrow read of that column instead
+    of pulling every history row for the appointment set.
+
+    Return shape is unchanged from the old history-based version so
+    all callers (appointment.py, dashboard.py) keep working:
+    appointment_id -> {"new_status": <status>}. Appointments with no
+    status at all (e.g. walk-in appointments that never got a history
+    row) have NULL current_status and are omitted — exactly like the
+    old behavior where they had no history rows to match.
     """
 
     if not appointment_ids:
@@ -373,10 +388,9 @@ def get_latest_status_for_appointments(appointment_ids):
 
     response = execute_with_retry(
         supabase
-        .table("appointment_status_history")
-        .select("*")
+        .table("appointments")
+        .select("appointment_id,current_status")
         .in_("appointment_id", appointment_ids)
-        .order("changed_at", desc=True)
     )
 
     rows = response.data or []
@@ -386,10 +400,11 @@ def get_latest_status_for_appointments(appointment_ids):
     for row in rows:
 
         appointment_id = row.get("appointment_id")
+        current_status = row.get("current_status")
 
-        # Rows are already ordered newest-first, so the first
-        # one we see per appointment_id is the latest.
-        if appointment_id not in latest_by_appointment:
-            latest_by_appointment[appointment_id] = row
+        if current_status:
+            latest_by_appointment[appointment_id] = {
+                "new_status": current_status
+            }
 
     return latest_by_appointment

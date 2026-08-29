@@ -1169,6 +1169,16 @@ def update_appointment_status(appointment_id):
             .insert(status_data)
         )
 
+        # Keep the denormalized appointments.current_status column in
+        # sync with the history insert (single write path — the 2026-08-29
+        # perf migration made it the source of truth for status reads).
+        execute_with_retry(
+            supabase
+            .table("appointments")
+            .update({"current_status": new_status})
+            .eq("appointment_id", appointment_id)
+        )
+
         # Auto-create logbook entry when appointment is completed
         logbook_entry = None
         logbook_created = False
@@ -1504,7 +1514,7 @@ def create_appointment():
                 "error": "Failed to create appointment"
             }), 500
 
-        new_appointment = response.data[0]
+        new_appointment = dict(response.data[0])
 
         # Seed the initial status so it shows up for staff. The db stores the
         # lowercase enum value "pending" — never title-case "Pending".
@@ -1519,6 +1529,20 @@ def create_appointment():
                 "changed_by_admin_id": data.get("changed_by")
             })
         )
+
+        # Keep the denormalized appointments.current_status column in sync
+        # with the seeded history row (perf migration source of truth).
+        execute_with_retry(
+            supabase
+            .table("appointments")
+            .update({"current_status": "pending"})
+            .eq("appointment_id", new_appointment.get("appointment_id"))
+        )
+
+        # The row captured from the INSERT predates the sync update, so it
+        # still holds current_status = NULL. Reflect the just-seeded status
+        # in the response payload as well.
+        new_appointment["current_status"] = "pending"
 
         return jsonify({
             "success": True,
@@ -1640,6 +1664,15 @@ def cancel_appointment(appointment_id):
                 "remarks": "Cancelled by student",
                 "changed_by_admin_id": changed_by
             })
+        )
+
+        # Keep the denormalized appointments.current_status column in sync
+        # with the cancellation history row (perf migration source of truth).
+        execute_with_retry(
+            supabase
+            .table("appointments")
+            .update({"current_status": "cancelled"})
+            .eq("appointment_id", appointment_id)
         )
 
         return jsonify({
