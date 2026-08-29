@@ -701,18 +701,22 @@ def get_time_slots():
                     .select("*")
                     .eq("appointment_date", requested_date)
                 )
-                with ThreadPoolExecutor(max_workers=3) as executor:
+                with ThreadPoolExecutor(max_workers=2) as executor:
                     appointment_fut = executor.submit(
                         execute_with_retry, appointment_query
                     )
-                    students_fut = executor.submit(build_student_lookup)
                     reasons_fut = executor.submit(build_reason_lookup)
 
                     appointment_response = appointment_fut.result()
-                    students_by_id = students_fut.result()
                     reasons_by_id = reasons_fut.result()
                 appointments = appointment_response.data or []
                 appointment_ids = [a["appointment_id"] for a in appointments]
+                # Scope the student lookup to this date's appointment
+                # student ids instead of the old whole-table TTL dict
+                # (perf migration).
+                students_by_id = build_student_lookup(
+                    [a.get("student_id") for a in appointments]
+                )
                 latest_status_by_appointment = (
                     get_latest_status_for_appointments(appointment_ids)
                 )
@@ -815,16 +819,14 @@ def get_time_slots():
         # The appointments query is NOT submitted here when no date is
         # given — a schedule_id-only call scopes it to the schedule's
         # resolved time_slot_ids (below), so it depends on slot_response.
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             slot_fut = executor.submit(
                 execute_with_retry,
                 slot_query.order("slot_start", desc=False),
             )
-            students_fut = executor.submit(build_student_lookup)
             reasons_fut = executor.submit(build_reason_lookup)
 
             slot_response = slot_fut.result()
-            students_by_id = students_fut.result()
             reasons_by_id = reasons_fut.result()
 
         slots = slot_response.data or []
@@ -883,6 +885,12 @@ def get_time_slots():
 
         latest_status_by_appointment = (
             get_latest_status_for_appointments(appointment_ids)
+        )
+
+        # Scope the student lookup to this slot set's appointment student
+        # ids instead of the old whole-table TTL dict (perf migration).
+        students_by_id = build_student_lookup(
+            [a.get("student_id") for a in appointments]
         )
 
         # ----------------------------------------------------

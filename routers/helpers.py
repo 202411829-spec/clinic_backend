@@ -242,7 +242,46 @@ def get_lookup(table, id_column):
     return result
 
 
-def build_student_lookup():
+def _merge_student_row(students, row):
+    """
+    Merge a single `student_masterlist` row into a student lookup dict,
+    building the exact field shape build_student_lookup() has always
+    returned: name / age / sex / dept / deptCourse / year_level, keyed by
+    normalize_student_id(student_id).
+    """
+    student_id = row.get("student_id")
+    student_id_key = normalize_student_id(student_id)
+
+    department_name = row.get("department_name") or ""
+    course_name = row.get("course_name") or ""
+
+    # Keep the " - " separator so logbook.py's dept/course parser
+    # keeps splitting on it (Blockers G).
+    if department_name and course_name:
+        dept_course = f"{course_name} - {department_name}"
+    else:
+        dept_course = course_name or department_name or "-"
+
+    students[student_id_key] = {
+        "student_id": student_id,
+        "name": row.get("full_name") or "-",
+        "age": row.get("age") or calculate_age(row.get("birth_date")),
+        "sex": row.get("gender") or "-",
+        # "dept" is required by appointment.py's
+        # GET /appointments/slots booking join — keep it.
+        "dept": department_name or "-",
+        "deptCourse": dept_course,
+        "year_level": row.get("year_level"),
+    }
+
+
+# Cap the fallback ilike leg (mirrors logbook.py's _SEARCH_SCAN_CAP):
+# a wildcard- or whitespace-heavy id list must never pull back a
+# scan-sized result set.
+_STUDENT_LOOKUP_FALLBACK_CAP = 500
+
+
+def build_student_lookup(ids=None):
     """
     Returns a dict keyed by NORMALIZED student_id (see
     normalize_student_id), with fully joined student details:
@@ -253,60 +292,98 @@ def build_student_lookup():
     replacing the legacy 4-table Python merge across personal_information,
     student_name, department, and course_dept.
 
+    `ids` is an iterable of the student_id values the caller needs —
+    normally the DISTINCT student ids already carried on a page of
+    appointments/logbook rows. When provided, ONLY those students are
+    fetched via a bounded .in_("student_id", ids) query — never a
+    whole-table scan. This is the HOT path (logbook list / appointment
+    slots / per-entry joins): the set is page-sized and changes per page,
+    so the scoped result is deliberately NOT cached (caching it per page
+    would just churn the TTL cache with different key sets).
+
+    Registered-student edge case: an appointment's stored id can differ
+    from the masterlist by case/whitespace (manual-entry / walk-in ids).
+    The old whole-table lookup absorbed that drift through
+    normalize_student_id() during the Python join. To preserve that
+    exactly, a bounded, sanitized second query — exact and whitespace-
+    absorbing case-insensitive ilike legs, capped (like logbook.py's
+    _SEARCH_SCAN_CAP) and with wildcard/separator characters escaped —
+    runs ONLY for normalized keys the raw IN did not satisfy.
+
+    With no ids (or only null ids) the result is bounded to {} — an
+    explicit no-op, NEVER a full-table read. Callers that once used the
+    60s-TTL whole-table lookup must pass their concrete id set instead;
+    no caller needs every registered student.
+
     NOTE: keys are normalized, so callers must pass
     normalize_student_id(raw_id) when looking a student up.
     The raw (unmodified) student_id is still preserved in each
     row's "student_id" field for display/response purposes.
     """
-    cache_key = ("build_student_lookup",)
-    now = time.time()
 
-    with _reference_cache_lock:
-        cached = _reference_cache.get(cache_key)
-        if cached is not None:
-            value, fetched_at = cached
-            if now - fetched_at < _REFERENCE_CACHE_TTL:
-                return value
+    if not ids:
+        return {}
+
+    # Dedupe while preserving order; PostgREST's .in_() rejects an empty
+    # list, and null ids can never join the masterlist view anyway.
+    raw_ids = [sid for sid in dict.fromkeys(ids) if sid is not None]
+    if not raw_ids:
+        return {}
 
     response = execute_with_retry(
         supabase
         .table("student_masterlist")
         .select("*")
+        .in_("student_id", raw_ids)
     )
-
-    rows = response.data or []
 
     students = {}
 
-    for row in rows:
+    for row in response.data or []:
+        _merge_student_row(students, row)
 
-        student_id = row.get("student_id")
-        student_id_key = normalize_student_id(student_id)
+    needed_keys = [normalize_student_id(sid) for sid in raw_ids]
+    missing_keys = [key for key in needed_keys if key and key not in students]
 
-        department_name = row.get("department_name") or ""
-        course_name = row.get("course_name") or ""
+    if missing_keys:
 
-        # Keep the " - " separator so logbook.py's dept/course parser
-        # keeps splitting on it (Blockers G).
-        if department_name and course_name:
-            dept_course = f"{course_name} - {department_name}"
-        else:
-            dept_course = course_name or department_name or "-"
+        # Sanitize each key before it enters an ilike leg: a raw `%`/`_`
+        # would act as a SQL wildcard and a `,` would split the PostgREST
+        # or-list (400) — escape the wildcards and strip commas. The
+        # strict normalized-equality guard below still keys off the
+        # ORIGINAL normalized value, so a broadened leg can never merge
+        # the wrong student or overwrite an exact row.
+        sanitized_keys = [
+            key.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+            .replace(",", "")
+            for key in missing_keys
+        ]
+        or_legs = []
+        for key in sanitized_keys:
+            or_legs.append(f"student_id.ilike.{key}")
+            # Contains-leg absorbs masterlist-side leading/trailing
+            # whitespace (e.g. " 2021-0001 " vs "2021-0001") that an
+            # exact ilike can't see; only the exact normalized-equality
+            # guard below accepts a hit.
+            or_legs.append(f"student_id.ilike.*{key}*")
 
-        students[student_id_key] = {
-            "student_id": student_id,
-            "name": row.get("full_name") or "-",
-            "age": row.get("age") or calculate_age(row.get("birth_date")),
-            "sex": row.get("gender") or "-",
-            # "dept" is required by appointment.py's
-            # GET /appointments/slots booking join — keep it.
-            "dept": department_name or "-",
-            "deptCourse": dept_course,
-            "year_level": row.get("year_level"),
-        }
+        fallback_response = execute_with_retry(
+            supabase
+            .table("student_masterlist")
+            .select("*")
+            .or_(",".join(or_legs))
+            .range(0, _STUDENT_LOOKUP_FALLBACK_CAP - 1)
+        )
 
-    with _reference_cache_lock:
-        _reference_cache[cache_key] = (students, time.time())
+        missing_set = set(missing_keys)
+
+        for row in fallback_response.data or []:
+            # Only back-fill keys the raw IN left unmatched — never let a
+            # case-insensitive hit overwrite an exact-match row.
+            if normalize_student_id(row.get("student_id")) in missing_set:
+                _merge_student_row(students, row)
 
     return students
 

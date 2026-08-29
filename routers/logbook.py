@@ -172,15 +172,15 @@ def get_all_reference_data(appointment_ids, visit_log_ids):
     Only the appointments and visit_log_medicines rows the caller
     already knows it needs are read (via the caller's
     appointment_ids / visit_log_ids) — never a whole-table pull.
-    students / reasons / medicines come from the shared TTL-cached
-    lookup builders in routers.helpers.
+    Student details are scoped to the appointment student ids via
+    build_student_lookup(ids); reasons / medicines come from the
+    shared TTL-cached lookup builders in routers.helpers.
     """
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         appointments_fut = executor.submit(
             _fetch_appointments_by_id, appointment_ids
         )
-        students_fut = executor.submit(build_student_lookup)
         reasons_fut = executor.submit(build_reason_lookup)
         medicines_fut = executor.submit(build_medicine_lookup)
         log_medicine_fut = executor.submit(
@@ -188,10 +188,20 @@ def get_all_reference_data(appointment_ids, visit_log_ids):
         )
 
         appointments_by_id = appointments_fut.result()
-        students_by_id = students_fut.result()
         reasons_by_id = reasons_fut.result()
         medicines_by_id = medicines_fut.result()
         log_medicine_rows = log_medicine_fut.result()
+
+    # The student lookup depends on the appointments read — scope it to
+    # those appointments' student ids instead of the old whole-table TTL
+    # dict (perf migration).
+    students_by_id = build_student_lookup(
+        [
+            row.get("student_id")
+            for row in appointments_by_id.values()
+            if row.get("student_id") is not None
+        ]
+    )
 
     return (
         appointments_by_id,
@@ -533,12 +543,20 @@ def get_logbook():
         total = response.count if response.count is not None else len(logs)
 
         # --- Resolve display names from cache + per-page reads ---
-        students_by_id = build_student_lookup()
-        reasons_by_id = build_reason_lookup()
-        medicines_by_id = build_medicine_lookup()
-
         page_appointment_ids = [log.get("appointment_id") for log in logs]
         appointments_by_id = _fetch_appointments_by_id(page_appointment_ids)
+
+        # Scope the student lookup to this page's appointment student ids
+        # instead of the old whole-table TTL dict (perf migration).
+        students_by_id = build_student_lookup(
+            [
+                row.get("student_id")
+                for row in appointments_by_id.values()
+                if row.get("student_id") is not None
+            ]
+        )
+        reasons_by_id = build_reason_lookup()
+        medicines_by_id = build_medicine_lookup()
 
         log_medicine_rows = [
             medicine_row
