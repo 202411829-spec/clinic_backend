@@ -21,7 +21,8 @@ export default function StudentSignUp() {
     setError('')
     setLoading(true)
     try {
-      await studentSignIn(email, password)
+      const studentId = email.split('@')[0]
+      await studentSignIn(studentId, password)
       navigate('/student')
     } catch (err) {
       setError(
