@@ -224,7 +224,7 @@ const [slots, setSlots] = useState([]);
     let cancelled = false;
     setPendingCheckStatus("loading");
     appointmentsApi
-      .list()
+      .list({ student_id: studentId, date_from: toYMD(new Date()) })
       .then((res) => {
         if (cancelled) return;
         const rows = res?.appointments || [];

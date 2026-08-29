@@ -124,6 +124,10 @@ _STATUS_LABELS = {
     "cancelled": "Cancelled",
 }
 
+# Default page size for the root /appointments list when the caller omits
+# `limit`. The root list call must never read the whole table.
+_APPOINTMENTS_DEFAULT_LIMIT = 50
+
 
 def _normalize_status(status):
     """
@@ -438,18 +442,33 @@ def get_appointments():
 
     try:
         requested_date = request.args.get("date")
+        student_id = request.args.get("student_id")
+        date_from = request.args.get("date_from")
 
-        # Optional pagination. When omitted, preserve the existing
-        # behaviour of returning every matching row (the student
-        # UpcomingAppointmentPanel depends on fetching all of a
-        # student's future appointments across dates to find the
-        # nearest one).
+        # Optional pagination. Semantics:
+        #  - An explicit `limit` is always honored (paginated Admin/other
+        #    callers control their page size directly).
+        #  - A SCOPED call (student_id and/or date_from, or a literal
+        #    `date`) is naturally page-sized — the future/upcoming set for
+        #    one student (or one day) — so it is returned unbounded and is
+        #    NOT capped. This is what the student UpcomingAppointmentPanel
+        #    and Book pending-guard rely on after migrating to student_id +
+        #    date_from below.
+        #  - ONLY a truly bare call (no student_id, no date_from, no
+        #    `date`, no explicit limit) falls back to a bounded default page
+        #    so it can never read the whole table. No production caller
+        #    hits this bare path anymore.
+        limit_arg = request.args.get("limit")
+        has_explicit_limit = limit_arg is not None and str(limit_arg).strip() != ""
         try:
-            limit = int(request.args.get("limit", 0))
+            limit = int(limit_arg) if has_explicit_limit else 0
         except (TypeError, ValueError):
             limit = 0
         if limit < 0:
             limit = 0
+        is_scoped = bool(student_id) or bool(date_from) or bool(requested_date)
+        if limit == 0 and not is_scoped:
+            limit = _APPOINTMENTS_DEFAULT_LIMIT
 
         try:
             page = int(request.args.get("page", 1))
@@ -469,6 +488,11 @@ def get_appointments():
                 "appointment_date",
                 requested_date
             )
+
+        if student_id:
+            query = query.eq("student_id", student_id)
+        if date_from:
+            query = query.gte("appointment_date", date_from)
 
         query = (
             query
@@ -588,6 +612,15 @@ def get_time_slots():
 
         schedule_id = request.args.get("schedule_id")
         requested_date = request.args.get("date")
+
+        # No schedule and no date -> nothing to scope the response to.
+        # Without either we would have to read every slot and every
+        # appointment in the system, so reject the open-ended call.
+        if not schedule_id and not requested_date:
+            return jsonify({
+                "success": False,
+                "error": "Either 'schedule_id' or 'date' is required."
+            }), 400
 
         # ----------------------------------------------------
         # Booking window defense-in-depth: students may only query
@@ -778,42 +811,65 @@ def get_time_slots():
                     _override.get("schedule_id")
                 )
 
-        # ----------------------------------------------------
-        # Fetch appointments (optionally filtered by date),
-        # since bookings are grouped by slot_id
-        # ----------------------------------------------------
-
-        appointment_query = (
-            supabase
-            .table("appointments")
-            .select("*")
-        )
-
-        if requested_date:
-            appointment_query = appointment_query.eq(
-                "appointment_date",
-                requested_date
-            )
-
-        # Fetch time slots, appointments, and the student/reason
-        # lookups concurrently — all independent queries.
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # Fetch time slots plus the student/reason lookups concurrently.
+        # The appointments query is NOT submitted here when no date is
+        # given — a schedule_id-only call scopes it to the schedule's
+        # resolved time_slot_ids (below), so it depends on slot_response.
+        with ThreadPoolExecutor(max_workers=3) as executor:
             slot_fut = executor.submit(
                 execute_with_retry,
                 slot_query.order("slot_start", desc=False),
-            )
-            appointment_fut = executor.submit(
-                execute_with_retry, appointment_query
             )
             students_fut = executor.submit(build_student_lookup)
             reasons_fut = executor.submit(build_reason_lookup)
 
             slot_response = slot_fut.result()
-            appointment_response = appointment_fut.result()
             students_by_id = students_fut.result()
             reasons_by_id = reasons_fut.result()
 
         slots = slot_response.data or []
+
+        # ----------------------------------------------------
+        # Fetch appointments for the scoped set of time slots,
+        # since bookings are grouped by slot_id.
+        #
+        # Date calls filter appointments by appointment_date (indexed,
+        # naturally page-sized). Schedule_id-only calls resolve the
+        # schedule's slot_ids first and scope appointments with a bounded
+        # IN lookup — previously this was an unconditional read of the
+        # ENTIRE appointments table. A schedule with no slots short-circuits
+        # with an impossible equality so the query returns zero rows
+        # instead of scanning the table.
+        # ----------------------------------------------------
+
+        if requested_date:
+            appointment_query = (
+                supabase
+                .table("appointments")
+                .select("*")
+                .eq("appointment_date", requested_date)
+            )
+        else:
+            slot_ids = [
+                s.get("slot_id")
+                for s in slots
+                if s.get("slot_id") is not None
+            ]
+            appointment_query = (
+                supabase
+                .table("appointments")
+                .select("*")
+            )
+            if slot_ids:
+                appointment_query = appointment_query.in_(
+                    "time_slot_id", slot_ids
+                )
+            else:
+                appointment_query = appointment_query.eq(
+                    "appointment_id", -1
+                )
+
+        appointment_response = execute_with_retry(appointment_query)
 
         appointments = appointment_response.data or []
 

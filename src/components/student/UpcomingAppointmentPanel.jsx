@@ -52,11 +52,11 @@ export default function UpcomingAppointmentPanel() {
   useEffect(() => {
     if (!studentId) return undefined;
     let cancelled = false;
+    const today = toYMD(new Date());
     appointmentsApi
-      .list()
+      .list({ student_id: studentId, date_from: today })
       .then((res) => {
         if (cancelled) return;
-        const today = toYMD(new Date());
         const mine = (res?.appointments || [])
           .filter((a) => {
             if (String(a.student_id).toUpperCase().trim() !== String(studentId).toUpperCase().trim())

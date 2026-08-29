@@ -210,70 +210,30 @@ def get_all_reference_data(appointment_ids, visit_log_ids):
 # default "show the latest page" request read every row ever
 # logged. Filtering and pagination now happen in Postgres:
 #
-#   * date_from/date_to  -> gte/lte on appointments.appointment_date
-#   * reason_id          -> eq on appointments.reason_id
-#   * search             -> ilike across student/master/medicine fields
+#   * date_from/date_to  -> prefixed gte/lte on appointments (relationship)
+#   * reason_id          -> prefixed eq on appointments (relationship)
+#   * department/course  -> prefixed eq on appointments.students (FK join —
+#                           never a student_id IN list)
+#   * search             -> bounded ilike legs (capped scans) that resolve
+#                           to a bounded appointment_id IN list
 #   * page/page_size     -> .range() offset/limit, with count='exact'
 #
 # Only the requested page of `visit_logs` is fetched; display names
 # are then resolved from the cached lookup helpers and a per-page
-# appointments / visit_log_medicines read (never a whole-table pull).
+# appointments read. The page's visit_log_medicines rows are embedded
+# in the same query (one round-trip, page-sized).
+#
+# NO FULL-TABLE SCANS HERE: the date/reason/department/course filters
+# are relationship filters on the page query itself, and the free-text
+# search caps every ilike leg (see _SEARCH_SCAN_CAP) so a broad term
+# can never scan the whole students/appointments/visit_logs/
+# visit_log_medicines tables.
 # ============================================================
 
-def _scope_appointment_ids(date_from, date_to, reason_id):
-    """
-    Return the list of appointment_ids that fall within the
-    requested date window and reason. Returns None when no
-    date/reason restriction is given (caller must not filter
-    by appointment_id in that case).
-    """
-    if not date_from and not date_to and not reason_id:
-        return None
-
-    query = supabase.table("appointments").select("appointment_id")
-
-    if date_from:
-        query = query.gte("appointment_date", date_from)
-    if date_to:
-        query = query.lte("appointment_date", date_to)
-    if reason_id:
-        query = query.eq("reason_id", reason_id)
-
-    response = execute_with_retry(query)
-    return [row["appointment_id"] for row in (response.data or [])]
-
-
-def _scope_appointment_ids_by_student(base_scope, department_id, course_id):
-    """
-    Return the list of appointment_ids whose student matches the given
-    department_id and/or course_id (the students table exposes these as
-    FKs). When called, at least one of department_id/course_id is set.
-    The result is the appointment set for those students intersected
-    with `base_scope` (an appointment_id list or None for "no restriction").
-    """
-    student_query = supabase.table("students").select("student_id")
-    if department_id is not None:
-        student_query = student_query.eq("department_id", department_id)
-    if course_id is not None:
-        student_query = student_query.eq("course_id", course_id)
-
-    student_response = execute_with_retry(student_query)
-    student_ids = [row["student_id"] for row in (student_response.data or [])]
-
-    if not student_ids:
-        return []
-
-    appointment_ids = _collected_ids(
-        supabase.table("appointments")
-        .select("appointment_id")
-        .in_("student_id", student_ids)
-    )
-
-    if base_scope is not None:
-        base_set = set(base_scope)
-        appointment_ids = [aid for aid in appointment_ids if aid in base_set]
-
-    return appointment_ids
+# Max rows a single free-text search leg may read. Search results feed a
+# paginated list, so a term that matches this many rows is already a
+# degenerate query — capping keeps the ilike from being a full scan.
+_SEARCH_SCAN_CAP = 500
 
 
 def _collected_ids(query):
@@ -281,21 +241,36 @@ def _collected_ids(query):
     return [row["appointment_id"] for row in (response.data or [])]
 
 
-def _search_appointment_ids(scope, search):
+def _search_appointment_ids(search):
     """
-    Return the appointment_ids whose joined row matches the free-text
-    `search` term, intersected with the given date/reason `scope`
-    (list of appointment_ids or None). The search mirrors the fields
-    the UI searches: student name / student_id / dept / course,
-    log complaint, walk-in name / dept-course, and dispensed medicine.
-    Each term is pushed to Postgres as an ilike so only matching logs
-    are ever pulled.
+    Return the bounded list of appointment_ids whose joined row matches
+    the free-text `search` term — same OR-across-fields semantics as
+    before (student name / student_id / dept / course text on the
+    masterlist view, log complaint, walk-in name / dept-course, and the
+    dispensed medicine snapshot). Each leg is pushed to Postgres as an
+    ilike and CAPPED with .range() so no leg can scan its whole table;
+    the student/medicine legs map back to appointments with a single
+    bounded, index-backed IN lookup.
+
+    NOTE: every ilike leg is capped at `_SEARCH_SCAN_CAP` rows. When a
+    term matches MORE than that many rows, the leg TRUNCATES to the first
+    `_SEARCH_SCAN_CAP` matches (PostgREST range) — so the resolved
+    appointment set is a sample of the matches, and any downstream
+    "total" derived from this set reflects the CAPPED set, not the true
+    match count. Search is best-effort: cached/page-sized, never a full
+    scan.
+
+    The date/reason/department/course filters are NOT applied here —
+    they live on the page query as relationship filters. This function
+    only resolves the (possibly empty) appointment set for `search`.
     """
     like = f"%{search}%"
     matched = set()
 
     # a) Registered students: match the flattened masterlist view, then
-    #    map back to appointments (and any logs that carry a student_id).
+    #    map the matched student_ids to their appointments. (Log rows
+    #    don't set student_id in any write path — it's carried on the
+    #    appointment — so there's no separate visit_logs-list leg.)
     student_response = execute_with_retry(
         supabase
         .table("student_masterlist")
@@ -306,19 +281,13 @@ def _search_appointment_ids(scope, search):
             f"department_name.ilike.{like},"
             f"course_name.ilike.{like}"
         )
+        .range(0, _SEARCH_SCAN_CAP - 1)
     )
     student_ids = [row["student_id"] for row in (student_response.data or [])]
     if student_ids:
         matched.update(
             _collected_ids(
                 supabase.table("appointments")
-                .select("appointment_id")
-                .in_("student_id", student_ids)
-            )
-        )
-        matched.update(
-            _collected_ids(
-                supabase.table("visit_logs")
                 .select("appointment_id")
                 .in_("student_id", student_ids)
             )
@@ -334,14 +303,17 @@ def _search_appointment_ids(scope, search):
                 f"walk_in_name.ilike.{like},"
                 f"walk_in_department_course.ilike.{like}"
             )
+            .range(0, _SEARCH_SCAN_CAP - 1)
         )
     )
 
-    # c) Dispensed medicine (medicine_name snapshot on visit_log_medicines).
+    # c) Dispensed medicine (medicine_name snapshot), then map the
+    #    matched visit_logs back to appointments in one bounded lookup.
     medicine_response = execute_with_retry(
         supabase.table("visit_log_medicines")
         .select("visit_log_id")
         .ilike("medicine_name", like)
+        .range(0, _SEARCH_SCAN_CAP - 1)
     )
     med_log_ids = [row["visit_log_id"] for row in (medicine_response.data or [])]
     if med_log_ids:
@@ -353,11 +325,61 @@ def _search_appointment_ids(scope, search):
             )
         )
 
-    if scope is not None:
-        scope_set = set(scope)
-        matched = {aid for aid in matched if aid in scope_set}
-
+    matched.discard(None)
     return list(matched)
+
+
+def _logbook_page_query_params(date_from, date_to, reason_id,
+                               department_id, course_id):
+    """
+    Build (select_string, embedded_filters) for the logbook page query.
+
+    date/reason/department/course are pushed to Postgres as RELATIONSHIP
+    filters instead of a precomputed appointment_id IN list:
+      * appointments!inner(...)        — the log's appointment
+      * appointments.students!inner()  — the student's department / course
+        via the appointments.student_id FK (NEVER a student_id IN list)
+    Filters are applied as prefixed Top-level params
+    ("appointments.appointment_date", "appointments.students.department_id"),
+    the form this deployment's PostgREST serves with an exact count, and
+    which keeps raw query values out of the select string.
+
+    Returns a plain "*" select (plus the per-page medicines embed) with
+    no filters when no scope is requested — the page then reads every
+    log, exactly like the unfiltered default.
+    """
+    has_scope = bool(
+        date_from or date_to or reason_id
+        or department_id is not None or course_id is not None
+    )
+    meds_embed = "visit_log_medicines(visit_log_id,medicine_id,medicine_name,quantity_dispensed)"
+    if not has_scope:
+        return f"*,{meds_embed}", []
+
+    select_str = (
+        "*,appointments!inner(appointment_date,reason_id,"
+        "students!inner(department_id,course_id)),"
+    ) + meds_embed
+
+    filters = []
+    if date_from:
+        filters.append(("appointments.appointment_date", "gte", date_from))
+    if date_to:
+        filters.append(("appointments.appointment_date", "lte", date_to))
+    if reason_id:
+        filters.append(("appointments.reason_id", "eq", reason_id))
+    if department_id is not None:
+        filters.append(("appointments.students.department_id", "eq", department_id))
+    if course_id is not None:
+        filters.append(("appointments.students.course_id", "eq", course_id))
+
+    return select_str, filters
+
+
+def _apply_logbook_filters(query, embedded_filters):
+    for column, operator, criteria in embedded_filters:
+        query = query.filter(column, operator, criteria)
+    return query
 
 
 def _fetch_appointments_by_id(appointment_ids):
@@ -385,19 +407,21 @@ def _fetch_log_medicines(visit_log_ids):
     return response.data or []
 
 
-def _count_scoped_logs(appointment_scope):
+def _count_scoped_logs(select_str, embedded_filters, appointment_ids):
     """
     Return the exact number of visit_logs matching the given
-    appointment_id scope (None = every log). Used only to back-fill
-    the `total` for pages that fall past the end of the data (which
-    PostgREST rejects with a "range not satisfiable" error).
+    relationship filters and/or appointment_id set (None = every log).
+    Used only to back-fill the `total` for pages that fall past the end
+    of the data (which PostgREST rejects with a "range not satisfiable"
+    error).
     """
     query = (
         supabase.table("visit_logs")
-        .select("visit_log_id", count="exact")
+        .select(select_str, count="exact")
     )
-    if appointment_scope is not None:
-        query = query.in_("appointment_id", appointment_scope)
+    query = _apply_logbook_filters(query, embedded_filters)
+    if appointment_ids is not None:
+        query = query.in_("appointment_id", appointment_ids)
 
     try:
         # limit to 1 row; PostgREST still reports the exact total in
@@ -441,21 +465,15 @@ def get_logbook():
         page = max(1, request.args.get("page", default=1, type=int))
         page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
 
-        # --- Scope candidate appointments by date/reason in SQL ---
-        appointment_scope = _scope_appointment_ids(date_from, date_to, reason_id)
-
-        # --- Free-text search also returns a scoped appointment list ---
+        # --- Free-text search resolves to a bounded appointment set ---
+        # (date/reason/department/course are NOT materialized here — they
+        # are pushed into the page query below as relationship filters.)
+        appointment_ids = None
         if search:
-            appointment_scope = _search_appointment_ids(appointment_scope, search)
+            appointment_ids = _search_appointment_ids(search)
 
-        # --- Filter by student's department/course (independent filters) ---
-        if department_id is not None or course_id is not None:
-            appointment_scope = _scope_appointment_ids_by_student(
-                appointment_scope, department_id, course_id
-            )
-
-        # Nothing matched the filters — short-circuit instead of querying.
-        if appointment_scope == []:
+        # Nothing matched the free-text search — short-circuit.
+        if appointment_ids == []:
             return jsonify({
                 "success": True,
                 "count": 0,
@@ -466,18 +484,29 @@ def get_logbook():
             })
 
         # --- Fetch only the requested page of logs (exact count) ---
+        # date/reason/department/course filters are applied here as
+        # PostgREST relationship filters (no student_id / appointment_id
+        # IN list, no full-table ilike), and this same query embeds the
+        # page's visit_log_medicines rows so no extra round-trip is needed.
+        select_str, embedded_filters = _logbook_page_query_params(
+            date_from, date_to, reason_id, department_id, course_id
+        )
+
         start = (page - 1) * page_size
         end = start + page_size - 1
 
-        logs_query = (
-            supabase.table("visit_logs")
-            .select("*", count="exact")
-            .order("created_at", desc=True)
-            .order("visit_log_id", desc=True)
-            .range(start, end)
+        logs_query = _apply_logbook_filters(
+            (
+                supabase.table("visit_logs")
+                .select(select_str, count="exact")
+                .order("created_at", desc=True)
+                .order("visit_log_id", desc=True)
+                .range(start, end)
+            ),
+            embedded_filters
         )
-        if appointment_scope is not None:
-            logs_query = logs_query.in_("appointment_id", appointment_scope)
+        if appointment_ids is not None:
+            logs_query = logs_query.in_("appointment_id", appointment_ids)
 
         try:
             response = execute_with_retry(logs_query)
@@ -488,7 +517,9 @@ def get_logbook():
             # surfacing a 500 — keeping the exact response contract.
             code = getattr(e, "code", "") or ""
             if code == "PGRST103" or "not satisfiable" in str(e):
-                total = _count_scoped_logs(appointment_scope)
+                total = _count_scoped_logs(
+                    select_str, embedded_filters, appointment_ids
+                )
                 return jsonify({
                     "success": True,
                     "count": 0,
@@ -509,8 +540,11 @@ def get_logbook():
         page_appointment_ids = [log.get("appointment_id") for log in logs]
         appointments_by_id = _fetch_appointments_by_id(page_appointment_ids)
 
-        page_log_ids = [log.get("visit_log_id") for log in logs]
-        log_medicine_rows = _fetch_log_medicines(page_log_ids)
+        log_medicine_rows = [
+            medicine_row
+            for log in logs
+            for medicine_row in (log.get("visit_log_medicines") or [])
+        ]
 
         formatted = [
             format_log_entry(
