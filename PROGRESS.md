@@ -1,8 +1,17 @@
 # Project Progress
-Updated: 2026-08-29
+Updated: 2026-08-30
 
 ## Current Goal
-Code audit + cleanliness cleanup (backend + frontend) — both committed, pending push.
+Student sign-up feature (backend + frontend) — DONE, committed, pushed, QA PASS.
+
+## Student sign-up feature: DONE ✅
+- Backend `routers/auth.py` (`021d091`, `37397ca`, `da2850f`): `POST /api/auth/check-email`, `/send-code`, `/signup`. Domain check `@gordoncollege.edu.ph`. In-memory `_verification_codes` (5-min TTL).
+- Email delivery (`37397ca`): Gmail SMTP first (real delivery to `@gordoncollege.edu.ph` inboxes, no domain verification needed), Resend fallback, then console-log; always 200, never 500. SMTP creds in `.env`.
+- Auto-confirm fix (`da2850f`): replaced `supabase.auth.sign_up()` with `admin.create_user(..., email_confirm=True)` — removes Supabase's redundant "confirm your email" email and unblocks auto-login.
+- Frontend (`021d091`): `StudentSignUp.jsx`, `StudentSignUpForm.jsx` (3-step email→code→password), `/student/signup` route, link in `StudentLoginForm.jsx`, `authApi` in `src/lib/api.js`.
+- Auto-login bug fix (`316bacd`): was passing full email (double `@gordoncollege.edu.ph`); now passes email local part only.
+- QA PASS (no functional bugs): live end-to-end via real Supabase — signup 201, sign_in_with_password succeeds instantly (email auto-confirmed, `email_confirmed_at` set), student token accepted, build 0 errors/0 warnings.
+- Commit set: `021d091`, `37397ca`, `316bacd`, `da2850f` — all pushed, origin/main in sync.
 
 ## Code audit + cleanup (DONE, committed)
 - Audit (2 agents): backend + frontend — healthy (builds clean, no broken code), main issue = copy-paste duplication + dead code.
