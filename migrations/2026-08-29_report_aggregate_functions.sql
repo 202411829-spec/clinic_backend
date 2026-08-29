@@ -59,10 +59,12 @@ DECLARE
 BEGIN
     FOREACH v_key IN ARRAY v_fields LOOP
         EXECUTE format(
-            'SELECT coalesce(json_agg(x ORDER BY x.cnt DESC), ''[]''::json)'
+            'SELECT coalesce('
+            '  json_agg(j ORDER BY (j->>''count'')::int DESC),'
+            '  ''[]''::json'
+            ' )'
             ' FROM ('
-            '  SELECT json_build_object(%L, %I, ''count'', count(*)::int) AS j,'
-            '         count(*)::int AS cnt'
+            '  SELECT json_build_object(%L, %I, ''count'', count(*)::int) AS j'
             '  FROM report_appointment_rows'
             '  WHERE %s'
             '  GROUP BY %I'
