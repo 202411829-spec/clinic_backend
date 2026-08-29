@@ -101,6 +101,13 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
         College to process your personal and sensitive information, pursuant
         to the Gordon College Privacy Notice and Applicable laws
       </p>
+
+      <p className="mt-5 text-center text-sm text-gray-600">
+        Don't have an account?{' '}
+        <a href="/student/signup" className="font-semibold text-gc-accent hover:text-gc-green-600">
+          Sign up
+        </a>
+      </p>
     </form>
   )
 }

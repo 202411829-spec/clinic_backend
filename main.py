@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 
+from routers.auth import auth_bp
 from routers.student import student_bp
 from routers.appointment import appointment_bp
 from routers.dashboard import dashboard_bp
@@ -28,7 +29,7 @@ app = Flask(__name__)
 # =========================
 _origins = [
     origin.strip()
-    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
+    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174").split(",")
     if origin.strip()
 ]
 
@@ -42,6 +43,7 @@ CORS(
 # =========================
 # REGISTER ROUTERS
 # =========================
+app.register_blueprint(auth_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(appointment_bp)
 app.register_blueprint(dashboard_bp)

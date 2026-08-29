@@ -152,3 +152,30 @@ export const recordsApi = {
   medicalSummary: (studentId) => api.get(`/api/records/${studentId}/medical-summary`),
   updateProfile: (studentId, body) => api.patch(`/api/records/${studentId}/profile`, body),
 }
+
+// ---- Public Student Sign-up ----
+// These endpoints are unauthenticated (the student has no session yet), so
+// they use a raw fetch instead of the `api` helper above — that helper would
+// attach a Bearer token and bounce to login on any 401, which is wrong for
+// the pre-auth sign-up flow. TODO: move behind a backend /auth router once
+// the Python endpoints are finalized.
+async function authRequest(path, body) {
+  const response = await fetch(new URL(path, API_BASE_URL), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  const data = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(data?.error || data?.detail || `Request failed (${response.status})`)
+  }
+  return data
+}
+
+export const authApi = {
+  checkEmail: (email) => authRequest('/api/auth/check-email', { email }),
+  sendCode: (email) => authRequest('/api/auth/send-code', { email }),
+  signup: (payload) => authRequest('/api/auth/signup', payload),
+}
