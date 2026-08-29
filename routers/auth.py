@@ -297,14 +297,26 @@ def signup():
     if existing_account.data:
         return error_response("An account with this email already exists.", 409)
 
-    # --- create Supabase auth user ---
-    auth_result = supabase.auth.sign_up({"email": email, "password": password})
+    # --- create Supabase auth user (admin API, auto-confirm) ---
+    # Using admin.create_user with email_confirm=True bypasses
+    # Supabase's built-in email confirmation flow.  We already verified
+    # the email with our own 6-digit code, so the double-confirmation
+    # would just block login with "Email not confirmed".
+    try:
+        auth_result = supabase.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+        })
+    except Exception as exc:
+        exc_str = str(exc).lower()
+        if "already" in exc_str or "exists" in exc_str:
+            return error_response("An account with this email already exists.", 409)
+        logger.error("Admin create_user failed: %r", exc)
+        return error_response(f"Failed to create auth user: {exc}", 500)
 
     if auth_result.user is None:
-        error_msg = "Failed to create auth user."
-        if auth_result.session is None and hasattr(auth_result, "error") and auth_result.error:
-            error_msg = str(auth_result.error)
-        return error_response(error_msg, 500)
+        return error_response("Failed to create auth user.", 500)
 
     auth_user_id = auth_result.user.id
     student_id = _extract_student_id(email)
