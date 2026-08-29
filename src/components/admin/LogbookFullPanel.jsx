@@ -5,7 +5,19 @@ import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
 import { formatMDY } from "../../lib/calendar.js";
 
+import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
+import oswsSeal from "../../assets/certificate/osws-seal.png";
+import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+
 const PAGE_SIZE = 20;
+
+// "YYYY-MM-DD" (from <input type="date">) -> "MM/DD/YYYY" for print/PDF labels.
+function fmtDate(iso) {
+  if (!iso) return "All";
+  const parts = String(iso).split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
 
 // Map a backend /logbook row onto the shape this panel renders.
 function mapEntry(r) {
@@ -293,91 +305,150 @@ export default function LogbookFullPanel() {
     setShowWalkInForm(false);
   }
 
+  // Labels for the active filters, used for the print/PDF summary metadata line
+  // (mirrors Reports' "period — department" convention).
+  const departmentLabel = departments.find((d) => String(d.value) === String(departmentFilter))?.label;
+  const courseLabel = courses.find((c) => String(c.value) === String(courseFilter))?.label;
+  const reasonLabel = reasonRecords.find((r) => String(r.reason_id) === String(reasonFilter))?.description;
+  const dateSummary = dateFrom || dateTo ? `${fmtDate(dateFrom)} to ${fmtDate(dateTo)}` : "All Dates";
+  const printSummary = `${dateSummary} — ${departmentLabel || "All Departments"} — ${courseLabel || "All Course"} — ${reasonLabel || "All Reasons"}${search ? ` — Search: "${search}"` : ""} — Total: ${totalEntries} entries`;
+
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   function handlePrint() {
     window.print();
   }
 
-  // Generates an A4-portrait PDF containing ONLY the logbook table (header +
-  // visible rows) with a small page-number footer — same lazy import("jspdf")
-  // pattern as ReportsFullPanel.
+  // Generates an A4-portrait PDF in the same visual language as ReportsFullPanel:
+  // Reports' letterhead + "Clinic Logbook" title + filter metadata, then the
+  // boxed logbook table (header + visible rows) with a small page-number footer.
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const margin = 10;
+      let y = 18;
+
+      // Letterhead — mirrors ReportsFullPanel's PDF header block.
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("GORDON COLLEGE", 105, y, { align: "center" });
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+      doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
+      y += 10;
+
+      // Title — mirrors Reports' "Clinic Report" line.
+      doc.setFontSize(16);
+      doc.setFont(undefined, "bold");
+      doc.text("Clinic Logbook", 14, y);
+      y += 8;
+
+      // Metadata — mirrors Reports' "Period:"/"Department:" lines.
+      doc.setFontSize(10);
+      doc.setFont(undefined, "normal");
+      doc.setTextColor("#000000");
+      doc.text(`Date: ${dateFrom ? fmtDate(dateFrom) : "All"} to ${dateTo ? fmtDate(dateTo) : "All"}`, 14, y);
+      y += 5;
+      doc.text(`Department: ${departmentLabel || "All"}`, 14, y);
+      y += 5;
+      doc.text(`Course: ${courseLabel || "All"}`, 14, y);
+      y += 5;
+      doc.text(`Reason: ${reasonLabel || "All Reasons"}`, 14, y);
+      if (search) {
+        y += 5;
+        doc.text(`Search: ${search}`, 14, y);
+      }
+      y += 5;
+      doc.text(`Total entries: ${totalEntries}`, 14, y);
+      y += 10;
+
+      const margin = 14;
       const pageW = 210 - margin * 2;
-      let y = 0;
+      const cols = [
+        { label: "Date & Time", w: 22 },
+        { label: "Student ID", w: 18 },
+        { label: "Name", w: 26 },
+        { label: "Age", w: 9 },
+        { label: "Dept / Course", w: 26 },
+        { label: "Sex", w: 10 },
+        { label: "Reason", w: 24 },
+        { label: "Complaint", w: 24 },
+        { label: "Medicine", w: 21 },
+      ];
+      // Give the widest free column whatever's left so the widths total pageW.
+      cols[8].w += pageW - cols.reduce((sum, c) => sum + c.w, 0);
+      const colX = [];
+      let x = margin;
+      cols.forEach((c) => { colX.push(x); x += c.w; });
+      const headerH = 7;
+      const rowH = 7;
+      let pageNum = 1;
 
-      function drawTable(rows) {
-        const cols = [
-          { label: "Date & Time", w: 22 },
-          { label: "Student ID", w: 18 },
-          { label: "Name", w: 26 },
-          { label: "Age", w: 9 },
-          { label: "Dept / Course", w: 26 },
-          { label: "Sex", w: 10 },
-          { label: "Reason", w: 24 },
-          { label: "Complaint", w: 24 },
-          { label: "Medicine", w: 21 },
-        ];
-        const colX = [];
-        let x = margin;
-        cols.forEach((c) => { colX.push(x); x += c.w; });
-        const headerH = 7;
-        const rowH = 7;
+      function drawHeaderRow(top) {
+        doc.setFillColor("#F3F4F6");
+        doc.rect(margin, top, pageW, headerH, "F");
+        doc.setFontSize(7);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor("#374151");
+        cols.forEach((c, i) => {
+          doc.text(c.label, colX[i] + 1, top + 4.4);
+        });
+      }
 
-        function drawHeaderRow(top) {
-          doc.setFillColor("#F3F4F6");
-          doc.rect(margin, top, pageW, headerH, "F");
-          doc.setFontSize(7);
-          doc.setFont(undefined, "bold");
-          doc.setTextColor("#374151");
-          cols.forEach((c, i) => {
-            doc.text(c.label, colX[i] + 1, top + 4.4);
-          });
-        }
+      function drawFooter(pageNum) {
+        doc.setFontSize(7);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor("#9CA3AF");
+        doc.text(String(pageNum), 105, 290, { align: "center" });
+      }
 
-        function drawFooter(pageNum) {
-          doc.setFontSize(7);
-          doc.setFont(undefined, "normal");
-          doc.setTextColor("#9CA3AF");
-          doc.text(String(pageNum), 105, 290, { align: "center" });
-        }
-
-        let pageNum = 1;
-        drawHeaderRow(y);
-        y += headerH;
+      function drawTable(startTop) {
+        drawHeaderRow(startTop);
+        let ty = startTop + headerH;
 
         doc.setFontSize(7.5);
         doc.setFont(undefined, "normal");
-        rows.forEach((entry) => {
-          if (y > 283) {
+        if (entries.length === 0) {
+          doc.setTextColor("#111827");
+          doc.text("No logbook entries to display.", margin, ty + 6);
+          drawFooter(pageNum);
+          return;
+        }
+        entries.forEach((entry) => {
+          if (ty > 283) {
             drawFooter(pageNum);
             doc.addPage();
             pageNum += 1;
-            y = 14;
-            drawHeaderRow(y);
-            y += headerH;
+            ty = 18;
+            drawHeaderRow(ty);
+            ty += headerH;
           }
           doc.setTextColor("#111827");
-          doc.text(String(entry.dateTime), colX[0] + 1, y + 4, { maxWidth: cols[0].w - 2 });
-          doc.text(String(entry.studentId), colX[1] + 1, y + 4, { maxWidth: cols[1].w - 2 });
-          doc.text(String(entry.name), colX[2] + 1, y + 4, { maxWidth: cols[2].w - 2 });
-          doc.text(String(entry.age), colX[3] + 1, y + 4, { maxWidth: cols[3].w - 2 });
-          doc.text(String(entry.deptCourse), colX[4] + 1, y + 4, { maxWidth: cols[4].w - 2 });
-          doc.text(String(entry.sex), colX[5] + 1, y + 4, { maxWidth: cols[5].w - 2 });
-          doc.text(String(entry.reason), colX[6] + 1, y + 4, { maxWidth: cols[6].w - 2 });
-          doc.text(String(entry.complaint), colX[7] + 1, y + 4, { maxWidth: cols[7].w - 2 });
-          doc.text(String(entry.medicine), colX[8] + 1, y + 4, { maxWidth: cols[8].w - 2 });
-          y += rowH;
+          doc.text(String(entry.dateTime), colX[0] + 1, ty + 4, { maxWidth: cols[0].w - 2 });
+          doc.text(String(entry.studentId), colX[1] + 1, ty + 4, { maxWidth: cols[1].w - 2 });
+          doc.text(String(entry.name), colX[2] + 1, ty + 4, { maxWidth: cols[2].w - 2 });
+          doc.text(String(entry.age), colX[3] + 1, ty + 4, { maxWidth: cols[3].w - 2 });
+          doc.text(String(entry.deptCourse), colX[4] + 1, ty + 4, { maxWidth: cols[4].w - 2 });
+          doc.text(String(entry.sex), colX[5] + 1, ty + 4, { maxWidth: cols[5].w - 2 });
+          doc.text(String(entry.reason), colX[6] + 1, ty + 4, { maxWidth: cols[6].w - 2 });
+          doc.text(String(entry.complaint), colX[7] + 1, ty + 4, { maxWidth: cols[7].w - 2 });
+          doc.text(String(entry.medicine), colX[8] + 1, ty + 4, { maxWidth: cols[8].w - 2 });
+          ty += rowH;
         });
         drawFooter(pageNum);
       }
 
-      drawTable(entries);
+      let tableStart = y;
+      if (tableStart > 283 - headerH) {
+        drawFooter(pageNum);
+        doc.addPage();
+        pageNum += 1;
+        tableStart = 18;
+      }
+      drawTable(tableStart);
+
       doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
@@ -405,7 +476,32 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print:p-0">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+      {/* print-only formal letterhead — same structure as ReportsFullPanel */}
+      <div className="hidden print:flex items-center gap-3 mb-4 pb-4 border-b border-gray-300">
+        <div className="flex-1 flex items-center gap-2">
+          <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
+          <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
+        </div>
+        <div className="flex-1 text-center px-2">
+          <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
+          <p className="text-xs text-gray-600 leading-snug">
+            Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
+          </p>
+          <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
+          <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
+        </div>
+        <div className="flex-1 flex items-center justify-end">
+          <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
+        </div>
+      </div>
+      <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+        CLINIC LOGBOOK
+      </h2>
+      <p className="hidden print:block text-sm text-gray-600 mb-4">
+        {printSummary}
+      </p>
+
       {/* header + Print/PDF toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4 print:hidden">
         {/* header — matches the dashboard Logbook widget's card header */}
@@ -487,9 +583,10 @@ export default function LogbookFullPanel() {
 
       {/* Table — same boxed/grid look as the dashboard widget: bordered
           cells + gray-50 header, instead of a borderless divide-only table.
-          This is the ONLY content that prints: the toolbar/filters above,
-          the pagination below, and the walk-in form are all print:hidden, and
-          the layout's sidebar/topbar already carry print:hidden. */}
+          In print this is preceded by the letterhead/title/summary block
+          above; the toolbar/filters up top, the pagination below, and the
+          walk-in form are all print:hidden, and the layout's sidebar/topbar
+          already carry print:hidden. */}
       <div className="overflow-x-auto -mx-4 md:mx-0 print:overflow-visible print:mx-0">
         <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:text-xs">
           <thead>

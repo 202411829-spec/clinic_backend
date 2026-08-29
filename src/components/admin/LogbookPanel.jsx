@@ -5,6 +5,18 @@ import NavIcon from "./NavIcon.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { logbookApi } from "../../lib/api.js";
 
+import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
+import oswsSeal from "../../assets/certificate/osws-seal.png";
+import healthServicesSeal from "../../assets/certificate/health-services-seal.png";
+
+// "YYYY-MM-DD" (from <input type="date">) -> "MM/DD/YYYY" for print/PDF labels.
+function fmtMDY(iso) {
+  if (!iso) return "All";
+  const parts = String(iso).split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
 // Backend dateTime is formatted as "MM/DD/YYYY h:mm AM" (or "MM/DD/YYYY HH:MM"
 // for the created_at fallback) — normalize to "YYYY-MM-DD" so the date
 // filters can compare ranges as plain strings.
@@ -136,6 +148,11 @@ export default function LogbookPanel({
     });
   }, [entries, search, department, course, reasonFilter, dateFrom, dateTo]);
 
+  // Summary of the active filters, shown on the printed page + PDF (mirrors
+  // Reports' "period — department" metadata line).
+  const dateSummary = dateFrom || dateTo ? `${fmtMDY(dateFrom)} to ${fmtMDY(dateTo)}` : "All Dates";
+  const printSummary = `${dateSummary} — ${department} — ${course} — ${reasonFilter}${search ? ` — Search: "${search}"` : ""} — Total: ${filtered.length} entries`;
+
   const PAGE_SIZE = 5;
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const [page, setPage] = useState(1);
@@ -161,7 +178,7 @@ export default function LogbookPanel({
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const margin = 12;
+      const margin = 14;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const usableWidth = pageWidth - margin * 2;
@@ -171,13 +188,58 @@ export default function LogbookPanel({
       const headerHeight = 7;
       const bottomLimit = pageHeight - margin;
 
-      let rowTop;
+      // Letterhead — mirrors ReportsFullPanel's PDF header block.
+      let y = 18;
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("GORDON COLLEGE", 105, y, { align: "center" });
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+      doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
+      y += 10;
+
+      // Title — mirrors Reports' "Clinic Report" line.
+      doc.setFontSize(16);
+      doc.setFont(undefined, "bold");
+      doc.text("Clinic Logbook", 14, y);
+      y += 8;
+
+      // Metadata — mirrors Reports' "Period:"/"Department:" lines.
+      doc.setFontSize(10);
+      doc.setFont(undefined, "normal");
+      doc.setTextColor("#000000");
+      doc.text(`Date: ${fmtMDY(dateFrom)} to ${fmtMDY(dateTo)}`, 14, y);
+      y += 5;
+      doc.text(`Department: ${department}`, 14, y);
+      y += 5;
+      doc.text(`Course: ${course}`, 14, y);
+      y += 5;
+      doc.text(`Reason: ${reasonFilter}`, 14, y);
+      if (search) {
+        y += 5;
+        doc.text(`Search: ${search}`, 14, y);
+      }
+      y += 5;
+      doc.text(`Total entries: ${filtered.length}`, 14, y);
+      y += 8;
+
+      let rowTop = y;
+      let pageNum = 1;
+
+      const drawPageNumber = () => {
+        doc.setFontSize(7);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor("#9CA3AF");
+        doc.text(String(pageNum), pageWidth / 2, pageHeight - 7, { align: "center" });
+      };
 
       const drawTableHeader = () => {
         doc.setFontSize(7.5);
         doc.setFont(undefined, "bold");
-        doc.setFillColor(238, 240, 242);
+        doc.setFillColor("#F3F4F6");
         doc.rect(margin, rowTop, usableWidth, headerHeight, "F");
+        doc.setTextColor("#374151");
         let x = margin;
         PDF_TABLE_HEADERS.forEach((h, i) => {
           doc.text(h, x + cellPad, rowTop + 3.2);
@@ -194,6 +256,12 @@ export default function LogbookPanel({
         rowTop += headerHeight;
       };
 
+      if (rowTop > bottomLimit - headerHeight) {
+        drawPageNumber();
+        doc.addPage();
+        pageNum += 1;
+        rowTop = 18;
+      }
       doc.setDrawColor(190);
       doc.setLineWidth(0.15);
       drawTableHeader();
@@ -201,6 +269,7 @@ export default function LogbookPanel({
       if (pageRows.length === 0) {
         doc.setFontSize(9);
         doc.setFont(undefined, "normal");
+        doc.setTextColor("#000000");
         doc.text("No logbook entries to display.", margin, rowTop + 5);
       }
 
@@ -220,8 +289,10 @@ export default function LogbookPanel({
         const rowHeight = lineCount * lineHeight + 1.5;
 
         if (rowTop + rowHeight > bottomLimit) {
+          drawPageNumber();
           doc.addPage();
-          rowTop = margin;
+          pageNum += 1;
+          rowTop = 18;
           doc.setDrawColor(190);
           doc.setLineWidth(0.15);
           drawTableHeader();
@@ -229,6 +300,7 @@ export default function LogbookPanel({
 
         doc.setFontSize(7.5);
         doc.setFont(undefined, "normal");
+        doc.setTextColor("#111827");
         let x = margin;
         lines.forEach((cellLinesList, i) => {
           let ty = rowTop + 3.5;
@@ -249,6 +321,7 @@ export default function LogbookPanel({
         rowTop += rowHeight;
       });
 
+      drawPageNumber();
       doc.save("logbook-report.pdf");
     } catch (err) {
       console.error("Failed to generate PDF:", err);
@@ -409,7 +482,31 @@ export default function LogbookPanel({
       </div>
 
       {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
-      <div id="logbook-widget" className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 print:overflow-visible print:-mx-0 print:mx-0">
+      <div id="logbook-widget" className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 print:overflow-visible print:mx-0">
+        {/* print-only formal letterhead — same structure as ReportsFullPanel */}
+        <div className="hidden print:flex items-center gap-3 mb-4 pb-4 border-b border-gray-300">
+          <div className="flex-1 flex items-center gap-2">
+            <img src={gordonCollegeSeal} alt="Gordon College seal" className="w-14 h-14 object-contain" />
+            <img src={oswsSeal} alt="Office of Student Welfare and Services seal" className="w-14 h-14 object-contain" />
+          </div>
+          <div className="flex-1 text-center px-2">
+            <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
+            <p className="text-xs text-gray-600 leading-snug">
+              Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City
+            </p>
+            <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
+            <p className="font-bold text-gc-green text-sm mt-1">Office of Student Welfare and Service — Health Services Unit</p>
+          </div>
+          <div className="flex-1 flex items-center justify-end">
+            <img src={healthServicesSeal} alt="Health Services Unit seal" className="w-14 h-14 object-contain" />
+          </div>
+        </div>
+        <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+          CLINIC LOGBOOK
+        </h2>
+        <p className="hidden print:block text-sm text-gray-600 mb-4">
+          {printSummary}
+        </p>
         <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse print:min-w-full">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
