@@ -64,10 +64,14 @@ export default function SidebarNav({ onNavigate }) {
             />
           </div>
           <div className="w-11 h-11 rounded-full overflow-hidden shrink-0">
+            {/* health-services-logo.png has more padding baked into the source
+                file than gordon-college-logo.png, so the seal renders visibly
+                smaller inside the same circle. Scaling it up slightly makes
+                the two seals read as the same size side by side. */}
             <img
               src="/health-services-logo.png"
               alt="Health Services Unit seal"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover scale-[1.08]"
             />
           </div>
         </div>

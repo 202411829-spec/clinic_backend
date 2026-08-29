@@ -44,7 +44,15 @@ function NavContent() {
       <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
         <div className="flex items-center justify-center gap-2">
           <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 object-contain" />
-          <img src="/health-services-logo.png" alt="Health Services Unit seal" className="h-16 w-16 object-contain" />
+          {/* health-services-logo.png has more padding baked into the source
+              file than gordon-college-logo.png, so the seal itself renders
+              visibly smaller at the same box size. Scaling it up slightly
+              makes the two seals read as the same size side by side. */}
+          <img
+            src="/health-services-logo.png"
+            alt="Health Services Unit seal"
+            className="h-16 w-16 object-contain scale-[1.08]"
+          />
         </div>
         <p className="mt-2 text-sm font-extrabold leading-tight text-white">GORDON COLLEGE</p>
         <p className="text-[11px] leading-tight text-white/80">Clinic Appointment System</p>

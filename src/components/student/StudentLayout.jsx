@@ -1,18 +1,57 @@
 // src/components/student/StudentLayout.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
-import StudentSidebar from "./StudentSidebar";
-import StudentMobileSidebarOverlay from "./StudentMobileSidebarOverlay";
-import Topbar from "../admin/Topbar";
-import StudentMobileMenuHandle from "./StudentMobileMenuHandle";
+import StudentSidebar from "./StudentSidebar.jsx";
+import StudentMobileSidebarOverlay from "./StudentMobileSidebarOverlay.jsx";
+import Topbar from "../admin/Topbar.jsx";
+import StudentMobileMenuHandle from "./StudentMobileMenuHandle.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { masterlistApi } from "../../lib/api.js";
 
-// TODO: replace with the logged-in student from your Supabase session /
-// auth context once that's wired up. Hardcoded for now so the layout
-// matches the mockup out of the box.
-const currentUser = { name: "Joseph Daniel B. Ramos", role: "CCS BS Computer Science" };
+// Builds the short "CCS BS Computer Science" style role label from the
+// masterlist's full department/course names, e.g.
+// "College of Computer Studies (CCS)" + "Bachelor of Science in Computer
+// Science (BSCS)" -> "CCS BS Computer Science". Falls back gracefully if
+// either field is missing so a partial profile still shows something useful.
+function buildRoleLabel(profile) {
+  if (!profile) return "";
+  const deptAbbrev = profile.department_name?.match(/\(([^)]+)\)/)?.[1] ?? "";
+  const course = (profile.course_name ?? "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return [deptAbbrev, course].filter(Boolean).join(" ");
+}
 
 export default function StudentLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { studentId } = useAuth();
+
+  // Was previously hardcoded to a fixed name/role regardless of who was
+  // actually logged in — now pulled from the real masterlist profile for
+  // the current session, matching what the Student Record page shows.
+  const [currentUser, setCurrentUser] = useState({ name: "", role: "" });
+
+  useEffect(() => {
+    if (!studentId) return undefined;
+    let cancelled = false;
+    masterlistApi
+      .getStudent(studentId)
+      .then((profile) => {
+        if (cancelled || !profile) return;
+        const middle = profile.middle_initial ? ` ${profile.middle_initial}.` : "";
+        setCurrentUser({
+          name: `${profile.first_name ?? ""}${middle} ${profile.last_name ?? ""}`.trim(),
+          role: buildRoleLabel(profile),
+        });
+      })
+      .catch(() => {
+        // No matching masterlist record for this login (e.g. an account
+        // without a students row yet) — fall back to the username instead
+        // of silently showing someone else's name.
+        if (!cancelled) setCurrentUser({ name: studentId, role: "" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId]);
 
   return (
     <div className="min-h-screen md:h-screen bg-gc-student md:flex md:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">

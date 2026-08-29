@@ -3,16 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon.jsx";
 import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
-import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
 import { clinicScheduleApi } from "../../lib/api.js";
 import { formatMDY } from "../../lib/calendar.js";
-
-const BLOCK_LENGTH_OPTIONS = [
-  { value: "15", label: "15 minutes" },
-  { value: "30", label: "30 minutes" },
-  { value: "60", label: "1 hour" },
-];
 
 function InfoDot({ label }) {
   return (
@@ -49,18 +42,11 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  // Split "8:00 AM - 9:00 AM" into a clean two-line label (start on line 1,
-  // end on line 2) instead of letting the browser wrap wherever it fits —
-  // that was breaking mid-unit (e.g. "9:00" / "AM" on separate lines) and
-  // looked inconsistent row to row.
-  const [startLabel, endLabel] = block.time.split(" - ");
-
   return (
-    <div className="relative">
-      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5 min-w-0">
-        <span className="text-sm font-semibold text-gray-800 leading-tight">
-          <span className="block whitespace-nowrap">{startLabel} –</span>
-          <span className="block whitespace-nowrap">{endLabel}</span>
+    <div className="relative w-full">
+      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5">
+        <span className="text-sm font-semibold text-gray-800 leading-tight whitespace-nowrap">
+          {block.time}
         </span>
         <div className="flex items-center gap-2 shrink-0">
           {/* Slots are set once per generated schedule and stay fixed per block,
@@ -508,18 +494,6 @@ export default function ClinicScheduleFullPanel() {
               <h3 className="text-xs font-bold tracking-wide text-gray-500 uppercase">
                 Time Block Preview
               </h3>
-              {/* Bulk action: change every block's length at once (e.g. all
-                  30-minute blocks instead of 1-hour) — slots per block are
-                  recalculated automatically to still cover Number of Students.
-                  Per-row Edit/Delete (⋮) below is unaffected and stays put. */}
-              <UniversalDropdown
-                value={blockLengthMinutes}
-                onChange={setBlockLengthMinutes}
-                options={BLOCK_LENGTH_OPTIONS}
-                className="w-[120px] shrink-0"
-                buttonClassName="!px-2.5 !py-1.5 !text-xs"
-                panelClassName="!text-xs"
-              />
             </div>
             <div className="space-y-2 overflow-y-auto overflow-x-hidden pr-1 -mr-1 flex-1 min-h-0">
               {blocks.map((block) => (
