@@ -55,7 +55,7 @@ function mapEntry(r) {
   };
 }
 
-const PDF_TABLE_HEADERS = ["Date & Time", "Name", "Student ID", "Dept. / Course", "Reason", "Complaint", "Medicine"];
+const PDF_TABLE_HEADERS = ["Date & Time", "Name", "Age", "Dept. / Course", "Sex", "Reason", "Complaint", "Medicine"];
 
 function pdfCellLines(doc, text, maxWidth) {
   return doc.splitTextToSize(String(text ?? ""), maxWidth).slice(0, 3);
@@ -165,43 +165,13 @@ export default function LogbookPanel({
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const usableWidth = pageWidth - margin * 2;
-      const colWidths = [26, 32, 18, 32, 23, 30, 27].map((w) => (w / 188) * usableWidth);
+      const colWidths = [26, 30, 12, 32, 12, 23, 30, 23].map((w) => (w / 188) * usableWidth);
       const cellPad = 2;
       const lineHeight = 3.6;
       const headerHeight = 7;
       const bottomLimit = pageHeight - margin;
 
-      let y = 18;
       let rowTop;
-
-      doc.setFontSize(14);
-      doc.setFont(undefined, "bold");
-      doc.text("GORDON COLLEGE", pageWidth / 2, y, { align: "center" });
-      y += 5;
-      doc.setFontSize(9);
-      doc.setFont(undefined, "normal");
-      doc.text("Health Service Clinic — Logbook Report", pageWidth / 2, y, { align: "center" });
-      y += 8;
-
-      doc.setFontSize(11);
-      doc.setFont(undefined, "bold");
-      doc.text("Logbook", margin, y);
-      y += 5;
-
-      doc.setFontSize(8.5);
-      doc.setFont(undefined, "normal");
-      const notes = [
-        search && `Search: ${search}`,
-        department !== "All Departments" && `Department: ${department}`,
-        course !== "All Course" && `Course: ${course}`,
-        reasonFilter !== "All Reason" && `Reason: ${reasonFilter}`,
-        dateFrom && `From: ${dateFrom}`,
-        dateTo && `To: ${dateTo}`,
-      ].filter(Boolean);
-      doc.text(notes.length ? notes.join("   |   ") : "Showing all logbook entries", margin, y);
-      y += 4;
-      doc.text(`Total records: ${filtered.length}   •   Generated: ${new Date().toLocaleString()}`, margin, y);
-      y += 7;
 
       const drawTableHeader = () => {
         doc.setFontSize(7.5);
@@ -228,18 +198,19 @@ export default function LogbookPanel({
       doc.setLineWidth(0.15);
       drawTableHeader();
 
-      if (filtered.length === 0) {
+      if (pageRows.length === 0) {
         doc.setFontSize(9);
         doc.setFont(undefined, "normal");
-        doc.text("No logbook entries match the current search and filters.", margin, rowTop + 5);
+        doc.text("No logbook entries to display.", margin, rowTop + 5);
       }
 
-      filtered.forEach((entry) => {
+      pageRows.forEach((entry) => {
         const cells = [
           entry.dateTime,
           entry.name,
-          entry.studentId,
+          entry.age,
           entry.deptCourse,
+          entry.sex,
           entry.reason,
           entry.complaint,
           entry.medicine,
@@ -355,8 +326,17 @@ export default function LogbookPanel({
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
+      {/* Print-only: hide every surrounding widget and dashboard chrome so that
+          the printed page contains ONLY this widget's table. */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #logbook-widget, #logbook-widget * { visibility: visible; }
+          #logbook-widget { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3 print:hidden">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
             <NavIcon name="book" className="w-4 h-4" />
@@ -379,7 +359,7 @@ export default function LogbookPanel({
       </div>
 
       {/* search + filters + export */}
-      <div className="flex flex-col gap-2 mb-3">
+      <div className="flex flex-col gap-2 mb-3 print:hidden">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
             <NavIcon name="user" className="w-4 h-4 shrink-0" />
@@ -434,8 +414,8 @@ export default function LogbookPanel({
       </div>
 
       {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
-      <div className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0">
-        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse">
+      <div id="logbook-widget" className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 print:overflow-visible print:-mx-0 print:mx-0">
+        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse print:min-w-full">
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
               <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300">Date / Time</th>
@@ -483,7 +463,7 @@ export default function LogbookPanel({
       </div>
 
       {/* pagination */}
-      <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+      <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 print:hidden">
         <p className="text-xs text-gray-400">
           {filtered.length} search result{filtered.length === 1 ? "" : "s"}
         </p>
@@ -516,7 +496,7 @@ export default function LogbookPanel({
 
       {/* bottom trigger — hidden once the form is open */}
       {!showWalkInForm && (
-        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2">
+        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
           <button
             onClick={() => setShowWalkInForm(true)}
             className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
@@ -528,7 +508,7 @@ export default function LogbookPanel({
 
       {/* walk-in visit form — expands directly below the button, closes back into it */}
       {showWalkInForm && (
-        <div className="mt-4 pt-4 border-t-2 border-gray-300">
+        <div className="mt-4 pt-4 border-t-2 border-gray-300 print:hidden">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
             <button
