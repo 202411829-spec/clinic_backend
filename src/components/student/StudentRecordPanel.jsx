@@ -4,10 +4,13 @@
 // scoped to Student Information / Emergency Contact / Medical History only,
 // with a single "Edit" action instead of print/PDF export).
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "../admin/NavIcon";
 import { computeAge } from "../../data/studentRecordSample";
 import EditStudentInfoModal from "./EditStudentInfoModal";
 import { recordsApi, masterlistApi } from "../../lib/api.js";
+import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
+import { isStudentProfileComplete } from "../../lib/profileCompleteness.js";
 
 function SectionHeader({ icon, title }) {
   return (
@@ -54,6 +57,8 @@ function formatDisplayName(name = "") {
 }
 
 export default function StudentRecordPanel({ student: initialStudent, studentId, error }) {
+  const navigate = useNavigate();
+  const { status, loadError, applyProfile, recheck } = useProfileCompleteness();
   const [student, setStudent] = useState(initialStudent);
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
@@ -122,11 +127,23 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
     setSaveError(null);
     setIsSaving(true);
     try {
-      await recordsApi.updateProfile(studentId, payload);
+      const res = await recordsApi.updateProfile(studentId, payload);
       setStudent(updatedStudent);
       setEditing(false);
       setSavedNotice(true);
       window.setTimeout(() => setSavedNotice(false), 4000);
+      // Complete-your-record gate: recompute derived completeness straight
+      // from the backend echo (no extra fetch) so the gate lifts the moment
+      // the profile becomes complete, then hand the student off to the
+      // Dashboard. If the record is still incomplete (e.g. the edit form's
+      // department/course selectors were left empty), they simply stay on
+      // this page with the banner explaining what's left.
+      const updatedData = res?.data;
+      const complete = Boolean(updatedData && isStudentProfileComplete(updatedData));
+      applyProfile(updatedData);
+      if (complete) {
+        window.setTimeout(() => navigate("/student/dashboard"), 1600);
+      }
     } catch (err) {
       setSaveError(err.message || "Failed to save. Please try again.");
     } finally {
@@ -162,6 +179,27 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           Edit
         </button>
       </div>
+
+      {status === "incomplete" && (
+        <div className="flex items-start justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
+          <span className="flex items-start gap-2">
+            <NavIcon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>
+              <span className="font-semibold">Complete your record to unlock the portal.</span>{" "}
+              Only this page is available until your profile below is filled in.
+            </span>
+          </span>
+          {loadError && (
+            <button
+              type="button"
+              onClick={() => recheck()}
+              className="shrink-0 text-sm font-semibold text-amber-900 underline underline-offset-2 hover:opacity-75"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {savedNotice && (
         <div className="flex items-start justify-between gap-3 bg-gc-green/5 border border-gc-green/20 text-gc-green text-sm rounded-xl px-4 py-3">

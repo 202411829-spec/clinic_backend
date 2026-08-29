@@ -13,7 +13,13 @@ import { studentMainNav } from "../../data/studentNav";
  * layout pattern as the admin sidebar, so the two portals match at the
  * same w-64 sidebar width.
  */
-export default function StudentSidebarContent({ onNavigate }) {
+export default function StudentSidebarContent({ onNavigate, profileComplete }) {
+  // While the record is incomplete, the portal is hard-gated to the Record
+  // page, so the nav must not lead students toward locked pages. Only the
+  // Record item is offered until the gate lifts.
+  const visibleNav = profileComplete
+    ? studentMainNav
+    : studentMainNav.filter((item) => item.to === "/student/record");
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col items-center gap-2.5 px-4 pt-6 pb-5">
@@ -47,7 +53,7 @@ export default function StudentSidebarContent({ onNavigate }) {
           Main
         </p>
         <ul className="space-y-1">
-          {studentMainNav.map((item) => (
+          {visibleNav.map((item) => (
             <li key={item.to}>
               <NavLink
                 to={item.to}
@@ -76,21 +82,23 @@ export default function StudentSidebarContent({ onNavigate }) {
       </div>
 
       <div className="border-t border-white/20">
-        <NavLink
-          to="/student/feedback"
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            [
-              "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-colors",
-              isActive
-                ? "bg-gc-green text-white"
-                : "text-white/95 bg-gc-green-800 hover:bg-gc-green-900",
-            ].join(" ")
-          }
-        >
-          <NavIcon name="feedback" className="w-[18px] h-[18px]" />
-          <span>Feedback</span>
-        </NavLink>
+        {profileComplete && (
+          <NavLink
+            to="/student/feedback"
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              [
+                "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-colors",
+                isActive
+                  ? "bg-gc-green text-white"
+                  : "text-white/95 bg-gc-green-800 hover:bg-gc-green-900",
+              ].join(" ")
+            }
+          >
+            <NavIcon name="feedback" className="w-[18px] h-[18px]" />
+            <span>Feedback</span>
+          </NavLink>
+        )}
         <NavLink
           to="/student/about"
           onClick={onNavigate}

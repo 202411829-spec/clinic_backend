@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import StudentSidebarContent from "./StudentSidebarContent";
 
-export default function StudentMobileSidebarOverlay({ open, onClose }) {
+export default function StudentMobileSidebarOverlay({ open, onClose, profileComplete }) {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -37,7 +37,7 @@ export default function StudentMobileSidebarOverlay({ open, onClose }) {
         <div className="flex justify-center pt-3">
           <span className="h-1 w-16 rounded-full bg-white/50" />
         </div>
-        <StudentSidebarContent onNavigate={onClose} />
+        <StudentSidebarContent onNavigate={onClose} profileComplete={profileComplete} />
       </div>
     </div>
   );

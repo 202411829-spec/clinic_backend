@@ -1,12 +1,47 @@
 // src/components/student/StudentLayout.jsx
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import StudentSidebar from "./StudentSidebar.jsx";
 import StudentMobileSidebarOverlay from "./StudentMobileSidebarOverlay.jsx";
 import Topbar from "../admin/Topbar.jsx";
 import StudentMobileMenuHandle from "./StudentMobileMenuHandle.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
 import { masterlistApi } from "../../lib/api.js";
+
+// The one student page that is always reachable — the rest (Dashboard / Book
+// / Feedback) stay locked behind the complete-your-record gate below.
+const RECORD_PATH = "/student/record";
+
+// Lightweight loader shown in the main pane while profile completeness is
+// being determined, so the gate never flash-redirects blind before it knows.
+function CompletenessLoader() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-24">
+      <svg
+        className="w-8 h-8 animate-spin text-gc-green"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+        />
+      </svg>
+      <p className="text-sm font-semibold text-gray-400">Loading your profile…</p>
+    </div>
+  );
+}
 
 // Builds the short "CCS BS Computer Science" style role label from the
 // masterlist's full department/course names, e.g.
@@ -23,6 +58,8 @@ function buildRoleLabel(profile) {
 export default function StudentLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { studentId } = useAuth();
+  const location = useLocation();
+  const { status, checking, profileComplete } = useProfileCompleteness();
 
   // Was previously hardcoded to a fixed name/role regardless of who was
   // actually logged in — now pulled from the real masterlist profile for
@@ -53,13 +90,22 @@ export default function StudentLayout() {
     };
   }, [studentId]);
 
+  // HARD GATE: while the record is incomplete the student may only reach the
+  // Record page. Rendering <Navigate> here swaps the whole route (sidebar and
+  // the child page) so Dashboard/Book/Feedback never even flash. The Record
+  // page is exempted below so it is always reachable.
+  if (!checking && status === "incomplete" && location.pathname !== RECORD_PATH) {
+    return <Navigate to={RECORD_PATH} replace />;
+  }
+
   return (
     <div className="min-h-screen md:h-screen bg-gc-student md:flex md:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
-      <StudentSidebar />
+      <StudentSidebar profileComplete={profileComplete} />
 
       <StudentMobileSidebarOverlay
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        profileComplete={profileComplete}
       />
 
       <StudentMobileMenuHandle onClick={() => setMobileNavOpen(true)} />
@@ -72,7 +118,7 @@ export default function StudentLayout() {
           showLogout={false}
         />
         <main className="px-4 md:px-8 pb-10 print:p-0">
-          <Outlet />
+          {checking ? <CompletenessLoader /> : <Outlet />}
         </main>
       </div>
     </div>

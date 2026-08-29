@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import AdminLayout from './components/layout/AdminLayout.jsx'
 import { AppointmentProvider } from './context/AppointmentContext.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
+import { ProfileCompletenessProvider } from './context/ProfileCompletenessContext.jsx'
 
 const AdminLogin = lazy(() => import('./pages/auth/AdminLogin.jsx'))
 const Masterlist = lazy(() => import('./pages/admin/Masterlist.jsx'))
@@ -84,7 +85,9 @@ export default function App() {
         element={
           <ProtectedRoute loginPath="/student/login">
             <AppointmentProvider>
-              <StudentLayout />
+              <ProfileCompletenessProvider>
+                <StudentLayout />
+              </ProfileCompletenessProvider>
             </AppointmentProvider>
           </ProtectedRoute>
         }
