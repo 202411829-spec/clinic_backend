@@ -1,11 +1,9 @@
 // src/components/admin/LogbookFullPanel.jsx
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import NavIcon from "./NavIcon.jsx";
-import {
-  logbookEntries as sampleEntries,
-} from "../../data/dashboardSample.js";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
-import { logbookApi, referenceApi } from "../../lib/api.js";
+import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
+import { formatMDY } from "../../lib/calendar.js";
 
 const PAGE_SIZE = 20;
 
@@ -105,18 +103,20 @@ export default function LogbookFullPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Derived for dropdowns
-  const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
-  const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
-
   // Pagination & filters state
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [reasonFilter, setReasonFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
   const [totalEntries, setTotalEntries] = useState(0);
   const [pageSize] = useState(PAGE_SIZE);
+
+  // Options for the new department/course filters, loaded from the masterlist.
+  const [departments, setDepartments] = useState([]);
+  const [courses, setCourses] = useState([]);
 
   // Guards against a stale request finishing after a newer one has already
   // started (e.g. the user changes filters twice quickly) — without this,
@@ -139,6 +139,8 @@ export default function LogbookFullPanel() {
         ...(dateFrom && { date_from: dateFrom }),
         ...(dateTo && { date_to: dateTo }),
         ...(reasonFilter && { reason_id: reasonFilter }),
+        ...(departmentFilter && { department_id: departmentFilter }),
+        ...(courseFilter && { course_id: courseFilter }),
       };
 
       const [logbookRes, reasonsRes, medicinesRes] = await Promise.all([
@@ -160,12 +162,47 @@ export default function LogbookFullPanel() {
     } finally {
       if (isCurrent()) setLoading(false);
     }
-  }, [page, search, dateFrom, dateTo, reasonFilter, pageSize]);
+  }, [page, search, dateFrom, dateTo, reasonFilter, departmentFilter, courseFilter, pageSize]);
 
   // Reload when filters change
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load department & course options for the filters (independent, not cascaded).
+  useEffect(() => {
+    masterlistApi
+      .listDepartments()
+      .then((res) =>
+        setDepartments(
+          (res?.departments || res || []).map((d) => ({
+            value: d.department_id,
+            label: d.department_name,
+          }))
+        )
+      )
+      .catch(() => {});
+    masterlistApi
+      .listCourses()
+      .then((res) =>
+        setCourses(
+          (res?.courses || res || []).map((c) => ({
+            value: c.course_id,
+            label: c.course_name,
+          }))
+        )
+      )
+      .catch(() => {});
+  }, []);
+
+  // Any filter change resets the page to 1 so the user never lands out of
+  // range on a smaller filtered result set.
+  function changeSearch(v) { setSearch(v); setPage(1); }
+  function changeDateFrom(v) { setDateFrom(v); setPage(1); }
+  function changeDateTo(v) { setDateTo(v); setPage(1); }
+  function changeReason(v) { setReasonFilter(v); setPage(1); }
+  function changeDepartment(v) { setDepartmentFilter(v); setPage(1); }
+  function changeCourse(v) { setCourseFilter(v); setPage(1); }
 
   // Walk-in visit form — hidden by default, opened by the "+ Add Walk-in
   // Visit" button, same pattern as the dashboard Logbook widget.
@@ -237,6 +274,8 @@ export default function LogbookFullPanel() {
         ...(dateFrom && { date_from: dateFrom }),
         ...(dateTo && { date_to: dateTo }),
         ...(reasonFilter && { reason_id: reasonFilter }),
+        ...(departmentFilter && { department_id: departmentFilter }),
+        ...(courseFilter && { course_id: courseFilter }),
       });
       setEntries((res?.logbook || []).map(mapEntry));
       setTotalEntries(res?.total || 0);
@@ -249,6 +288,149 @@ export default function LogbookFullPanel() {
 
     resetWalkInForm();
     setShowWalkInForm(false);
+  }
+
+  // Human-readable filter labels, used for the PDF header summary and print.
+  const filterSummary = useMemo(() => {
+    const parts = [];
+    if (search.trim()) parts.push(`Search: ${search.trim()}`);
+    if (departmentFilter) {
+      const d = departments.find((o) => String(o.value) === String(departmentFilter));
+      parts.push(`Department: ${d ? d.label : departmentFilter}`);
+    }
+    if (courseFilter) {
+      const c = courses.find((o) => String(o.value) === String(courseFilter));
+      parts.push(`Course: ${c ? c.label : courseFilter}`);
+    }
+    if (reasonFilter) {
+      const r = reasonRecords.find((x) => String(x.reason_id) === String(reasonFilter));
+      parts.push(`Reason: ${r ? r.description : reasonFilter}`);
+    }
+    if (dateFrom || dateTo) parts.push(`Date: ${dateFrom ? dateFrom : "…"} to ${dateTo ? dateTo : "…"}`);
+    return parts.join("  |  ");
+  }, [search, departmentFilter, courseFilter, reasonFilter, dateFrom, dateTo, departments, courses]);
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  function handlePrint() {
+    window.print();
+  }
+
+  // Generates an A4-portrait PDF of the currently filtered logbook rows with
+  // a header, filter summary, and a paginated table — using the same lazy
+  // import("jspdf") pattern as ReportsFullPanel.
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const margin = 12;
+      const pageW = 210 - margin * 2;
+      let y = 0;
+
+      function pageTop() {
+        y = 14;
+        doc.setFontSize(14);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor("#044B0E");
+        doc.text("GORDON COLLEGE", 105, y, { align: "center" });
+        y += 5;
+        doc.setFontSize(9);
+        doc.setTextColor("#4B5563");
+        doc.setFont(undefined, "normal");
+        doc.text("Health Service Clinic — Logbook", 105, y, { align: "center" });
+        y += 9;
+      }
+
+      // Title + filter summary block (drawn on the first page only).
+      function titleBlock() {
+        pageTop();
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor("#111827");
+        doc.text("Logbook Report", margin, y);
+        y += 6;
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor("#374151");
+        const lines = doc.splitTextToSize(
+          `Filters: ${filterSummary || "None"}`, pageW
+        );
+        doc.text(lines, margin, y);
+        y += lines.length * 3.5 + 2;
+        doc.setTextColor("#6B7280");
+        doc.text(`Date Generated: ${formatMDY(new Date())}`, margin, y);
+        y += 3;
+        doc.text(`Total Entries: ${totalEntries}`, margin, y);
+        y += 7;
+      }
+
+      function drawTable(rows) {
+        const cols = [
+          { label: "Name", w: 34 },
+          { label: "ID", w: 20 },
+          { label: "Dept / Course", w: 30 },
+          { label: "Sex", w: 12 },
+          { label: "Age", w: 10 },
+          { label: "Reason", w: 26 },
+          { label: "Date & Time", w: 22 },
+          { label: "Medicine", w: 24 },
+          { label: "Complaint", w: 32 },
+        ];
+        const colX = [];
+        let x = margin;
+        cols.forEach((c) => { colX.push(x); x += c.w; });
+        const headerH = 6;
+        const rowH = 7;
+
+        function drawHeaderRow(top) {
+          doc.setFillColor("#F3F4F6");
+          doc.rect(margin, top, pageW, headerH, "F");
+          doc.setFontSize(7.5);
+          doc.setFont(undefined, "bold");
+          doc.setTextColor("#374151");
+          cols.forEach((c, i) => {
+            doc.text(c.label, colX[i] + 1, top + 4.2);
+          });
+        }
+
+        function newPage() {
+          doc.addPage();
+          pageTop();
+          drawHeaderRow(y);
+          y += headerH;
+        }
+
+        titleBlock();
+        drawHeaderRow(y);
+        y += headerH;
+
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, "normal");
+        rows.forEach((entry) => {
+          if (y > 285) newPage();
+          doc.setTextColor("#111827");
+          doc.text(String(entry.name), colX[0] + 1, y + 4, { maxWidth: cols[0].w - 2 });
+          doc.text(String(entry.studentId), colX[1] + 1, y + 4, { maxWidth: cols[1].w - 2 });
+          doc.text(String(entry.deptCourse), colX[2] + 1, y + 4, { maxWidth: cols[2].w - 2 });
+          doc.text(String(entry.sex), colX[3] + 1, y + 4, { maxWidth: cols[3].w - 2 });
+          doc.text(String(entry.age), colX[4] + 1, y + 4, { maxWidth: cols[4].w - 2 });
+          doc.text(String(entry.reason), colX[5] + 1, y + 4, { maxWidth: cols[5].w - 2 });
+          doc.text(String(entry.dateTime), colX[6] + 1, y + 4, { maxWidth: cols[6].w - 2 });
+          doc.text(String(entry.medicine), colX[7] + 1, y + 4, { maxWidth: cols[7].w - 2 });
+          doc.text(String(entry.complaint), colX[8] + 1, y + 4, { maxWidth: cols[8].w - 2 });
+          y += rowH;
+        });
+      }
+
+      drawTable(entries);
+      doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Couldn't generate the PDF. Please try again.");
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   if (loading) {
@@ -269,58 +451,104 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      {/* header — matches the dashboard Logbook widget's card header */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-          <NavIcon name="book" className="w-4 h-4" />
-        </span>
-        <div>
-          <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
-            Logbook
-          </h1>
-          <p className="text-xs text-gray-400 leading-tight">
-            View history of completed clinic visits.
-          </p>
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print:p-0">
+      {/* print-only formal heading */}
+      <div className="hidden print:block text-center mb-4 border-b-2 border-gray-300 pb-3">
+        <h1 className="font-bold text-gc-green text-lg tracking-wide">GORDON COLLEGE</h1>
+        <p className="text-xs text-gray-600 leading-snug">Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City</p>
+        <p className="text-xs text-gray-600 leading-snug">Tel. No.: (047) 222-4080</p>
+        <p className="font-bold text-gc-green text-sm mt-1">Health Service Clinic — Logbook</p>
+        {filterSummary && <p className="text-xs text-gray-600 mt-2">{filterSummary}</p>}
+        <p className="text-xs text-gray-600 mt-1">Date Generated: {formatMDY(new Date())}</p>
+      </div>
+
+      {/* header + Print/PDF toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4 print:hidden">
+        {/* header — matches the dashboard Logbook widget's card header */}
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+            <NavIcon name="book" className="w-4 h-4" />
+          </span>
+          <div>
+            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
+              Logbook
+            </h1>
+            <p className="text-xs text-gray-400 leading-tight">
+              View history of completed clinic visits.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+          >
+            <NavIcon name="printer" className="w-4 h-4" />
+            Print
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
+          >
+            <NavIcon name="download" className="w-4 h-4" />
+            {downloadingPdf ? "Preparing…" : "Download PDF"}
+          </button>
         </div>
       </div>
 
       {/* Search + Filters */}
-      <div className="flex flex-col md:flex-row gap-3 mb-3">
+      <div className="flex flex-col md:flex-row gap-3 mb-3 print:hidden">
         <div className="relative flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 focus-within:ring-2 focus-within:ring-gc-green focus-within:border-transparent transition">
-          <NavIcon name="user" className="w-4 h-4 shrink-0" />
+          <NavIcon name="search" className="w-4 h-4 shrink-0" />
           <input
             type="text"
             placeholder="Search student ID, name, complaint, medicine…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => changeSearch(e.target.value)}
             className="w-full outline-none placeholder:text-gray-400 text-gray-900 bg-transparent"
           />
         </div>
-        <div className="flex flex-wrap gap-2 md:w-[500px]">
+        <div className="flex flex-wrap gap-2 md:w-[620px]">
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => changeDateFrom(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
             placeholder="From date"
           />
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => changeDateTo(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
             placeholder="To date"
           />
           <UniversalDropdown
             value={reasonFilter}
-            onChange={setReasonFilter}
-            options={reasons}
+            onChange={changeReason}
+            options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
             placeholder="All Reasons"
-            className="min-w-[180px]"
+            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
+          />
+          <UniversalDropdown
+            value={departmentFilter}
+            onChange={changeDepartment}
+            options={departments}
+            placeholder="All Departments"
+            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
+          />
+          <UniversalDropdown
+            value={courseFilter}
+            onChange={changeCourse}
+            options={courses}
+            placeholder="All Course"
+            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
           />
         </div>
       </div>
+
 
       {/* Table — same boxed/grid look as the dashboard widget: bordered
           cells + gray-50 header, instead of a borderless divide-only table */}

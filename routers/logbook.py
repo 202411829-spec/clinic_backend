@@ -250,6 +250,39 @@ def _scope_appointment_ids(date_from, date_to, reason_id):
     return [row["appointment_id"] for row in (response.data or [])]
 
 
+def _scope_appointment_ids_by_student(base_scope, department_id, course_id):
+    """
+    Return the list of appointment_ids whose student matches the given
+    department_id and/or course_id (the students table exposes these as
+    FKs). When called, at least one of department_id/course_id is set.
+    The result is the appointment set for those students intersected
+    with `base_scope` (an appointment_id list or None for "no restriction").
+    """
+    student_query = supabase.table("students").select("student_id")
+    if department_id is not None:
+        student_query = student_query.eq("department_id", department_id)
+    if course_id is not None:
+        student_query = student_query.eq("course_id", course_id)
+
+    student_response = execute_with_retry(student_query)
+    student_ids = [row["student_id"] for row in (student_response.data or [])]
+
+    if not student_ids:
+        return []
+
+    appointment_ids = _collected_ids(
+        supabase.table("appointments")
+        .select("appointment_id")
+        .in_("student_id", student_ids)
+    )
+
+    if base_scope is not None:
+        base_set = set(base_scope)
+        appointment_ids = [aid for aid in appointment_ids if aid in base_set]
+
+    return appointment_ids
+
+
 def _collected_ids(query):
     response = execute_with_retry(query)
     return [row["appointment_id"] for row in (response.data or [])]
@@ -394,6 +427,8 @@ def _count_scoped_logs(appointment_scope):
 #   date_from       - filter logs on/after this date (YYYY-MM-DD)
 #   date_to         - filter logs on/before this date (YYYY-MM-DD)
 #   reason_id       - filter by reason ID
+#   department_id   - filter by the student's department ID
+#   course_id       - filter by the student's course ID
 #   page            - page number (default 1)
 #   page_size       - items per page (default 20, max 100)
 # ============================================================
@@ -408,6 +443,8 @@ def get_logbook():
         date_from = request.args.get("date_from")
         date_to = request.args.get("date_to")
         reason_id = request.args.get("reason_id", type=int)
+        department_id = request.args.get("department_id", type=int)
+        course_id = request.args.get("course_id", type=int)
         page = max(1, request.args.get("page", default=1, type=int))
         page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
 
@@ -417,6 +454,12 @@ def get_logbook():
         # --- Free-text search also returns a scoped appointment list ---
         if search:
             appointment_scope = _search_appointment_ids(appointment_scope, search)
+
+        # --- Filter by student's department/course (independent filters) ---
+        if department_id is not None or course_id is not None:
+            appointment_scope = _scope_appointment_ids_by_student(
+                appointment_scope, department_id, course_id
+            )
 
         # Nothing matched the filters — short-circuit instead of querying.
         if appointment_scope == []:

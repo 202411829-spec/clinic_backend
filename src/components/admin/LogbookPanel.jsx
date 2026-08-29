@@ -2,24 +2,63 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon.jsx";
-import {
-  recentLogbookEntries as sampleEntries,
-} from "../../data/dashboardSample.js";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { logbookApi } from "../../lib/api.js";
 
+// Backend dateTime is formatted as "MM/DD/YYYY h:mm AM" (or "MM/DD/YYYY HH:MM"
+// for the created_at fallback) — normalize to "YYYY-MM-DD" so the date
+// filters can compare ranges as plain strings.
+function toISODate(value) {
+  const s = String(value || "");
+  const m = s.slice(0, 10).split("/");
+  if (m.length !== 3) return "";
+  const mm = m[0];
+  const dd = m[1];
+  const yyyy = m[2];
+  if (!/^\d{2}$/.test(mm) || !/^\d{2}$/.test(dd) || !/^\d{4}$/.test(yyyy)) return "";
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Backend deptCourse is "Course - Department" (course first). Try the known
+// dash variants so course/dept filters match against loaded rows regardless
+// of which separator the formatting path happened to use.
+function splitDeptCourse(value) {
+  const text = String(value || "");
+  for (const sep of [" - ", " — ", " – ", " -", "- "]) {
+    if (text.includes(sep)) {
+      const parts = text.split(sep);
+      return { course: (parts[0] || "").trim(), dept: (parts[1] || "").trim() };
+    }
+  }
+  return { course: text.trim(), dept: "" };
+}
+
 function mapEntry(r) {
+  const parsed = r.deptCourse && r.deptCourse !== "-" ? splitDeptCourse(r.deptCourse) : {};
+  const dept = r.dept || parsed.dept || "-";
+  const course = r.course || parsed.course || "-";
+  const deptCourse = r.deptCourse || (course !== "-" ? `${course} - ${dept}` : "-");
   return {
     id: r.id ?? r.log_id,
     dateTime: r.dateTime || "-",
+    dateISO: toISODate(r.dateTime),
+    studentId: r.student_id ?? "-",
     name: r.name || "-",
     age: r.age ?? "-",
-    deptCourse: r.deptCourse || "-",
+    dept,
+    course,
+    deptCourse,
     sex: r.sex || "-",
     reason: r.reason || "-",
     complaint: r.complaint || "-",
     medicine: r.medicine || "-",
   };
+}
+
+const PDF_TABLE_HEADERS = ["Date & Time", "Name", "Student ID", "Dept. / Course", "Reason", "Complaint", "Medicine"];
+
+function pdfCellLines(doc, text, maxWidth) {
+  return doc.splitTextToSize(String(text ?? ""), maxWidth).slice(0, 3);
 }
 
 export default function LogbookPanel({
@@ -60,15 +99,18 @@ export default function LogbookPanel({
   const [department, setDepartment] = useState("All Departments");
   const [course, setCourse] = useState("All Course");
   const [reasonFilter, setReasonFilter] = useState("All Reason");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   // Derive departments and courses from entries
   const departments = useMemo(() => {
-    const set = new Set(entries.map((e) => e.deptCourse.split(" — ")[1]?.trim() || e.deptCourse).filter(Boolean));
+    const set = new Set(entries.map((e) => e.dept).filter((d) => d && d !== "-"));
     return ["All Departments", ...Array.from(set)];
   }, [entries]);
 
   const courses = useMemo(() => {
-    const set = new Set(entries.map((e) => e.deptCourse.split(" — ")[0]?.trim() || e.deptCourse).filter(Boolean));
+    const set = new Set(entries.map((e) => e.course).filter((c) => c && c !== "-"));
     return ["All Course", ...Array.from(set)];
   }, [entries]);
 
@@ -77,16 +119,22 @@ export default function LogbookPanel({
     return entries.filter((e) => {
       const matchesSearch =
         !q ||
-        e.name.toLowerCase().includes(q) ||
-        e.studentId.toLowerCase().includes(q) ||
-        e.course.toLowerCase().includes(q) ||
-        e.dept.toLowerCase().includes(q);
+        (e.name || "").toLowerCase().includes(q) ||
+        (e.studentId || "").toLowerCase().includes(q) ||
+        (e.course || "").toLowerCase().includes(q) ||
+        (e.dept || "").toLowerCase().includes(q) ||
+        (e.reason || "").toLowerCase().includes(q) ||
+        (e.complaint || "").toLowerCase().includes(q) ||
+        (e.medicine || "").toLowerCase().includes(q);
       const matchesDept = department === "All Departments" || e.dept === department;
       const matchesCourse = course === "All Course" || e.course === course;
       const matchesReason = reasonFilter === "All Reason" || e.reason === reasonFilter;
-      return matchesSearch && matchesDept && matchesCourse && matchesReason;
+      const matchesDate =
+        (!dateFrom || (e.dateISO && e.dateISO >= dateFrom)) &&
+        (!dateTo || (e.dateISO && e.dateISO <= dateTo));
+      return matchesSearch && matchesDept && matchesCourse && matchesReason && matchesDate;
     });
-  }, [entries, search, department, course, reasonFilter]);
+  }, [entries, search, department, course, reasonFilter, dateFrom, dateTo]);
 
   const PAGE_SIZE = 5;
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -102,6 +150,141 @@ export default function LogbookPanel({
       setter(e.target.value);
       setPage(1);
     };
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
+  async function handleDownloadPdf() {
+    setDownloading(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const margin = 12;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const usableWidth = pageWidth - margin * 2;
+      const colWidths = [26, 32, 18, 32, 23, 30, 27].map((w) => (w / 188) * usableWidth);
+      const cellPad = 2;
+      const lineHeight = 3.6;
+      const headerHeight = 7;
+      const bottomLimit = pageHeight - margin;
+
+      let y = 18;
+      let rowTop;
+
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("GORDON COLLEGE", pageWidth / 2, y, { align: "center" });
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont(undefined, "normal");
+      doc.text("Health Service Clinic — Logbook Report", pageWidth / 2, y, { align: "center" });
+      y += 8;
+
+      doc.setFontSize(11);
+      doc.setFont(undefined, "bold");
+      doc.text("Logbook", margin, y);
+      y += 5;
+
+      doc.setFontSize(8.5);
+      doc.setFont(undefined, "normal");
+      const notes = [
+        search && `Search: ${search}`,
+        department !== "All Departments" && `Department: ${department}`,
+        course !== "All Course" && `Course: ${course}`,
+        reasonFilter !== "All Reason" && `Reason: ${reasonFilter}`,
+        dateFrom && `From: ${dateFrom}`,
+        dateTo && `To: ${dateTo}`,
+      ].filter(Boolean);
+      doc.text(notes.length ? notes.join("   |   ") : "Showing all logbook entries", margin, y);
+      y += 4;
+      doc.text(`Total records: ${filtered.length}   •   Generated: ${new Date().toLocaleString()}`, margin, y);
+      y += 7;
+
+      const drawTableHeader = () => {
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, "bold");
+        doc.setFillColor(238, 240, 242);
+        doc.rect(margin, rowTop, usableWidth, headerHeight, "F");
+        let x = margin;
+        PDF_TABLE_HEADERS.forEach((h, i) => {
+          doc.text(h, x + cellPad, rowTop + 3.2);
+          x += colWidths[i];
+        });
+        doc.setDrawColor(160);
+        doc.setLineWidth(0.2);
+        doc.rect(margin, rowTop, usableWidth, headerHeight);
+        x = margin;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.line(x, rowTop, x, rowTop + headerHeight);
+        }
+        rowTop += headerHeight;
+      };
+
+      doc.setDrawColor(190);
+      doc.setLineWidth(0.15);
+      drawTableHeader();
+
+      if (filtered.length === 0) {
+        doc.setFontSize(9);
+        doc.setFont(undefined, "normal");
+        doc.text("No logbook entries match the current search and filters.", margin, rowTop + 5);
+      }
+
+      filtered.forEach((entry) => {
+        const cells = [
+          entry.dateTime,
+          entry.name,
+          entry.studentId,
+          entry.deptCourse,
+          entry.reason,
+          entry.complaint,
+          entry.medicine,
+        ];
+        const lines = cells.map((c, i) => pdfCellLines(doc, c, colWidths[i] - cellPad * 2));
+        const lineCount = Math.max(...lines.map((l) => Math.max(1, l.length)));
+        const rowHeight = lineCount * lineHeight + 1.5;
+
+        if (rowTop + rowHeight > bottomLimit) {
+          doc.addPage();
+          rowTop = margin;
+          doc.setDrawColor(190);
+          doc.setLineWidth(0.15);
+          drawTableHeader();
+        }
+
+        doc.setFontSize(7.5);
+        doc.setFont(undefined, "normal");
+        let x = margin;
+        lines.forEach((cellLinesList, i) => {
+          let ty = rowTop + 3.5;
+          cellLinesList.forEach((line) => {
+            doc.text(line, x + cellPad, ty);
+            ty += lineHeight;
+          });
+          x += colWidths[i];
+        });
+
+        doc.line(margin, rowTop + rowHeight, margin + usableWidth, rowTop + rowHeight);
+        x = margin;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          x += colWidths[i];
+          doc.line(x, rowTop, x, rowTop + rowHeight);
+        }
+
+        rowTop += rowHeight;
+      });
+
+      doc.save("logbook-report.pdf");
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Couldn't generate the PDF. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
   }
 
   function handleAddMedicine() {
@@ -195,20 +378,59 @@ export default function LogbookPanel({
         </button>
       </div>
 
-      {/* search + filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-        <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
-          <NavIcon name="user" className="w-4 h-4 shrink-0" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by surname, name, student ID, or course..."
-            className="w-full outline-none placeholder:text-gray-400"
-          />
+      {/* search + filters + export */}
+      <div className="flex flex-col gap-2 mb-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
+            <NavIcon name="user" className="w-4 h-4 shrink-0" />
+            <input
+              value={search}
+              onChange={updateFilter(setSearch)}
+              placeholder="Search by surname, name, student ID, or course..."
+              className="w-full outline-none placeholder:text-gray-400 text-gray-900"
+            />
+          </div>
+          <UniversalDropdown value={department} onChange={(v) => { setDepartment(v); setPage(1); }} options={departments} />
+          <UniversalDropdown value={course} onChange={(v) => { setCourse(v); setPage(1); }} options={courses} />
+          <UniversalDropdown value={reasonFilter} onChange={(v) => { setReasonFilter(v); setPage(1); }} options={["All Reason", ...reasons]} />
         </div>
-        <UniversalDropdown value={department} onChange={(v) => { setDepartment(v); setPage(1); }} options={departments} />
-        <UniversalDropdown value={course} onChange={(v) => { setCourse(v); setPage(1); }} options={courses} />
-        <UniversalDropdown value={reasonFilter} onChange={(v) => { setReasonFilter(v); setPage(1); }} options={["All Reason", ...reasons]} />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={updateFilter(setDateFrom)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={updateFilter(setDateTo)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+            />
+          </label>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50"
+            >
+              <NavIcon name="printer" className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <NavIcon name="download" className="w-4 h-4" />
+              {downloading ? "Preparing…" : "Download PDF"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
