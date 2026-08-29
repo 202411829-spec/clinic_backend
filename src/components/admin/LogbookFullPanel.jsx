@@ -478,74 +478,65 @@ export default function LogbookFullPanel() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-          >
-            <NavIcon name="printer" className="w-4 h-4" />
-            Print
-          </button>
-          <button
-            onClick={handleDownloadPdf}
-            disabled={downloadingPdf}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
-          >
-            <NavIcon name="download" className="w-4 h-4" />
-            {downloadingPdf ? "Preparing…" : "Download PDF"}
-          </button>
-        </div>
       </div>
 
-      {/* Search + Filters */}
-      <div className="flex flex-col md:flex-row gap-3 mb-3 print:hidden">
-        <div className="relative flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 focus-within:ring-2 focus-within:ring-gc-green focus-within:border-transparent transition">
-          <NavIcon name="search" className="w-4 h-4 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search student ID, name, complaint, medicine…"
-            value={search}
-            onChange={(e) => changeSearch(e.target.value)}
-            className="w-full outline-none placeholder:text-gray-400 text-gray-900 bg-transparent"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2 md:w-[620px]">
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => changeDateFrom(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
-            placeholder="From date"
-          />
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => changeDateTo(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gc-green focus:border-transparent transition"
-            placeholder="To date"
-          />
+      {/* search + filters + export — matches the dashboard Logbook widget toolbar */}
+      <div className="flex flex-col gap-2 mb-3 print:hidden">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
+            <NavIcon name="search" className="w-4 h-4 shrink-0" />
+            <input
+              value={search}
+              onChange={(e) => changeSearch(e.target.value)}
+              placeholder="Search student ID, name, complaint, medicine…"
+              className="w-full outline-none placeholder:text-gray-400 text-gray-900"
+            />
+          </div>
+          <UniversalDropdown value={departmentFilter} onChange={changeDepartment} options={departments} placeholder="All Departments" />
+          <UniversalDropdown value={courseFilter} onChange={changeCourse} options={courses} placeholder="All Course" />
           <UniversalDropdown
             value={reasonFilter}
             onChange={changeReason}
             options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
             placeholder="All Reasons"
-            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
           />
-          <UniversalDropdown
-            value={departmentFilter}
-            onChange={changeDepartment}
-            options={departments}
-            placeholder="All Departments"
-            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
-          />
-          <UniversalDropdown
-            value={courseFilter}
-            onChange={changeCourse}
-            options={courses}
-            placeholder="All Course"
-            className="min-w-[150px] flex-1 md:flex-none md:min-w-[170px]"
-          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => changeDateFrom(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+            />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => changeDateTo(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+            />
+          </label>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50"
+            >
+              <NavIcon name="printer" className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <NavIcon name="download" className="w-4 h-4" />
+              {downloadingPdf ? "Preparing…" : "Download PDF"}
+            </button>
+          </div>
         </div>
       </div>
 
