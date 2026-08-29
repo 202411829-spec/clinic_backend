@@ -208,6 +208,7 @@ export default function LogbookFullPanel() {
   // Visit" button, same pattern as the dashboard Logbook widget.
   const [showWalkInForm, setShowWalkInForm] = useState(false);
   const [regId, setRegId] = useState("");
+  const [walkInName, setWalkInName] = useState("");
   const [walkInReasonId, setWalkInReasonId] = useState("");
   const [complaint, setComplaint] = useState("");
   const [medicineInput, setMedicineInput] = useState("");
@@ -217,6 +218,7 @@ export default function LogbookFullPanel() {
 
   function resetWalkInForm() {
     setRegId("");
+    setWalkInName("");
     setWalkInReasonId("");
     setComplaint("");
     setMedicineInput("");
@@ -241,7 +243,7 @@ export default function LogbookFullPanel() {
   }
 
   async function handleAddWalkIn() {
-    if (!regId.trim() || !walkInReasonId) return;
+    if ((!regId.trim() && !walkInName.trim()) || !walkInReasonId) return;
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -257,7 +259,8 @@ export default function LogbookFullPanel() {
     try {
       setWalkInError(null);
       await logbookApi.createWalkIn({
-        student_id: regId.trim(),
+        student_id: regId.trim() || undefined,
+        walk_in_name: walkInName.trim() || undefined,
         appointment_date: `${y}-${m}-${d}`,
         appointment_time: time,
         reason_id: Number(walkInReasonId),
@@ -584,6 +587,18 @@ export default function LogbookFullPanel() {
                 value={regId}
                 onChange={(e) => setRegId(e.target.value)}
                 placeholder="Student ID"
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Patient Name</label>
+              <input
+                value={walkInName}
+                onChange={(e) => {
+                  setWalkInName(e.target.value);
+                  if (walkInError) setWalkInError(null);
+                }}
+                placeholder="Full name (required if not registered)"
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
               />
             </div>

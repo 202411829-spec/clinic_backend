@@ -92,7 +92,7 @@ export default function LogbookPanel({
   const [medicineInput, setMedicineInput] = useState("");
   const [quantity, setQuantity] = useState("");
   const [medTags, setMedTags] = useState([]);
-  const [walkInError, setWalkInError] = useState("");
+  const [walkInError, setWalkInError] = useState(null);
 
   // Search and filter state
   const [search, setSearch] = useState("");
@@ -279,17 +279,11 @@ export default function LogbookPanel({
     setMedicineInput("");
     setQuantity("");
     setMedTags([]);
-    setWalkInError("");
+    setWalkInError(null);
   }
 
   async function handleAddWalkIn() {
-    if ((!regId.trim() && !walkInName.trim()) || !walkInReasonId) {
-      if (!regId.trim() && !walkInName.trim()) {
-        setWalkInError("Enter Student ID or Patient Name");
-      }
-      return;
-    }
-    setWalkInError("");
+    if ((!regId.trim() && !walkInName.trim()) || !walkInReasonId) return;
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -303,6 +297,7 @@ export default function LogbookPanel({
       .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
 
     try {
+      setWalkInError(null);
       await logbookApi.createWalkIn({
         student_id: regId.trim() || undefined,
         walk_in_name: walkInName.trim() || undefined,
@@ -317,7 +312,7 @@ export default function LogbookPanel({
       setEntries((res?.logbook || []).slice(0, 5).map(mapEntry));
     } catch (err) {
       console.error("Walk-in failed:", err);
-      alert(`Couldn't save the walk-in visit: ${err.message}`);
+      setWalkInError(err.message || "Couldn't save the walk-in visit.");
       return;
     }
 
@@ -523,6 +518,10 @@ export default function LogbookPanel({
             </button>
           </div>
 
+          {walkInError && (
+            <p className="mb-3 text-sm font-semibold text-red-600">{walkInError}</p>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500">
@@ -532,26 +531,23 @@ export default function LogbookPanel({
                 value={regId}
                 onChange={(e) => {
                   setRegId(e.target.value);
-                  if (walkInError) setWalkInError("");
+                  if (walkInError) setWalkInError(null);
                 }}
                 placeholder="Student ID"
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
               />
-              <label className="mt-2 block text-xs font-semibold text-gray-500">
-                Patient Name
-              </label>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">Patient Name</label>
               <input
                 value={walkInName}
                 onChange={(e) => {
                   setWalkInName(e.target.value);
-                  if (walkInError) setWalkInError("");
+                  if (walkInError) setWalkInError(null);
                 }}
                 placeholder="Full name (required if not registered)"
                 className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
               />
-              {walkInError && (
-                <p className="mt-1 text-xs text-red-500">{walkInError}</p>
-              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500">Reason</label>
