@@ -7,14 +7,23 @@ POST /api/auth/signup       - create Supabase auth user + students + app_account
 """
 
 import logging
+import os
 import random
 import re
+import smtplib
 import time
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from flask import Blueprint, jsonify, request
 
 from database import supabase
 from routers.helpers import error_response, execute_with_retry, handle_errors
+
+try:
+    import resend
+except ImportError:
+    resend = None
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +96,43 @@ def _extract_student_id(email: str) -> str:
     return email.split("@")[0]
 
 
+def _send_email_via_smtp(to_email: str, code: str) -> bool:
+    """Send verification code email via Gmail SMTP. Returns True on success."""
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_user = os.environ.get("SMTP_USER", "")
+    smtp_password = os.environ.get("SMTP_PASSWORD", "")
+
+    if not smtp_user or not smtp_password:
+        logger.warning("SMTP credentials not configured — skipping SMTP send")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = smtp_user
+    msg["To"] = to_email
+    msg["Subject"] = "Your Gordon College Clinic verification code"
+
+    html_body = (
+        f"<p>Your verification code is: <strong>{code}</strong></p>"
+        f"<p>This code expires in 5 minutes.</p>"
+    )
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, to_email, msg.as_string())
+        logger.info("SMTP email sent to %s", to_email)
+        return True
+    except smtplib.SMTPAuthenticationError as exc:
+        logger.error("SMTP authentication failed: %r", exc)
+        return False
+    except Exception as exc:
+        logger.warning("SMTP send failed for %s: %r", to_email, exc)
+        return False
+
+
 # ============================================================
 # POST /api/auth/check-email
 #
@@ -155,7 +201,34 @@ def send_code():
     code = _generate_code()
     _verification_codes[email] = (code, time.time())
 
-    logger.info("Verification code for %s: %s", email, code)
+    # --- send email: try SMTP first, then fallback to Resend ---
+    smtp_ok = _send_email_via_smtp(email, code)
+
+    if not smtp_ok:
+        # Fallback: try Resend if configured
+        api_key = os.environ.get("RESEND_API_KEY", "").strip()
+        if api_key and resend is not None:
+            try:
+                resend.api_key = api_key
+                resend.Emails.send({
+                    "from": "Clinic Appointment System <onboarding@resend.dev>",
+                    "to": [email],
+                    "subject": "Your Verification Code",
+                    "html": (
+                        f"<p>Your verification code is: <strong>{code}</strong></p>"
+                        f"<p>This code expires in 5 minutes.</p>"
+                    ),
+                })
+                logger.info("Resend email sent to %s", email)
+            except Exception as exc:
+                logger.warning("Resend email failed for %s: %r", email, exc)
+        else:
+            logger.warning(
+                "No email provider available — code for %s logged only: %s",
+                email, code,
+            )
+    else:
+        logger.info("Verification code sent to %s via SMTP", email)
 
     return jsonify({"success": True, "message": "Verification code sent"}), 200
 
