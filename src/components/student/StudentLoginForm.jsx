@@ -80,6 +80,12 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
             </button>
           </div>
         </div>
+
+        <div className="mt-3 text-right">
+          <a href="/student/forgot-password" className="text-sm font-semibold text-gc-accent hover:text-gc-green-600">
+            Forgot password?
+          </a>
+        </div>
       </div>
 
       {error ? (

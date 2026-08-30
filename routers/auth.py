@@ -1,9 +1,13 @@
 """
-Authentication endpoints for student signup flow.
+Authentication endpoints for student signup and password reset flows.
 
-POST /api/auth/check-email  - validate email format + domain, check availability
-POST /api/auth/send-code    - generate & store a 6-digit verification code
-POST /api/auth/signup       - create Supabase auth user + students + app_accounts rows
+POST /api/auth/check-email        - validate email format + domain, check availability
+POST /api/auth/send-code          - generate & store a 6-digit verification code
+POST /api/auth/signup             - create Supabase auth user + students + app_accounts rows
+
+POST /api/auth/forgot/check-email - check if an account exists for password reset
+POST /api/auth/forgot/send-code   - send a 6-digit code for password reset
+POST /api/auth/forgot/reset       - reset password using the verification code
 """
 
 import logging
@@ -43,6 +47,9 @@ MIN_PASSWORD_LENGTH = 8
 
 # In-memory verification codes: {email: (code, created_at)}
 _verification_codes: dict[str, tuple[str, float]] = {}
+
+# In-memory forgot-password codes: {email: (code, created_at)}
+_forgot_codes: dict[str, tuple[str, float]] = {}
 
 
 # ============================================================
@@ -471,3 +478,210 @@ def signup():
     logger.info("Signup completed for %s (auth_user_id=%s)", email, auth_user_id)
 
     return jsonify({"success": True, "message": "Account created successfully"}), 201
+
+
+# ============================================================
+# FORGOT PASSWORD FLOW
+# ============================================================
+
+def _is_forgot_code_valid(email: str, code: str) -> bool:
+    """Check that *code* matches the stored forgot-password code for *email* and hasn't expired."""
+    stored = _forgot_codes.get(email)
+    if stored is None:
+        return False
+    stored_code, created_at = stored
+    if time.time() - created_at > CODE_TTL_SECONDS:
+        _forgot_codes.pop(email, None)
+        return False
+    return stored_code == code
+
+
+# ============================================================
+# POST /api/auth/forgot/check-email
+#
+# Request:  { "email": "202411829@gordoncollege.edu.ph" }
+# Response: { "success": true, "exists": true|false, "message": "..." }
+#
+# Checks whether an account exists for the given email.
+# ============================================================
+
+@auth_bp.route("/forgot/check-email", methods=["POST"])
+@handle_errors("forgot check-email error")
+def forgot_check_email():
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip().lower()
+
+    # --- validation ---
+    err, status = _validate_email(email)
+    if err:
+        return error_response(err, status)
+
+    # --- check if an app_account exists for this email ---
+    response = execute_with_retry(
+        supabase
+        .table("app_accounts")
+        .select("account_id")
+        .eq("email", email)
+        .limit(1)
+    )
+
+    exists = bool(response.data)
+
+    if not exists:
+        return error_response(
+            "No account found for this email. Please sign up.",
+            404,
+        )
+
+    return jsonify({
+        "success": True,
+        "exists": True,
+        "message": "Account found.",
+    }), 200
+
+
+# ============================================================
+# POST /api/auth/forgot/send-code
+#
+# Request:  { "email": "202411829@gordoncollege.edu.ph" }
+# Response: { "success": true, "message": "Verification code sent" }
+#
+# Generates a 6-digit code, stores it in _forgot_codes, and
+# sends it via email (SMTP → Resend fallback).
+# ============================================================
+
+@auth_bp.route("/forgot/send-code", methods=["POST"])
+@handle_errors("forgot send-code error")
+def forgot_send_code():
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip().lower()
+
+    # --- validation ---
+    err, status = _validate_email(email)
+    if err:
+        return error_response(err, status)
+
+    # --- check account exists ---
+    account_check = execute_with_retry(
+        supabase
+        .table("app_accounts")
+        .select("account_id")
+        .eq("email", email)
+        .limit(1)
+    )
+
+    if not account_check.data:
+        return error_response(
+            "No account found for this email. Please sign up.",
+            404,
+        )
+
+    # --- generate & store code ---
+    code = _generate_code()
+    _forgot_codes[email] = (code, time.time())
+    logger.info("DEBUG forgot code for %s: %s", email, code)
+
+    # --- send email: try SMTP first, then fallback to Resend ---
+    smtp_ok = _send_email_via_smtp(email, code)
+
+    if not smtp_ok:
+        api_key = os.environ.get("RESEND_API_KEY", "").strip()
+        if api_key and resend is not None:
+            try:
+                resend.api_key = api_key
+                resend.Emails.send({
+                    "from": "Clinic Appointment System <onboarding@resend.dev>",
+                    "to": [email],
+                    "subject": "Your Password Reset Code",
+                    "html": (
+                        f"<p>Your password reset code is: <strong>{code}</strong></p>"
+                        f"<p>This code expires in 5 minutes.</p>"
+                    ),
+                })
+                logger.info("Resend email sent to %s", email)
+            except Exception as exc:
+                logger.warning("Resend email failed for %s: %r", email, exc)
+        else:
+            logger.warning(
+                "No email provider available — forgot code for %s logged only: %s",
+                email, code,
+            )
+    else:
+        logger.info("Forgot password code sent to %s via SMTP", email)
+
+    return jsonify({"success": True, "message": "Verification code sent"}), 200
+
+
+# ============================================================
+# POST /api/auth/forgot/reset
+#
+# Request: {
+#   "email":    "202411829@gordoncollege.edu.ph",
+#   "code":     "482916",
+#   "password": "s3cretP@ss",
+#   "confirmPassword": "s3cretP@ss"
+# }
+#
+# Response: { "success": true, "message": "Password reset successfully." }
+# ============================================================
+
+@auth_bp.route("/forgot/reset", methods=["POST"])
+@handle_errors("forgot reset error")
+def forgot_reset():
+    body = request.get_json(silent=True) or {}
+
+    # --- extract & validate required fields ---
+    email = (body.get("email") or "").strip().lower()
+    code = (body.get("code") or "").strip()
+    password = body.get("password") or ""
+    confirm_password = body.get("confirmPassword") or ""
+
+    # --- field presence checks ---
+    if not email:
+        return error_response("Email is required.", 400)
+    if not code:
+        return error_response("Verification code is required.", 400)
+    if not password:
+        return error_response("Password is required.", 400)
+    if not confirm_password:
+        return error_response("Password confirmation is required.", 400)
+
+    # --- email validation ---
+    err, status = _validate_email(email)
+    if err:
+        return error_response(err, status)
+
+    # --- password validation ---
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return error_response(
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters.", 400
+        )
+
+    if password != confirm_password:
+        return error_response("Passwords do not match.", 400)
+
+    # --- verify code ---
+    if not _is_forgot_code_valid(email, code):
+        return error_response("Invalid or expired verification code.", 400)
+
+    # --- find auth user ---
+    auth_user = _find_auth_user_by_email(email)
+    if auth_user is None:
+        return error_response("Account not found.", 404)
+
+    # --- reset password via Supabase admin API ---
+    try:
+        supabase.auth.admin.update_user_by_id(
+            auth_user.id,
+            {"password": password},
+        )
+    except Exception as exc:
+        logger.error("Admin update_user_by_id failed for %s: %r", email, exc)
+        return error_response("Failed to reset password. Please try again.", 500)
+
+    # --- consume forgot code ---
+    _forgot_codes.pop(email, None)
+
+    logger.info("Password reset completed for %s", email)
+
+    return jsonify({"success": True, "message": "Password reset successfully."}), 200

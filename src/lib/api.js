@@ -179,3 +179,16 @@ export const authApi = {
   sendCode: (email) => authRequest('/api/auth/send-code', { email }),
   signup: (payload) => authRequest('/api/auth/signup', payload),
 }
+
+// ---- Public Student Forgot Password ----
+// Same pre-auth, unauthenticated raw-fetch pattern as authApi above.
+//   POST /api/auth/forgot/check-email { email }        -> 200 { exists } | 404
+//   POST /api/auth/forgot/send-code   { email }        -> 200 { success }
+//   POST /api/auth/forgot/reset       { email, code,
+//                                       password,
+//                                       confirmPassword } -> 200 | 400
+export const forgotApi = {
+  checkEmail: (email) => authRequest('/api/auth/forgot/check-email', { email }),
+  sendCode: (email) => authRequest('/api/auth/forgot/send-code', { email }),
+  reset: (payload) => authRequest('/api/auth/forgot/reset', payload),
+}
