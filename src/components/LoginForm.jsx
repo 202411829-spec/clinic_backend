@@ -69,17 +69,23 @@ export default function LoginForm({ align = 'left', onSubmit, loading = false, e
               placeholder="Your password"
               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 text-right">
+            <a href="/admin/forgot-password" className="text-sm font-semibold text-gc-accent hover:text-gc-green-600">
+              Forgot password?
+            </a>
           </div>
         </div>
-      </div>
 
       {error ? (
         <p role="alert" className="mt-4 text-sm font-medium text-red-600">

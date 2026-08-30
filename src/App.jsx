@@ -20,6 +20,7 @@ const MedicalSummary = lazy(() => import('./pages/admin/MedicalSummary.jsx'))
 const StudentLogin = lazy(() => import('./pages/auth/StudentLogin.jsx'))
 const StudentSignUp = lazy(() => import('./pages/auth/StudentSignUp.jsx'))
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword.jsx'))
+const AdminForgotPassword = lazy(() => import('./pages/auth/AdminForgotPassword.jsx'))
 const StudentLayout = lazy(() => import('./components/student/StudentLayout.jsx'))
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard.jsx'))
 const StudentBook = lazy(() => import('./pages/student/Book.jsx'))
@@ -53,6 +54,7 @@ export default function App() {
 
       {/* ADMIN */}
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
 
       <Route
         path="/admin"

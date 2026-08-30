@@ -12,21 +12,80 @@ const STEPS = [
 ]
 
 /**
- * Multi-step "forgot password" form for the Student Portal.
+ * Per-portal branding + behavior for the forgot-password form. The class
+ * strings are written out in full (not interpolated) so Tailwind's content
+ * scanner still picks them up at build time.
+ */
+const VARIANTS = {
+  student: {
+    portalLabel: 'Student Portal',
+    emailLabel: 'Gordon College email',
+    emailPlaceholder: `name${EMAIL_DOMAIN}`,
+    subtitle: "We'll send a code to your Gordon College email to verify it's you.",
+    loginPath: '/student/login',
+    normalizeEmail: (value) => value,
+    validateEmail: (value) => {
+      if (!value.trim()) return 'Please enter your email address.'
+      if (!EMAIL_RE.test(value.trim())) {
+        return `Use your Gordon College email (ending in ${EMAIL_DOMAIN}).`
+      }
+      return ''
+    },
+    textAccent: 'text-gc-accent',
+    bgAccent: 'bg-gc-accent',
+    borderAccent: 'focus:border-gc-accent',
+    ringAccent: 'focus:ring-gc-accent/20',
+    ringAccentStrong: 'focus:ring-gc-accent/30',
+    hoverAccent: 'hover:text-gc-green-600',
+    hoverBgAccent: 'hover:bg-gc-green-600',
+  },
+  admin: {
+    portalLabel: 'Admin Portal',
+    emailLabel: 'Email',
+    emailPlaceholder: 'Email / Username',
+    subtitle: "We'll send a code to your email to verify it's you.",
+    loginPath: '/admin/login',
+    // Admins log in as username@gordoncollege.edu.ph, so accept a bare
+    // username and complete the address before hitting the API.
+    normalizeEmail: (value) =>
+      value.includes('@') ? value : `${value}@gordoncollege.edu.ph`,
+    validateEmail: (value) =>
+      value.trim() ? '' : 'Please enter your email or username.',
+    textAccent: 'text-gc-accent',
+    bgAccent: 'bg-gc-green-700',
+    borderAccent: 'focus:border-gc-green-700',
+    ringAccent: 'focus:ring-gc-green-700/30',
+    ringAccentStrong: 'focus:ring-gc-green-700/30',
+    hoverAccent: 'hover:text-gc-green-600',
+    hoverBgAccent: 'hover:bg-gc-green-800',
+  },
+}
+
+/**
+ * Multi-step "forgot password" form, reused by both the Student and Admin
+ * portals via the `variant` prop.
  *
- * Step 1: collect the Gordon College email, confirm an account exists
+ * Step 1: collect the email/username, confirm an account exists
  *         (POST /api/auth/forgot/check-email), then trigger a 6-digit code
  *         email (POST /api/auth/forgot/send-code).
- * Step 2: let the student paste the 6-digit code they received.
+ * Step 2: let the user paste the 6-digit code they received.
  * Step 3: collect + confirm a new password, then reset the account
  *         (POST /api/auth/forgot/reset). On success the parent redirects
- *         the student to /student/login.
+ *         the user to the login screen.
  *
  * `onSuccess()` is called after the backend confirms the reset succeeded,
  * once a short success message has been shown, so the page can route the
- * student to the login screen.
+ * user to the login screen.
  */
-export default function ForgotPasswordForm({ align = 'left', onSuccess, loading = false, error = '' }) {
+export default function ForgotPasswordForm({
+  variant = 'student',
+  align = 'left',
+  onSuccess,
+  loading = false,
+  error = '',
+}) {
+  const cfg = VARIANTS[variant] ?? VARIANTS.student
+
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -42,17 +101,9 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
   const isCentered = align === 'center'
   const isBusy = busy || loading
 
-  function validateEmail() {
-    if (!email.trim()) return 'Please enter your email address.'
-    if (!EMAIL_RE.test(email.trim())) {
-      return `Use your Gordon College email (ending in ${EMAIL_DOMAIN}).`
-    }
-    return ''
-  }
-
   async function handleEmailSubmit(e) {
     e.preventDefault()
-    const emailError = validateEmail()
+    const emailError = cfg.validateEmail(email)
     if (emailError) {
       setFieldError(emailError)
       return
@@ -60,15 +111,16 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
     setFieldError('')
     setBusy(true)
     try {
-      const result = await forgotApi.checkEmail(email.trim())
+      const target = cfg.normalizeEmail(email.trim())
+      const result = await forgotApi.checkEmail(target)
       // A 200 means an account exists. If the backend explicitly flags it as
-      // missing, surface that so the student can correct the email.
+      // missing, surface that so the user can correct the email.
       if (result && result.exists === false) {
         setFieldError('We could not find an account with that email. Check the address and try again.')
         return
       }
-      await forgotApi.sendCode(email.trim())
-      setInfo(`We sent a 6-digit code to ${email.trim()}.`)
+      await forgotApi.sendCode(target)
+      setInfo(`We sent a 6-digit code to ${target}.`)
       setStep(2)
     } catch (err) {
       // The backend returns 404 when no account matches the email.
@@ -87,8 +139,9 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
     setFieldError('')
     setBusy(true)
     try {
-      await forgotApi.sendCode(email.trim())
-      setInfo(`We resent a 6-digit code to ${email.trim()}.`)
+      const target = cfg.normalizeEmail(email.trim())
+      await forgotApi.sendCode(target)
+      setInfo(`We resent a 6-digit code to ${target}.`)
     } catch (err) {
       setFieldError(err?.message || 'Could not resend the code. Please try again.')
     } finally {
@@ -128,8 +181,9 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
     setFieldError('')
     setBusy(true)
     try {
+      const target = cfg.normalizeEmail(email.trim())
       await forgotApi.reset({
-        email: email.trim(),
+        email: target,
         code,
         password,
         confirmPassword,
@@ -140,7 +194,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
       setTimeout(() => onSuccess?.(), 1500)
     } catch (err) {
       const message = err?.message || 'Could not reset your password. Please try again.'
-      // If the backend rejected the code, send the student back to re-enter it.
+      // If the backend rejected the code, send the user back to re-enter it.
       if (/code/i.test(message)) {
         setFieldError(message)
         setCode('')
@@ -177,14 +231,14 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
       className="w-full"
     >
       <div className={isCentered ? 'text-center' : 'text-left'}>
-        <p className="text-xs font-bold tracking-[0.15em] text-gc-accent uppercase">
-          Student Portal
+        <p className={`text-xs font-bold tracking-[0.15em] ${cfg.textAccent} uppercase`}>
+          {cfg.portalLabel}
         </p>
         <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-gc-green-700">
           Reset your password
         </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-gray-600">
-          We'll send a code to your Gordon College email to verify it's you.
+          {cfg.subtitle}
         </p>
       </div>
 
@@ -198,7 +252,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
               <span
                 className={[
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                  active || doneStep ? 'bg-gc-accent text-white' : 'bg-gray-100 text-gray-400',
+                  active || doneStep ? `${cfg.bgAccent} text-white` : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
                 {s.id}
@@ -207,7 +261,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
                 {s.label}
               </span>
               {idx < STEPS.length - 1 && (
-                <span className={`h-0.5 flex-1 ${doneStep ? 'bg-gc-accent' : 'bg-gray-100'}`} />
+                <span className={`h-0.5 flex-1 ${doneStep ? cfg.bgAccent : 'bg-gray-100'}`} />
               )}
             </li>
           )
@@ -218,7 +272,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
         {step === 1 && (
           <div>
             <label htmlFor="forgot-email" className="block text-sm font-semibold text-gray-900 mb-1.5">
-              Gordon College email
+              {cfg.emailLabel}
             </label>
             <input
               id="forgot-email"
@@ -230,8 +284,8 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
                 setEmail(e.target.value)
                 setFieldError('')
               }}
-              placeholder={`name${EMAIL_DOMAIN}`}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+              placeholder={cfg.emailPlaceholder}
+              className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
             />
           </div>
         )}
@@ -249,7 +303,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
                   setFieldError('')
                   setInfo('')
                 }}
-                className="mb-1.5 text-xs font-semibold text-gc-accent hover:text-gc-green-600"
+                className={`mb-1.5 text-xs font-semibold ${cfg.textAccent} ${cfg.hoverAccent}`}
               >
                 Change email
               </button>
@@ -263,13 +317,13 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
               value={code}
               onChange={(e) => handleCodeChange(e.target.value)}
               placeholder="••••••"
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-center text-[22px] tracking-[0.5em] text-gray-900 shadow-sm placeholder:text-gray-300 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+              className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-center text-[22px] tracking-[0.5em] text-gray-900 shadow-sm placeholder:text-gray-300 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
             />
             <button
               type="button"
               onClick={handleResend}
               disabled={isBusy}
-              className="mt-2 text-xs font-semibold text-gc-accent hover:text-gc-green-600 disabled:opacity-60"
+              className={`mt-2 text-xs font-semibold ${cfg.textAccent} ${cfg.hoverAccent} disabled:opacity-60`}
             >
               Resend code
             </button>
@@ -294,7 +348,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
                     setFieldError('')
                   }}
                   placeholder="At least 8 characters"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+                  className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
                 />
                 <button
                   type="button"
@@ -327,7 +381,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
                   setFieldError('')
                 }}
                 placeholder="Re-enter your password"
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+                className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
               />
             </div>
           </>
@@ -347,7 +401,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
       <button
         type="submit"
         disabled={isBusy}
-        className="mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`mt-7 w-full rounded-xl ${cfg.bgAccent} py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors ${cfg.hoverBgAccent} focus:outline-none focus:ring-2 ${cfg.ringAccentStrong} disabled:cursor-not-allowed disabled:opacity-60`}
       >
         {isBusy
           ? 'Please wait…'
@@ -374,7 +428,7 @@ export default function ForgotPasswordForm({ align = 'left', onSuccess, loading 
 
       <p className="mt-5 text-center text-sm text-gray-600">
         Remembered it?{' '}
-        <a href="/student/login" className="font-semibold text-gc-accent hover:text-gc-green-600">
+        <a href={cfg.loginPath} className={`font-semibold ${cfg.textAccent} ${cfg.hoverAccent}`}>
           Log in
         </a>
       </p>
