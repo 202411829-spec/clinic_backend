@@ -134,11 +134,19 @@ def add_admin():
         supabase.table("admin_accounts").insert({
             "email": email,
             "username": username,
+            "first_name": "",
+            "last_name": "",
             "role": role,
             "is_active": False,
-        }).select("*")
+        })
     )
     row = (inserted.data or [None])[0]
+    # Fallback fetch if insert did not return row (some supabase-py versions)
+    if row is None:
+        fetched = execute_with_retry(
+            supabase.table("admin_accounts").select("*").eq("email", email).limit(1)
+        )
+        row = (fetched.data or [None])[0]
     return jsonify({"success": True, "message": "Admin invite created", "admin": row}), 201
 
 
@@ -160,11 +168,11 @@ def deactivate_admin(admin_id):
     if not row.get("is_active"):
         return jsonify({"success": True, "message": "Admin already inactive", "admin": row}), 200
 
-    updated = execute_with_retry(
-        supabase.table("admin_accounts").update({"is_active": False}).eq("admin_id", admin_id).select("*")
+    execute_with_retry(
+        supabase.table("admin_accounts").update({"is_active": False}).eq("admin_id", admin_id)
     )
-    admin = (updated.data or [None])[0] or row
-    return jsonify({"success": True, "message": "Admin deactivated", "admin": admin}), 200
+    row["is_active"] = False
+    return jsonify({"success": True, "message": "Admin deactivated", "admin": row}), 200
 
 
 @admin_mgmt_bp.route("/admins/<admin_id>/activate", methods=["PATCH"])
@@ -199,11 +207,11 @@ def activate_admin(admin_id):
         else:
             return error_response("Pending — must complete signup", 409)
 
-    updated = execute_with_retry(
-        supabase.table("admin_accounts").update({"is_active": True}).eq("admin_id", admin_id).select("*")
+    execute_with_retry(
+        supabase.table("admin_accounts").update({"is_active": True}).eq("admin_id", admin_id)
     )
-    admin = (updated.data or [None])[0] or row
-    return jsonify({"success": True, "message": "Admin activated", "admin": admin}), 200
+    row["is_active"] = True
+    return jsonify({"success": True, "message": "Admin activated", "admin": row}), 200
 
 
 @admin_mgmt_bp.route("/admins/<admin_id>", methods=["DELETE"])
@@ -298,13 +306,13 @@ def update_admin_profile(admin_id):
         return error_response("No fields to update.", 400)
 
     resp = execute_with_retry(
-        supabase.table("admin_accounts").select("admin_id").eq("admin_id", admin_id).limit(1)
+        supabase.table("admin_accounts").select("admin_id, email, username, first_name, last_name, role, license_no, is_active").eq("admin_id", admin_id).limit(1)
     )
     if not resp.data:
         return error_response("Admin not found", 404)
 
-    updated = execute_with_retry(
-        supabase.table("admin_accounts").update(updates).eq("admin_id", admin_id).select("*")
+    execute_with_retry(
+        supabase.table("admin_accounts").update(updates).eq("admin_id", admin_id)
     )
-    row = (updated.data or [None])[0]
+    row = {**resp.data[0], **updates}
     return jsonify({"success": True, "message": "Profile updated", "admin": row}), 200
