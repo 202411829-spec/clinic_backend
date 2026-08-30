@@ -133,3 +133,126 @@ def add_admin():
     )
     row = (inserted.data or [None])[0]
     return jsonify({"success": True, "message": "Admin invite created", "admin": row}), 201
+
+
+# ============================================================
+# DEACTIVATE / ACTIVATE / HARD DELETE
+# ============================================================
+
+
+@admin_mgmt_bp.route("/admins/<admin_id>/deactivate", methods=["PATCH"])
+@require_admin
+@handle_errors("deactivate admin error")
+def deactivate_admin(admin_id):
+    resp = execute_with_retry(
+        supabase.table("admin_accounts").select("admin_id, is_active").eq("admin_id", admin_id).limit(1)
+    )
+    if not resp.data:
+        return error_response("Admin not found", 404)
+    row = resp.data[0]
+    if not row.get("is_active"):
+        return jsonify({"success": True, "message": "Admin already inactive", "admin": row}), 200
+
+    updated = execute_with_retry(
+        supabase.table("admin_accounts").update({"is_active": False}).eq("admin_id", admin_id).select("*")
+    )
+    admin = (updated.data or [None])[0] or row
+    return jsonify({"success": True, "message": "Admin deactivated", "admin": admin}), 200
+
+
+@admin_mgmt_bp.route("/admins/<admin_id>/activate", methods=["PATCH"])
+@require_admin
+@handle_errors("activate admin error")
+def activate_admin(admin_id):
+    resp = execute_with_retry(
+        supabase.table("admin_accounts").select("admin_id, is_active").eq("admin_id", admin_id).limit(1)
+    )
+    if not resp.data:
+        return error_response("Admin not found", 404)
+    row = resp.data[0]
+    if row.get("is_active"):
+        return jsonify({"success": True, "message": "Admin already active", "admin": row}), 200
+
+    # Requires existing app_accounts (else pending must complete signup)
+    acct = execute_with_retry(
+        supabase.table("app_accounts").select("account_id").eq("admin_id", admin_id).limit(1)
+    )
+    if not acct.data:
+        # Also check by email fallback
+        admin_full = execute_with_retry(
+            supabase.table("admin_accounts").select("email").eq("admin_id", admin_id).limit(1)
+        )
+        email = (admin_full.data[0].get("email") if admin_full.data else None)
+        if email:
+            acct2 = execute_with_retry(
+                supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
+            )
+            if not acct2.data:
+                return error_response("Pending — must complete signup", 409)
+        else:
+            return error_response("Pending — must complete signup", 409)
+
+    updated = execute_with_retry(
+        supabase.table("admin_accounts").update({"is_active": True}).eq("admin_id", admin_id).select("*")
+    )
+    admin = (updated.data or [None])[0] or row
+    return jsonify({"success": True, "message": "Admin activated", "admin": admin}), 200
+
+
+@admin_mgmt_bp.route("/admins/<admin_id>", methods=["DELETE"])
+@require_admin
+@handle_errors("delete admin error")
+def delete_admin(admin_id):
+    body = request.get_json(silent=True) or {}
+    confirm_email = (body.get("confirmEmail") or "").strip().lower()
+    if not confirm_email:
+        return error_response("Please type the admin email to confirm", 400)
+
+    resp = execute_with_retry(
+        supabase.table("admin_accounts").select("admin_id, email").eq("admin_id", admin_id).limit(1)
+    )
+    if not resp.data:
+        return error_response("Admin not found", 404)
+    row = resp.data[0]
+    row_email = (row.get("email") or "").strip().lower()
+    if confirm_email != row_email:
+        return error_response("Please type the admin email to confirm", 400)
+
+    # Self-delete guard: id or email matches caller
+    caller_id = getattr(g, "user", {}).get("id")
+    caller_email = (getattr(g, "user", {}).get("email") or "").strip().lower()
+    if str(admin_id) == str(caller_id) or row_email == caller_email:
+        return jsonify({"success": False, "error": "Cannot delete yourself"}), 403
+
+    # Also block self-delete via app_accounts admin_id match
+    if caller_id:
+        caller_acct = execute_with_retry(
+            supabase.table("app_accounts").select("admin_id").eq("auth_user_id", caller_id).limit(1)
+        )
+        if caller_acct.data and str(caller_acct.data[0].get("admin_id")) == str(admin_id):
+            return jsonify({"success": False, "error": "Cannot delete yourself"}), 403
+
+    # If app_accounts exists, delete auth user then app_accounts row
+    acct = execute_with_retry(
+        supabase.table("app_accounts").select("auth_user_id, account_id").eq("admin_id", admin_id).limit(1)
+    )
+    # Fallback by email if admin_id not matched
+    if not acct.data and row_email:
+        acct = execute_with_retry(
+            supabase.table("app_accounts").select("auth_user_id, account_id").eq("email", row_email).limit(1)
+        )
+    if acct.data:
+        auth_user_id = acct.data[0].get("auth_user_id")
+        if auth_user_id:
+            try:
+                supabase.auth.admin.delete_user(auth_user_id)
+            except Exception as exc:
+                logger.warning("Failed to delete auth user %s: %r", auth_user_id, exc)
+        execute_with_retry(
+            supabase.table("app_accounts").delete().eq("account_id", acct.data[0]["account_id"])
+        )
+
+    execute_with_retry(
+        supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
+    )
+    return jsonify({"success": True, "message": "Admin deleted"}), 200
