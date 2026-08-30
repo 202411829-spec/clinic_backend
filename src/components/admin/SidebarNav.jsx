@@ -18,17 +18,17 @@ function NavGroup({ title, items, onNavigate }) {
               onClick={onNavigate}
               className={({ isActive }) =>
                 [
-                  "relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors overflow-hidden",
+                  "relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-smooth overflow-hidden active:scale-[0.98]",
                   isActive
                     ? "bg-[#1E6C1A] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
-                    : "text-white/85 hover:bg-white/10",
+                    : "text-white/85 hover:bg-white/10 hover:translate-x-0.5",
                 ].join(" ")
               }
             >
               {({ isActive }) =>
                 isActive ? (
                   <>
-                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32]" />
+                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32] animate-scale-in" />
                     <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
                     <span>{item.label}</span>
                   </>
@@ -92,13 +92,13 @@ export default function SidebarNav({ onNavigate }) {
       </nav>
 
       <div className="px-2 pb-5 pt-3 border-t border-white/15 mx-2 space-y-1">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-medium [&>button]:text-white/85 [&>button:hover]:bg-white/10 [&>button:hover]:text-white/85 [&_svg]:w-[18px] [&_svg]:h-[18px]">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-medium [&>button]:text-white/85 [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-white/10 [&>button:hover]:text-white/85 [&>button:active]:scale-[0.98] [&_svg]:w-[18px] [&_svg]:h-[18px]">
           <LogoutMenu redirectTo="/admin/login" />
         </div>
         <NavLink
           to="/admin/about"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-white/85 hover:bg-white/10"
+          className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-white/85 transition-all duration-200 hover:bg-white/10 active:scale-[0.98]"
         >
           <NavIcon name="info" className="w-[18px] h-[18px]" />
           <span>About</span>

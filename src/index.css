@@ -13,12 +13,87 @@
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Give every interactive element a smooth default transition so the
+     many existing `hover:bg-*` / `hover:text-*` utilities across the
+     admin panels (Appointments, Logbook, Masterlist, Reports, etc.)
+     ease into place instead of snapping instantly. Only cheap,
+     compositor-friendly properties are listed, and print is excluded
+     since it doesn't need any of this. Scoped to interactive elements
+     only, so it never touches layout-heavy containers. */
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  tr {
+    transition-property: background-color, color, border-color, box-shadow, transform, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@media print {
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  tr {
+    transition: none !important;
+  }
 }
 
 @layer utilities {
   /* Autofill fix so Chrome doesn't paint inputs yellow */
   input:-webkit-autofill {
     -webkit-box-shadow: 0 0 0px 1000px white inset;
+  }
+
+  /* ---------- shared UI-refinement utilities ----------
+     Small, reusable classes so every panel/card/button in the admin
+     portal can opt into the same subtle motion language instead of each
+     page hand-rolling its own transition classes. All of these only
+     animate `transform`/`opacity`/`box-shadow`, which the browser can
+     composite on the GPU — no layout recalculation, so they stay smooth
+     even on low-end laptops and don't slow the app down. */
+
+  /* Cards/panels: gentle lift + shadow on hover */
+  .card-hover {
+    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -8px rgba(4, 75, 14, 0.25);
+  }
+
+  /* Buttons/icon-buttons: quick tactile press feedback */
+  .btn-press {
+    transition: transform 0.12s ease-out, opacity 0.12s ease-out;
+  }
+  .btn-press:active {
+    transform: scale(0.96);
+  }
+
+  /* Table rows: subtle highlight instead of an abrupt background swap */
+  .row-hover {
+    transition: background-color 0.15s ease-out;
+  }
+}
+
+/* Respect the OS-level "reduce motion" setting — turn every custom
+   animation/transition into an instant state change instead of removing
+   functionality. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

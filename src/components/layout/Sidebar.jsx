@@ -30,12 +30,12 @@ function NavItem({ to, label, Icon }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-colors ${
-          isActive ? 'bg-gc-green-600' : 'hover:bg-white/5'
+        `flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 ease-smooth ${
+          isActive ? 'bg-gc-green-600' : 'hover:bg-white/5 hover:translate-x-0.5'
         }`
       }
     >
-      <Icon className="h-5 w-5 shrink-0" />
+      <Icon className="h-5 w-5 shrink-0 transition-transform duration-200" />
       {label}
     </NavLink>
   )
@@ -83,13 +83,13 @@ function NavContent() {
       </nav>
 
       <div className="px-3 pb-2">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-3 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white [&>button]:transition-colors [&>button:hover]:bg-white/5 [&_svg]:h-5 [&_svg]:w-5">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-3 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-white/5 [&_svg]:h-5 [&_svg]:w-5">
           <LogoutMenu redirectTo="/admin/login" />
         </div>
       </div>
 
       <div className="bg-gc-green-800 px-3 py-3">
-        <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-white/5">
+        <button className="btn-press flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-white/5">
           <InfoIcon className="h-5 w-5" />
           About
         </button>

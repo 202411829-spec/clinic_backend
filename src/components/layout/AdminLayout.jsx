@@ -144,13 +144,27 @@ export default function AdminLayout() {
         <TopBar />
         <main className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
           {checkingPending ? (
-            <div className="flex min-h-[60vh] items-center justify-center">
-              <p className="text-sm font-medium text-gray-500">Loading…</p>
+            // Only this content area shows the loading state — Sidebar and
+            // TopBar above are already mounted and visible, so switching
+            // admins/reloading never blanks out the whole screen anymore.
+            <div className="flex min-h-[60vh] items-center justify-center animate-fade-in">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-gc-green-100 border-t-gc-green-700" />
+                <p className="text-sm font-medium text-gray-500">Loading…</p>
+              </div>
             </div>
           ) : isPending ? (
             <Pending />
           ) : (
-            <Outlet />
+            // key={pathname} forces React to remount this wrapper on every
+            // route change, which restarts the fade-in-up animation — so
+            // every admin page (Dashboard, Appointments, Logbook, etc.) gets
+            // the same subtle "settle in" transition automatically, without
+            // each page needing its own animation code. Transform/opacity
+            // only, so it stays smooth and doesn't slow navigation down.
+            <div key={location.pathname} className="animate-fade-in-up print:animate-none">
+              <Outlet />
+            </div>
           )}
         </main>
       </div>

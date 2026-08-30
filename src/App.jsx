@@ -31,12 +31,18 @@ const StudentBook = lazy(() => import('./pages/student/Book.jsx'))
 const StudentRecord = lazy(() => import('./pages/student/StudentRecord.jsx'))
 const StudentFeedback = lazy(() => import('./pages/student/Feedback.jsx'))
 
-// Minimal loading state shown while the Supabase session is being restored,
-// so protected content never flashes for unauthenticated visitors.
+// Shown only while a lazy-loaded route chunk is still downloading (rare,
+// usually sub-second on repeat visits since Vite caches the chunks) — not
+// used for auth/session checks anymore, so the sidebar is never hidden
+// behind this. Fades in instead of popping in instantly, and uses a spinner
+// instead of a static "Loading…" line so it reads as intentional, not stuck.
 function SessionLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white">
-      <p className="text-sm font-semibold text-gc-green-700">Loading…</p>
+    <div className="flex min-h-screen items-center justify-center bg-white animate-fade-in">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gc-green-100 border-t-gc-green-700" />
+        <p className="text-sm font-semibold text-gc-green-700">Loading…</p>
+      </div>
     </div>
   )
 }
@@ -44,8 +50,15 @@ function SessionLoader() {
 function ProtectedRoute({ loginPath, children }) {
   const { isAuthenticated, loading } = useAuth()
 
-  if (loading) return <SessionLoader />
-  if (!isAuthenticated) return <Navigate to={loginPath} replace />
+  // Previously this returned <SessionLoader /> while `loading` was true,
+  // which blocked the whole layout — including the sidebar — from mounting
+  // until the Supabase session finished restoring. That produced a jarring
+  // blank-screen-then-everything-pops-in flash. Now we render the layout
+  // right away; AdminLayout/StudentLayout already show their own
+  // sidebar-visible loading state internally while auth resolves, and we
+  // only redirect once we're certain the visitor isn't signed in.
+  if (!loading && !isAuthenticated) return <Navigate to={loginPath} replace />
+
   return children
 }
 

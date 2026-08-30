@@ -408,7 +408,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
       {isToday && <AppointmentsSummary counts={summaryCounts} />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
-        <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
+        <div className="md:col-span-2 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
           <NavIcon name="search" className="w-4 h-4 shrink-0 text-gray-400" />
           <input
             value={search}

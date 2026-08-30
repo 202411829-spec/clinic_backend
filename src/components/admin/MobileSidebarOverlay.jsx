@@ -21,7 +21,7 @@ export default function MobileSidebarOverlay({ open, onClose }) {
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 md:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       <button
         aria-label="Close menu"
         onClick={onClose}
