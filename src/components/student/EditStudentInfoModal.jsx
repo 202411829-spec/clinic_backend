@@ -112,7 +112,9 @@ function buildInitialForm(student, departments = [], courses = []) {
   const emergency = student.emergencyContact || {};
 
   return {
-    studentNumber: student.studentNumber || "",
+    // Student number is derived from the school email (student_id) and the
+    // backend ignores it in PATCH, so it's display-only / not validated.
+    studentNumber: student.studentNumber || student.studentId || student.student_id || "",
     departmentId: deptObj ? deptObj.department_id : "",
     courseId: courseObj ? courseObj.course_id : "",
     // kept for legacy display / name resolution
@@ -168,7 +170,10 @@ function buildStudentFromForm(student, form, photoDataUrl, departments = [], cou
     ...student,
     name,
     studentNumber: form.studentNumber,
+    // Both `dept`/`course` and `department`/`course` aliases are kept so the
+    // panel (which reads `department`) and the form stay consistent after a save.
     dept: deptName,
+    department: deptName,
     course: courseName,
     deptCourse:
       deptName && courseName ? `${deptName} / ${courseName}` : student.deptCourse,
@@ -278,7 +283,11 @@ const STEP1_EMERGENCY_REQUIRED = ["name", "relationship", "contactNumber", "pres
 function isStep1Valid(form) {
   return (
     STEP1_REQUIRED.every((k) => String(form[k] || "").trim() !== "") &&
-    STEP1_EMERGENCY_REQUIRED.every((k) => String(form.emergency[k] || "").trim() !== "")
+    STEP1_EMERGENCY_REQUIRED.every((k) => String(form.emergency[k] || "").trim() !== "") &&
+    // Academic program is mandatory: without it the record stays incomplete
+    // even though the PATCH itself succeeds, which looked like "not saved".
+    String(form.departmentId || "").trim() !== "" &&
+    String(form.courseId || "").trim() !== ""
   );
 }
 
@@ -440,7 +449,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
 
           {/* academic information */}
           <SectionBlock icon="file" title="Academic Information">
-            <Field label="Student Number" required error={err("studentNumber")}>
+            <Field label="Student Number">
               <input
                 className={inputClass}
                 placeholder="e.g. 20230000"
@@ -448,6 +457,9 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                 readOnly
                 disabled
               />
+              <p className="text-xs text-gray-400 mt-1">
+                Derived from your school email — not editable.
+              </p>
             </Field>
             <Field label="Department" required error={err("departmentId")}>
               <UniversalDropdown

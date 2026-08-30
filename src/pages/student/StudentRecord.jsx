@@ -31,18 +31,32 @@ function adaptStudent(profile, medSummary) {
   const history = medSummary?.medical_history || {};
   return {
     studentId: profile.student_id,
+    // studentNumber is derived from the school email local part and is the
+    // stable display identifier — it must survive a reload (it was previously
+    // dropped, so the field showed "-").
+    studentNumber: profile.student_id || "",
     name: `${profile.last_name ?? ""}, ${profile.first_name ?? ""}${middle}`.trim(),
     firstName: profile.first_name,
     lastName: profile.last_name,
-    birthday: profile.birth_date ?? null,
+    birthday: formatDate(profile.birth_date),
     sex: profile.gender ?? "-",
+    civilStatus: profile.civil_status ?? "-",
+    contactNumber: profile.contact_number ?? "-",
+    presentAddress: profile.present_address ?? "-",
     yearLevel: profile.year_level ?? "-",
     course: profile.course_name ?? "-",
     department: profile.department_name ?? "-",
+    deptCourse: `${profile.course_name ?? "-"} / ${profile.department_name ?? "-"}`,
+    // Persisted IDs so the edit form and the department/course lists line up
+    // even when the name-based lookup would miss.
+    departmentId: profile.department_id ?? "",
+    courseId: profile.course_id ?? "",
+    photo: profile.photo ?? null,
     emergencyContact: {
       name: ec.contact_name ?? ec.name ?? "-",
       relationship: ec.relationship ?? "-",
       contactNumber: ec.contact_number ?? ec.phone_number ?? ec.phone ?? "-",
+      presentAddress: ec.present_address ?? profile.present_address ?? "-",
     },
     medicalConditions: CONDITION_FIELDS.filter((k) => history[k]),
     previousOperation: {
