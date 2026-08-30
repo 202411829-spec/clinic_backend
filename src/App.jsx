@@ -19,6 +19,7 @@ const AdminProfile = lazy(() => import('./pages/admin/Profile.jsx'))
 const AdminStudentRecord = lazy(() => import('./pages/admin/StudentRecord.jsx'))
 const MedicalCertificate = lazy(() => import('./pages/admin/MedicalCertificate.jsx'))
 const MedicalSummary = lazy(() => import('./pages/admin/MedicalSummary.jsx'))
+const Pending = lazy(() => import('./pages/admin/Pending.jsx'))
 
 const StudentLogin = lazy(() => import('./pages/auth/StudentLogin.jsx'))
 const StudentSignUp = lazy(() => import('./pages/auth/StudentSignUp.jsx'))
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="admins" element={<Admins />} />
         <Route path="profile" element={<AdminProfile />} />
+        <Route path="pending" element={<Pending />} />
       </Route>
 
       {/* STUDENT */}

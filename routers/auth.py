@@ -743,53 +743,73 @@ def forgot_reset():
 @auth_bp.route("/admin/check-email", methods=["POST"])
 @handle_errors("admin check-email error")
 def admin_check_email():
+    """Check if an admin email is available for signup request.
+
+    Logic (no allowlist — any @gordoncollege.edu.ph can request):
+      - Email already active (admin_accounts.is_active + app_account) -> 409 "Already active"
+      - Email exists in admin_accounts but not active -> 200 {available:false, status:"pending"}
+      - Email not in admin_accounts -> 200 {available:true}
+    """
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip().lower()
     err, status = _validate_email(email)
     if err:
         return error_response(err, status)
 
-    resp = execute_with_retry(
-        supabase.table("admin_accounts").select("admin_id, is_active, email").eq("email", email).limit(1)
+    # Check if email already exists in admin_accounts
+    admin_resp = execute_with_retry(
+        supabase.table("admin_accounts").select("admin_id, is_active").eq("email", email).limit(1)
     )
-    if not resp.data:
-        return error_response("Not invited", 404)
+    if admin_resp.data:
+        row = admin_resp.data[0]
+        is_active = bool(row.get("is_active"))
+        if is_active:
+            # Check if already has app_account (fully active)
+            acct = execute_with_retry(
+                supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
+            )
+            if acct.data:
+                return error_response("Already active", 409)
+        # Not yet active (pending request or allowlist invite)
+        return jsonify({"success": True, "available": False, "status": "pending"}), 200
 
-    row = resp.data[0]
-    # If active and has app_accounts -> already active
-    acct = execute_with_retry(
+    # Also check app_accounts (e.g. student email reused as admin)
+    acct_resp = execute_with_retry(
         supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
     )
-    has_account = bool(acct.data)
-    is_active = bool(row.get("is_active"))
-    if is_active and has_account:
-        return error_response("Already active", 409)
+    if acct_resp.data:
+        return error_response("An account with this email already exists. Please log in instead.", 409)
 
-    status_label = "pending" if not is_active and not has_account else ("active" if is_active and has_account else "inactive")
-    return jsonify({"success": True, "invited": True, "status": status_label}), 200
+    # Email not in any admin table -- available for signup request
+    return jsonify({"success": True, "available": True}), 200
 
 
 @auth_bp.route("/admin/send-code", methods=["POST"])
 @handle_errors("admin send-code error")
 def admin_send_code():
+    """Send a 6-digit verification code for admin signup request.
+
+    No allowlist gate: any valid @gordoncollege.edu.ph that isn't already
+    active can request a code.  Rate limited to 3 sends per 15 minutes.
+    """
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip().lower()
     err, status = _validate_email(email)
     if err:
         return error_response(err, status)
 
-    # Re-validate allowlisted + pending
-    resp = execute_with_retry(
+    # Block if already active (admin_accounts.is_active + app_account exists)
+    admin_resp = execute_with_retry(
         supabase.table("admin_accounts").select("admin_id, is_active").eq("email", email).limit(1)
     )
-    if not resp.data:
-        return error_response("Not invited", 404)
-    is_active = bool(resp.data[0].get("is_active"))
-    acct = execute_with_retry(
-        supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
-    )
-    if is_active and acct.data:
-        return error_response("Already active", 409)
+    if admin_resp.data:
+        is_active = bool(admin_resp.data[0].get("is_active"))
+        if is_active:
+            acct = execute_with_retry(
+                supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
+            )
+            if acct.data:
+                return error_response("Already active", 409)
 
     _purge_admin_codes()
     if not _check_admin_rate_limit(email):
@@ -823,12 +843,27 @@ def admin_send_code():
 @auth_bp.route("/admin/signup", methods=["POST"])
 @handle_errors("admin signup error")
 def admin_signup():
+    """Create a pending admin signup request.
+
+    Any valid @gordoncollege.edu.ph can request.  Creates admin_accounts
+    (is_active=false) + app_accounts immediately, so the admin shows as
+    "pending" until an existing admin activates via PATCH /api/admins/:id/activate.
+
+    Request body:
+      email, code, password, confirmPassword,
+      first_name, last_name, license_no (optional), role (nurse|doctor)
+    """
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip().lower()
     code = (body.get("code") or "").strip()
     password = body.get("password") or ""
     confirm_password = body.get("confirmPassword") or ""
+    first_name = (body.get("first_name") or "").strip()
+    last_name = (body.get("last_name") or "").strip()
+    license_no = (body.get("license_no") or "").strip() or None
+    role = (body.get("role") or "").strip().lower()
 
+    # --- required field checks ---
     if not email:
         return error_response("Email is required.", 400)
     if not code:
@@ -837,44 +872,79 @@ def admin_signup():
         return error_response("Password is required.", 400)
     if not confirm_password:
         return error_response("Password confirmation is required.", 400)
+    if not first_name:
+        return error_response("First name is required.", 400)
+    if not last_name:
+        return error_response("Last name is required.", 400)
+    if role not in ("nurse", "doctor"):
+        return error_response("Role must be nurse or doctor.", 400)
 
+    # --- email validation ---
     err, status = _validate_email(email)
     if err:
         return error_response(err, status)
+
+    # --- password validation ---
     if len(password) < MIN_PASSWORD_LENGTH:
         return error_response(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.", 400)
     if password != confirm_password:
         return error_response("Passwords do not match.", 400)
+
+    # --- code validation ---
     if not code.isdigit() or len(code) != 6:
         return error_response("Invalid or expired code", 400)
-
     if not _is_admin_code_valid(email, code):
         return error_response("Invalid or expired code", 400)
 
-    # Re-validate still pending
+    # --- idempotency: reject if email already in admin_accounts or app_accounts ---
     admin_resp = execute_with_retry(
         supabase.table("admin_accounts").select("admin_id, is_active").eq("email", email).limit(1)
     )
-    if not admin_resp.data:
-        return error_response("Not invited", 404)
-    admin_row = admin_resp.data[0]
-    admin_id = admin_row["admin_id"]
-    if admin_row.get("is_active"):
-        # Check if already has account
-        acct_check = execute_with_retry(
-            supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
-        )
-        if acct_check.data:
-            return error_response("Already active", 409)
+    if admin_resp.data:
+        is_active = bool(admin_resp.data[0].get("is_active"))
+        if is_active:
+            acct_check = execute_with_retry(
+                supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
+            )
+            if acct_check.data:
+                return error_response("Already active", 409)
+        return error_response("A signup request already exists for this email. Please wait for approval.", 409)
 
-    # Idempotency: app_accounts exists?
     existing_account = execute_with_retry(
         supabase.table("app_accounts").select("account_id").eq("email", email).limit(1)
     )
     if existing_account.data:
         return error_response("An account with this email already exists. Please log in instead.", 409)
 
-    # Create auth user
+    # --- create admin_accounts row (is_active=False = pending) ---
+    username = email.split("@")[0]
+    admin_id = None
+    try:
+        inserted = execute_with_retry(
+            supabase.table("admin_accounts").insert({
+                "email": email,
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "license_no": license_no,
+                "role": role,
+                "is_active": False,
+            })
+        )
+        row = (inserted.data or [None])[0]
+        if row is None:
+            fetched = execute_with_retry(
+                supabase.table("admin_accounts").select("admin_id").eq("email", email).limit(1)
+            )
+            row = (fetched.data or [None])[0]
+        if row is None:
+            raise RuntimeError("admin_accounts insert returned no data")
+        admin_id = row["admin_id"]
+    except Exception as exc:
+        logger.error("Admin signup: failed to create admin_accounts row for %s: %r", email, exc)
+        return error_response("Failed to create admin account. Please try again.", 500)
+
+    # --- create Supabase auth user ---
     auth_user_id = None
     try:
         auth_result = supabase.auth.admin.create_user({
@@ -883,18 +953,39 @@ def admin_signup():
             "email_confirm": True,
         })
         if auth_result.user is None:
-            return error_response("Failed to create auth user.", 500)
+            raise RuntimeError("create_user returned None user")
         auth_user_id = auth_result.user.id
     except Exception as exc:
         exc_str = str(exc).lower()
         if "already" in exc_str or "exists" in exc_str:
+            # Rollback: delete the admin_accounts row we just created
+            try:
+                execute_with_retry(
+                    supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
+                )
+            except Exception:
+                pass
             return error_response("An account with this email already exists. Please log in instead.", 409)
-        logger.error("Admin create_user failed: %r", exc)
+        logger.error("Admin create_user failed for %s: %r", email, exc)
+        # Rollback admin_accounts
+        try:
+            execute_with_retry(
+                supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
+            )
+        except Exception:
+            pass
         return error_response(f"Failed to create auth user: {exc}", 500)
 
     if auth_user_id is None:
+        try:
+            execute_with_retry(
+                supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
+            )
+        except Exception:
+            pass
         return error_response("Failed to create auth user.", 500)
 
+    # --- create app_accounts row (links auth user to admin) ---
     try:
         execute_with_retry(
             supabase.table("app_accounts").insert({
@@ -904,11 +995,8 @@ def admin_signup():
                 "admin_id": admin_id,
             })
         )
-        execute_with_retry(
-            supabase.table("admin_accounts").update({"is_active": True}).eq("admin_id", admin_id)
-        )
     except Exception as exc:
-        # Rollback: delete orphaned app_accounts row, then auth user
+        # Rollback: delete app_accounts (if partial), auth user, admin_accounts
         try:
             execute_with_retry(
                 supabase.table("app_accounts").delete().eq("auth_user_id", auth_user_id)
@@ -919,9 +1007,21 @@ def admin_signup():
             supabase.auth.admin.delete_user(auth_user_id)
         except Exception:
             pass
-        logger.error("Admin signup DB insert failed: %r", exc)
+        try:
+            execute_with_retry(
+                supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
+            )
+        except Exception:
+            pass
+        logger.error("Admin signup DB insert failed for %s: %r", email, exc)
         return error_response("Failed to create admin account. Please try again.", 500)
 
+    # --- consume verification code ---
     _admin_signup_codes.pop(email, None)
-    logger.info("Admin signup completed for %s (admin_id=%s, auth_user_id=%s)", email, admin_id, auth_user_id)
-    return jsonify({"success": True, "message": "Admin account created", "admin_id": admin_id}), 201
+    logger.info("Admin signup request submitted for %s (admin_id=%s, auth_user_id=%s)", email, admin_id, auth_user_id)
+    return jsonify({
+        "success": True,
+        "message": "Request submitted, pending approval",
+        "admin_id": admin_id,
+        "status": "pending",
+    }), 201

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EyeIcon, EyeOffIcon } from './icons.jsx'
 
 /**
@@ -100,6 +101,13 @@ export default function LoginForm({ align = 'left', onSubmit, loading = false, e
       >
         {loading ? 'Logging in…' : 'Login'}
       </button>
+
+      <p className="mt-4 text-center text-sm text-gray-600">
+        Request admin access?{' '}
+        <Link to="/admin/signup" className="font-semibold text-gc-accent hover:text-gc-green-600">
+          Sign up
+        </Link>
+      </p>
 
       <p className="mt-5 text-xs leading-relaxed text-gray-500">
         By clicking the login button, you recognize the authority of Gordon

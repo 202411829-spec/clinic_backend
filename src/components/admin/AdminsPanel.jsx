@@ -101,9 +101,9 @@ export default function AdminsPanel() {
                       {a.status === 'active' ? (
                         <button onClick={() => handleToggle(a)} className="rounded-lg border px-3 py-1 text-xs font-semibold">Deactivate</button>
                       ) : (
-                        <button onClick={() => handleToggle(a)} className="rounded-lg bg-gc-accent px-3 py-1 text-xs font-semibold text-white">Activate</button>
+                        <button onClick={() => handleToggle(a)} className="rounded-lg bg-gc-accent px-3 py-1 text-xs font-semibold text-white">{a.status === 'pending' ? 'Accept' : 'Activate'}</button>
                       )}
-                      <button disabled={isSelf} title={isSelf ? 'Cannot delete yourself' : ''} onClick={() => setConfirmDelete(a)} className="text-xs font-semibold text-red-600 disabled:opacity-40">Delete</button>
+                      <button disabled={isSelf} title={isSelf ? 'Cannot delete yourself' : ''} onClick={() => setConfirmDelete(a)} className="text-xs font-semibold text-red-600 disabled:opacity-40">{a.status === 'pending' ? 'Reject' : 'Delete'}</button>
                     </td>
                   </tr>
                 )
@@ -124,12 +124,12 @@ export default function AdminsPanel() {
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="font-bold">Delete admin?</h3>
+            <h3 className="font-bold">{confirmDelete.status === 'pending' ? 'Reject request?' : 'Delete admin?'}</h3>
             <p className="mt-1 text-sm text-gray-600">Type <span className="font-semibold">{confirmDelete.email}</span> to confirm.</p>
             <input value={confirmEmail} onChange={e => setConfirmEmail(e.target.value)} placeholder={confirmDelete.email} className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm" />
             <div className="mt-4 flex gap-3">
               <button onClick={() => { setConfirmDelete(null); setConfirmEmail('') }} className="flex-1 rounded-xl border py-2.5 text-sm font-semibold">Cancel</button>
-              <button onClick={() => handleDelete(confirmDelete)} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white">Delete</button>
+              <button onClick={() => handleDelete(confirmDelete)} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white">{confirmDelete.status === 'pending' ? 'Reject' : 'Delete'}</button>
             </div>
           </div>
         </div>

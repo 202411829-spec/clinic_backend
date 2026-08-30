@@ -17,12 +17,17 @@ EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 
 def _derive_status(is_active: bool, has_app_account: bool) -> str:
-    if not is_active and not has_app_account:
-        return "pending"
+    """Derive human-readable status from DB flags.
+
+    - not is_active → pending (covers both new signup requests and old
+      allowlist invites that haven't completed activation)
+    - is_active + has_app_account → active
+    - is_active but no app_account → pending (orphan, rare)
+    """
     if is_active and has_app_account:
         return "active"
-    if not is_active and has_app_account:
-        return "inactive"
+    if not is_active:
+        return "pending"
     # is_active true but no app_account is treated as pending (orphan invite)
     return "pending"
 

@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { adminAuthApi } from '../../lib/api.js'
-import { adminSignIn } from '../../lib/supabaseClient.js'
 import { EyeIcon, EyeOffIcon } from '../../components/icons.jsx'
 
 const EMAIL_RE = /^[^\s@]+@gordoncollege\.edu\.ph$/i
 const STEPS = [
   { id: 1, label: 'Email' },
   { id: 2, label: 'Verify' },
-  { id: 3, label: 'Password' },
+  { id: 3, label: 'Profile' },
 ]
 
 const inputClass =
@@ -22,6 +21,10 @@ export default function AdminSignUp() {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [licenseNo, setLicenseNo] = useState('')
+  const [role, setRole] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -88,8 +91,20 @@ export default function AdminSignUp() {
     setStep(3)
   }
 
-  async function handlePasswordSubmit(e) {
+  async function handleProfileSubmit(e) {
     e.preventDefault()
+    if (!firstName.trim()) {
+      setFieldError('First name is required.')
+      return
+    }
+    if (!lastName.trim()) {
+      setFieldError('Last name is required.')
+      return
+    }
+    if (!role || !['nurse', 'doctor'].includes(role)) {
+      setFieldError('Please select a role (Nurse or Doctor).')
+      return
+    }
     if (!password || password.length < 8) {
       setFieldError('Password must be at least 8 characters.')
       return
@@ -106,11 +121,13 @@ export default function AdminSignUp() {
         code,
         password,
         confirmPassword,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        license_no: licenseNo.trim() || undefined,
+        role,
       })
-      // The username half of the Gordon College email is what Supabase uses
-      // as the sign-in identifier for admins.
-      await adminSignIn(email.trim().split('@')[0], password)
-      navigate('/admin/dashboard')
+      setInfo('Request submitted — pending approval. An existing admin will review.')
+      setTimeout(() => navigate('/admin/login'), 2000)
     } catch (err) {
       const msg = err?.message || 'Could not create your account. Please try again.'
       if (/code/i.test(msg)) {
@@ -178,7 +195,7 @@ export default function AdminSignUp() {
 
         <form
           onSubmit={
-            step === 1 ? handleEmailSubmit : step === 2 ? handleCodeSubmit : handlePasswordSubmit
+            step === 1 ? handleEmailSubmit : step === 2 ? handleCodeSubmit : handleProfileSubmit
           }
           className="mt-6 space-y-4"
         >
@@ -259,12 +276,101 @@ export default function AdminSignUp() {
 
           {step === 3 && (
             <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="admin-signup-first-name"
+                    className="block text-sm font-semibold text-gray-900 mb-1.5"
+                  >
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="admin-signup-first-name"
+                    name="first_name"
+                    type="text"
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(e) => {
+                      setFirstName(e.target.value)
+                      setFieldError('')
+                    }}
+                    placeholder="Juan"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="admin-signup-last-name"
+                    className="block text-sm font-semibold text-gray-900 mb-1.5"
+                  >
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="admin-signup-last-name"
+                    name="last_name"
+                    type="text"
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(e) => {
+                      setLastName(e.target.value)
+                      setFieldError('')
+                    }}
+                    placeholder="Dela Cruz"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="admin-signup-license"
+                  className="block text-sm font-semibold text-gray-900 mb-1.5"
+                >
+                  License No. <span className="text-xs font-normal text-gray-400">(optional)</span>
+                </label>
+                <input
+                  id="admin-signup-license"
+                  name="license_no"
+                  type="text"
+                  value={licenseNo}
+                  onChange={(e) => {
+                    setLicenseNo(e.target.value)
+                    setFieldError('')
+                  }}
+                  placeholder="e.g. RN-123456"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="admin-signup-role"
+                  className="block text-sm font-semibold text-gray-900 mb-1.5"
+                >
+                  Role <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="admin-signup-role"
+                  name="role"
+                  value={role}
+                  onChange={(e) => {
+                    setRole(e.target.value)
+                    setFieldError('')
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select role</option>
+                  <option value="nurse">Nurse</option>
+                  <option value="doctor">Doctor</option>
+                </select>
+              </div>
+
               <div>
                 <label
                   htmlFor="admin-signup-password"
                   className="block text-sm font-semibold text-gray-900 mb-1.5"
                 >
-                  Password
+                  New Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -296,7 +402,7 @@ export default function AdminSignUp() {
                   htmlFor="admin-signup-confirm"
                   className="block text-sm font-semibold text-gray-900 mb-1.5"
                 >
-                  Confirm password
+                  Confirm Password <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="admin-signup-confirm"
@@ -314,7 +420,7 @@ export default function AdminSignUp() {
               </div>
 
               <button type="submit" disabled={busy} className={primaryBtnClass}>
-                {busy ? 'Please wait…' : 'Create account'}
+                {busy ? 'Please wait…' : 'Submit request'}
               </button>
               <button
                 type="button"
