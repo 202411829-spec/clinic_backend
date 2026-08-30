@@ -196,23 +196,22 @@ function normalizeAppointmentStatus(value) {
 }
 
 function AppointmentsSummary({ counts }) {
-  const tiles = [
-    { label: "Total", value: counts.total, valueClass: "text-gc-green", bg: "bg-white", border: "border-gray-200" },
-    { label: "Pending", value: counts.pending, valueClass: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-    { label: "Completed", value: counts.completed, valueClass: "text-green-600", bg: "bg-green-50", border: "border-green-200" },
-    { label: "No-show", value: counts.no_show, valueClass: "text-red-600", bg: "bg-red-50", border: "border-red-200" },
-    { label: "Cancelled", value: counts.cancelled, valueClass: "text-gray-600", bg: "bg-gray-50", border: "border-gray-200" },
+  const items = [
+    { label: "Total", value: counts.total, dotClass: "bg-gc-green", textClass: "text-gc-green" },
+    { label: "Pending", value: counts.pending, dotClass: "bg-amber-500", textClass: "text-amber-600" },
+    { label: "Completed", value: counts.completed, dotClass: "bg-green-500", textClass: "text-green-600" },
+    { label: "No-show", value: counts.no_show, dotClass: "bg-red-500", textClass: "text-red-600" },
+    { label: "Cancelled", value: counts.cancelled, dotClass: "bg-gray-400", textClass: "text-gray-500" },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-3">
-      {tiles.map((t) => (
-        <div
-          key={t.label}
-          className={`rounded-xl border ${t.border} ${t.bg} px-3 py-2.5 flex flex-col items-center justify-center text-center`}
-        >
-          <span className={`text-xl font-bold leading-none ${t.valueClass}`}>{t.value}</span>
-          <span className="text-[11px] font-semibold tracking-widest uppercase text-gray-500 mt-1">{t.label}</span>
-        </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-xs">
+      {items.map((item, idx) => (
+        <span key={item.label} className="inline-flex items-center gap-1.5">
+          {idx > 0 && <span className="text-gray-300 mr-1 hidden sm:inline">•</span>}
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} aria-hidden />
+          <span className="text-gray-500 font-medium">{item.label}:</span>
+          <span className={`font-bold ${item.textClass}`}>{item.value}</span>
+        </span>
       ))}
     </div>
   );
