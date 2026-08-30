@@ -357,57 +357,65 @@ def signup():
     except Exception as exc:
         exc_str = str(exc).lower()
         if "already" in exc_str or "exists" in exc_str:
-            # An auth user with this email exists in Supabase (created by
-            # a prior signup attempt that used the old sign_up path without
-            # email_confirm=True).  Try to recover:
-            #   1. Find the existing auth user.
-            #   2. If email_confirmed_at is null → confirm it, ensure
-            #      app_accounts/students rows exist, and return success
-            #      so the frontend can auto-login.
-            #   3. If already confirmed → return 409 with actionable message.
+            # An auth user with this email exists in Supabase.  Determine
+            # whether this is a true duplicate (auth user + app_accounts
+            # both present) or an orphaned auth user (app_accounts row was
+            # deleted, e.g. during testing).
             existing_auth_user = _find_auth_user_by_email(email)
 
-            if existing_auth_user is not None:
-                auth_user_id = existing_auth_user.id
-
-                # Auto-confirm if the prior attempt left email unconfirmed.
-                if existing_auth_user.email_confirmed_at is None:
-                    try:
-                        supabase.auth.admin.update_user_by_id(
-                            auth_user_id,
-                            {"email_confirm": True},
-                        )
-                        logger.info(
-                            "Auto-confirmed previously unconfirmed auth user "
-                            "%s (%s)",
-                            email, auth_user_id,
-                        )
-                    except Exception as update_exc:
-                        logger.error(
-                            "Failed to auto-confirm auth user %s: %r",
-                            email, update_exc,
-                        )
-                        return error_response(
-                            "Account exists but could not be confirmed. "
-                            "Please contact support.", 500,
-                        )
-                    # Fall through to students/app_accounts creation below.
-                else:
-                    # Already confirmed — user can just log in.
-                    return error_response(
-                        "An account with this email already exists. "
-                        "Please log in instead.",
-                        409,
-                    )
-            else:
-                # Auth user exists (create_user said "already exists") but
-                # we couldn't find it via list_users — edge case, but
-                # return the actionable message anyway.
+            if existing_auth_user is None:
+                # create_user said "already exists" but we can't find the
+                # auth user via list_users — actionable message regardless.
                 return error_response(
                     "An account with this email already exists. "
                     "Please log in instead.",
                     409,
                 )
+
+            auth_user_id = existing_auth_user.id
+
+            # Check whether a corresponding app_accounts row exists.
+            orphan_check = execute_with_retry(
+                supabase
+                .table("app_accounts")
+                .select("account_id")
+                .eq("email", email)
+                .limit(1)
+            )
+
+            if orphan_check.data:
+                # Both auth user AND app_accounts exist → true duplicate.
+                return error_response(
+                    "An account with this email already exists. "
+                    "Please log in instead.",
+                    409,
+                )
+
+            # Orphaned auth user: app_accounts row is missing, so the
+            # tester deleted DB rows while the auth user remained.
+            # Ensure email is confirmed, then fall through to create the
+            # missing students + app_accounts rows.
+            if existing_auth_user.email_confirmed_at is None:
+                try:
+                    supabase.auth.admin.update_user_by_id(
+                        auth_user_id,
+                        {"email_confirm": True},
+                    )
+                    logger.info(
+                        "Auto-confirmed previously unconfirmed auth user "
+                        "%s (%s)",
+                        email, auth_user_id,
+                    )
+                except Exception as update_exc:
+                    logger.error(
+                        "Failed to auto-confirm auth user %s: %r",
+                        email, update_exc,
+                    )
+                    return error_response(
+                        "Account exists but could not be confirmed. "
+                        "Please contact support.", 500,
+                    )
+            # Fall through to students/app_accounts creation below.
         else:
             logger.error("Admin create_user failed: %r", exc)
             return error_response(f"Failed to create auth user: {exc}", 500)
