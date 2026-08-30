@@ -23,6 +23,8 @@ function isFilled(value) {
 // masterlist view; department_id/course_id confirm the student picked their
 // academic program in the edit form.
 const REQUIRED_PROFILE_FIELDS = [
+  "first_name",
+  "last_name",
   "gender",
   "birth_date",
   "civil_status",

@@ -439,8 +439,8 @@ def signup():
             .table("students")
             .insert({
                 "student_id": student_id,
-                "first_name": student_id,   # placeholder until profile is completed
-                "last_name": student_id,    # placeholder until profile is completed
+                "first_name": "",   # empty until user completes their profile
+                "last_name": "",    # empty until user completes their profile
                 "email": email,
             })
         )
