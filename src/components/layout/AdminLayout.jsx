@@ -9,6 +9,7 @@ import { adminsApi } from '../../lib/api.js'
 import Pending from '../../pages/admin/Pending.jsx'
 import AgentBubble from '../agent/AgentBubble.jsx'
 import AgentPanel from '../agent/AgentPanel.jsx'
+import { agentApi } from '../../lib/agentApi.js'
 
 // Medical Certificate / Medical Summary are printable official documents —
 // TopBar already hides itself there, so the mobile nav handle should too.
@@ -22,6 +23,63 @@ export default function AdminLayout() {
   const [checkingPending, setCheckingPending] = useState(true)
   const [isPending, setIsPending] = useState(false)
   const [agentOpen, setAgentOpen] = useState(false)
+  const [agentHistory, setAgentHistory] = useState([])
+  const [agentPreview, setAgentPreview] = useState(null)
+  const [agentLoading, setAgentLoading] = useState(false)
+  const [agentError, setAgentError] = useState('')
+
+  const handleAgentSend = async (text) => {
+    const trimmed = (text || '').trim()
+    if (!trimmed) return
+    const historySnapshot = agentHistory
+    setAgentHistory((h) => [...h, { role: 'user', content: trimmed }])
+    setAgentLoading(true)
+    setAgentError('')
+    try {
+      const res = await agentApi.chat(trimmed, historySnapshot)
+      if (res.preview) {
+        const mergedPreview = {
+          ...res.preview,
+          tool: res.preview.tool || res.tool,
+          args: res.preview.args || res.args,
+        }
+        setAgentPreview(mergedPreview)
+      } else {
+        setAgentPreview(null)
+      }
+      const replyContent = res.reply || res.message
+      if (replyContent) {
+        setAgentHistory((h) => [...h, { role: 'assistant', content: replyContent }])
+      }
+    } catch (err) {
+      setAgentError(err.message || 'Request failed')
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
+  const handleAgentConfirm = async (tool, args) => {
+    setAgentLoading(true)
+    setAgentError('')
+    try {
+      const res = await agentApi.confirm(tool, args)
+      const content = res.message || res.reply || 'Done'
+      setAgentHistory((h) => [...h, { role: 'assistant', content }])
+      setAgentPreview(null)
+    } catch (err) {
+      setAgentError(err.message || 'Confirm failed')
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
+  const handleAgentDismissPreview = () => setAgentPreview(null)
+
+  const handleAgentClear = () => {
+    setAgentHistory([])
+    setAgentPreview(null)
+    setAgentError('')
+  }
 
   // After login, fetch own admin record to check is_active. Inactive admins
   // (is_active === false or status !== 'active') see the Pending page instead.
@@ -102,14 +160,14 @@ export default function AdminLayout() {
           <AgentPanel
             open={agentOpen}
             onClose={() => setAgentOpen(false)}
-            onClear={() => {}}
-            history={[]}
-            preview={null}
-            onSend={async () => {}}
-            onConfirm={async () => {}}
-            onDismissPreview={() => {}}
-            error={null}
-            loading={false}
+            onClear={handleAgentClear}
+            history={agentHistory}
+            preview={agentPreview}
+            onSend={handleAgentSend}
+            onConfirm={handleAgentConfirm}
+            onDismissPreview={handleAgentDismissPreview}
+            error={agentError}
+            loading={agentLoading}
           />
         </>
       )}
