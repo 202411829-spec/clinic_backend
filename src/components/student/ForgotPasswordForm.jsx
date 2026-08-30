@@ -42,15 +42,17 @@ const VARIANTS = {
   admin: {
     portalLabel: 'Admin Portal',
     emailLabel: 'Email',
-    emailPlaceholder: 'Email / Username',
-    subtitle: "We'll send a code to your email to verify it's you.",
+    emailPlaceholder: `admin${EMAIL_DOMAIN}`,
+    subtitle: "We'll send a code to your Gordon College email to verify it's you.",
     loginPath: '/admin/login',
-    // Admins log in as username@gordoncollege.edu.ph, so accept a bare
-    // username and complete the address before hitting the API.
-    normalizeEmail: (value) =>
-      value.includes('@') ? value : `${value}@gordoncollege.edu.ph`,
-    validateEmail: (value) =>
-      value.trim() ? '' : 'Please enter your email or username.',
+    normalizeEmail: (value) => value,
+    validateEmail: (value) => {
+      if (!value.trim()) return 'Please enter your email address.'
+      if (!EMAIL_RE.test(value.trim())) {
+        return `Use your Gordon College email (ending in ${EMAIL_DOMAIN}).`
+      }
+      return ''
+    },
     textAccent: 'text-gc-accent',
     bgAccent: 'bg-gc-green-700',
     borderAccent: 'focus:border-gc-green-700',
