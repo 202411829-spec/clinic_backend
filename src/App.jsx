@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { ProfileCompletenessProvider } from './context/ProfileCompletenessContext.jsx'
 
 const AdminLogin = lazy(() => import('./pages/auth/AdminLogin.jsx'))
+const AdminSignUp = lazy(() => import('./pages/auth/AdminSignUp.jsx'))
 const Masterlist = lazy(() => import('./pages/admin/Masterlist.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 const Dashboard = lazy(() => import('./pages/admin/Dashboard.jsx'))
@@ -55,6 +56,7 @@ export default function App() {
 
       {/* ADMIN */}
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/signup" element={<AdminSignUp />} />
       <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
 
       <Route

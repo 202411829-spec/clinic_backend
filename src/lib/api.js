@@ -190,6 +190,16 @@ export const authApi = {
   signup: (payload) => authRequest('/api/auth/signup', payload),
 }
 
+// ---- Public Admin Sign-up (allowlisted admin activation) ----
+// Same pre-auth, unauthenticated raw-fetch pattern as authApi above. The admin
+// email must be on the backend allowlist (an existing, deactivated or pending
+// admin record) before a code can be sent and the account activated.
+export const adminAuthApi = {
+  checkEmail: (email) => authRequest('/api/auth/admin/check-email', { email }),
+  sendCode: (email) => authRequest('/api/auth/admin/send-code', { email }),
+  signup: (payload) => authRequest('/api/auth/admin/signup', payload),
+}
+
 // ---- Public Student Forgot Password ----
 // Same pre-auth, unauthenticated raw-fetch pattern as authApi above.
 //   POST /api/auth/forgot/check-email { email }        -> 200 { exists } | 404
