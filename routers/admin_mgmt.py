@@ -41,8 +41,15 @@ def _validate_admin_email(email: str):
 @require_admin
 @handle_errors("list admins error")
 def list_admins():
-    page = int(request.args.get("page", 1))
-    page_size = int(request.args.get("page_size", 20))
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        return error_response("Invalid page parameter", 400)
+    try:
+        page_size = int(request.args.get("page_size", 20))
+    except (TypeError, ValueError):
+        return error_response("Invalid page_size parameter", 400)
+    page = max(1, page)
     page_size = max(1, min(page_size, 100))
     search = sanitize_search(request.args.get("search"))
 

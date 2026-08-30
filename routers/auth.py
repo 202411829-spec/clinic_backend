@@ -908,7 +908,13 @@ def admin_signup():
             supabase.table("admin_accounts").update({"is_active": True}).eq("admin_id", admin_id)
         )
     except Exception as exc:
-        # Rollback auth user on failure
+        # Rollback: delete orphaned app_accounts row, then auth user
+        try:
+            execute_with_retry(
+                supabase.table("app_accounts").delete().eq("auth_user_id", auth_user_id)
+            )
+        except Exception:
+            pass
         try:
             supabase.auth.admin.delete_user(auth_user_id)
         except Exception:
