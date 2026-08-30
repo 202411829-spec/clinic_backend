@@ -22,6 +22,7 @@ const MANAGEMENT_ITEMS = [
   { to: '/admin/clinic-schedule', label: 'Clinic Schedule', Icon: ClinicScheduleIcon },
   { to: '/admin/reports', label: 'Reports', Icon: ReportsIcon },
   { to: '/admin/admins', label: 'Admins', Icon: ShieldIcon },
+  { to: '/admin/profile', label: 'Profile', Icon: MasterlistIcon },
 ]
 
 function NavItem({ to, label, Icon }) {
