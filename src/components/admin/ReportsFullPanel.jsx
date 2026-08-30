@@ -103,8 +103,6 @@ function KpiCard({ label, value, badge, icon }) {
 
 // ─── Breakdown card with horizontal progress bars ─────────────────────
 function BreakdownCard({ title, rows, accentIndex = 0 }) {
-  const maxPercent = Math.max(...rows.map((r) => r.percent || 0), 1);
-
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in-up print:rounded-lg print:break-inside-avoid">
       {/* Card header */}
@@ -118,7 +116,7 @@ function BreakdownCard({ title, rows, accentIndex = 0 }) {
           <p className="text-sm text-gray-400 py-4 text-center">No data available</p>
         )}
         {rows.map((r, i) => {
-          const widthPct = maxPercent > 0 ? ((r.percent || 0) / maxPercent) * 100 : 0;
+          const widthPct = r.percent || 0;
           const barColor = ACCENTS[(accentIndex + i) % ACCENTS.length];
           return (
             <div key={r.label} className="py-3 group">
