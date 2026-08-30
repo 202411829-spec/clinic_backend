@@ -35,19 +35,9 @@ export default function AdminLayout() {
     async function checkPending() {
       setCheckingPending(true)
       try {
-        const res = await adminsApi.list({ search: email })
-        const rows = res?.admins || res?.data || res?.admins_list || []
-        // Find exact email match (case-insensitive)
-        const lowerEmail = email.toLowerCase()
-        const self = Array.isArray(rows)
-          ? rows.find((a) => (a.email || '').toLowerCase() === lowerEmail)
-          : null
-
-        // If API returns single-object shape instead of list, handle it
-        const record = self || (res?.email && (res.email || '').toLowerCase() === lowerEmail ? res : null)
-
+        const res = await adminsApi.me()
+        const record = res?.admin || res
         if (!cancelled && record) {
-          // Support both is_active boolean and legacy status string
           const hasIsActive = Object.prototype.hasOwnProperty.call(record, 'is_active')
           if (hasIsActive) {
             setIsPending(record.is_active === false)
@@ -59,13 +49,9 @@ export default function AdminLayout() {
             setIsPending(false)
           }
         } else if (!cancelled) {
-          // No matching row found — do not block (assume active or allow access)
           setIsPending(false)
         }
       } catch {
-        // On error (e.g. pending users lack list permission) be conservative:
-        // don't block active admins, but try to avoid showing dashboard to
-        // truly pending users. If fetch fails we treat as not pending.
         if (!cancelled) setIsPending(false)
       } finally {
         if (!cancelled) setCheckingPending(false)

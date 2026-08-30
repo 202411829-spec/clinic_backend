@@ -129,6 +129,7 @@ export const reportsApi = {
 // ---- Admin Management (Admins roster) ----
 export const adminsApi = {
   list: (params) => api.get('/api/admins', params),
+  me: () => api.get('/api/admins/me'),
   add: (body) => api.post('/api/admins', body),
   deactivate: (adminId) => api.patch(`/api/admins/${adminId}/deactivate`, {}),
   activate: (adminId) => api.patch(`/api/admins/${adminId}/activate`, {}),
