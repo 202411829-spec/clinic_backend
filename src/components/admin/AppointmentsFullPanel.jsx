@@ -194,29 +194,6 @@ function normalizeAppointmentStatus(value) {
   return "pending";
 }
 
-function AppointmentsSummary({ counts }) {
-  const tiles = [
-    { label: "Total", value: counts.total, valueClass: "text-gc-green", bg: "bg-white", border: "border-gray-200" },
-    { label: "Pending", value: counts.pending, valueClass: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-    { label: "Completed", value: counts.completed, valueClass: "text-green-600", bg: "bg-green-50", border: "border-green-200" },
-    { label: "No-show", value: counts.no_show, valueClass: "text-red-600", bg: "bg-red-50", border: "border-red-200" },
-    { label: "Cancelled", value: counts.cancelled, valueClass: "text-gray-600", bg: "bg-gray-50", border: "border-gray-200" },
-  ];
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
-      {tiles.map((t) => (
-        <div
-          key={t.label}
-          className={`rounded-xl border ${t.border} ${t.bg} px-3 py-3 flex flex-col items-center justify-center text-center`}
-        >
-          <span className={`text-2xl font-bold leading-none ${t.valueClass}`}>{t.value}</span>
-          <span className="text-[11px] font-semibold tracking-widest uppercase text-gray-500 mt-1">{t.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function AppointmentsFullPanel({ selectedDate }) {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -226,7 +203,6 @@ export default function AppointmentsFullPanel({ selectedDate }) {
   const [department, setDepartment] = useState("All Department");
   const [reasonFilter, setReasonFilter] = useState("All Reason");
   const [reasonRecords, setReasonRecords] = useState([]);
-  const [appointmentsForCounts, setAppointmentsForCounts] = useState([]);
 
   // Fetch real time slots + bookings for the selected date.
   useEffect(() => {
@@ -246,23 +222,6 @@ export default function AppointmentsFullPanel({ selectedDate }) {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDate]);
-
-  // Fetch appointment counts for the summary (client-side derived from GET /appointments?date=YYYY-MM-DD).
-  // Uses appointmentsApi.list which returns appointments with current_status including cancelled.
-  useEffect(() => {
-    let cancelled = false;
-    appointmentsApi
-      .list({ date: toYMD(selectedDate) })
-      .then((res) => {
-        if (!cancelled) setAppointmentsForCounts(res?.appointments || []);
-      })
-      .catch(() => {
-        if (!cancelled) setAppointmentsForCounts([]);
       });
     return () => {
       cancelled = true;
@@ -291,7 +250,6 @@ export default function AppointmentsFullPanel({ selectedDate }) {
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     // Optimistic update, persisted via PATCH /appointments/<id>/status.
-    const normalized = normalizeAppointmentStatus(newStatus);
     setSlots((prev) =>
       prev.map((slot) =>
         slot.id !== slotId
@@ -302,11 +260,6 @@ export default function AppointmentsFullPanel({ selectedDate }) {
                 b.id === bookingId ? { ...b, status: newStatus } : b
               ),
             }
-      )
-    );
-    setAppointmentsForCounts((prev) =>
-      prev.map((a) =>
-        String(a.appointment_id) === String(bookingId) ? { ...a, current_status: normalized } : a
       )
     );
     appointmentsApi
@@ -369,25 +322,11 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     }));
   }, [slots, search, department, reasonFilter]);
 
-  const summaryCounts = useMemo(() => {
-    const counts = { total: 0, pending: 0, completed: 0, no_show: 0, cancelled: 0 };
-    for (const a of appointmentsForCounts) {
-      const st = normalizeAppointmentStatus(a.current_status);
-      counts.total += 1;
-      if (st === "pending") counts.pending += 1;
-      else if (st === "completed") counts.completed += 1;
-      else if (st === "no_show") counts.no_show += 1;
-      else if (st === "cancelled") counts.cancelled += 1;
-    }
-    return counts;
-  }, [appointmentsForCounts]);
-
   const totalBookings = useMemo(
     () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
     [filteredSlots]
   );
   const hasAppointments = totalBookings > 0;
-  const isToday = toYMD(selectedDate) === toYMD(new Date())
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
@@ -404,8 +343,6 @@ export default function AppointmentsFullPanel({ selectedDate }) {
           {formatLongDate(selectedDate)}
         </span>
       </div>
-
-      {isToday && <AppointmentsSummary counts={summaryCounts} />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
         <div className="md:col-span-2 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
