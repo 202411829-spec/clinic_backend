@@ -13,4 +13,5 @@ export const mainNav = [
 export const managementNav = [
   { label: "Clinic Schedule", to: "/admin/clinic-schedule", icon: "clock" },
   { label: "Reports", to: "/admin/reports", icon: "chart" },
+  { label: "Admins", to: "/admin/admins", icon: "shield" },
 ];

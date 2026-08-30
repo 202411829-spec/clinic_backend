@@ -6,6 +6,7 @@ import {
   MasterlistIcon,
   ClinicScheduleIcon,
   ReportsIcon,
+  ShieldIcon,
   InfoIcon,
 } from '../icons.jsx'
 import LogoutMenu from '../LogoutMenu.jsx'
@@ -20,6 +21,7 @@ const MAIN_ITEMS = [
 const MANAGEMENT_ITEMS = [
   { to: '/admin/clinic-schedule', label: 'Clinic Schedule', Icon: ClinicScheduleIcon },
   { to: '/admin/reports', label: 'Reports', Icon: ReportsIcon },
+  { to: '/admin/admins', label: 'Admins', Icon: ShieldIcon },
 ]
 
 function NavItem({ to, label, Icon }) {

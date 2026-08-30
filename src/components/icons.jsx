@@ -119,3 +119,12 @@ export function EyeOffIcon(props) {
     </svg>
   )
 }
+
+export function ShieldIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z" strokeLinejoin="round" />
+      <path d="M12 11a2 2 0 100 4 2 2 0 000-4z" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}

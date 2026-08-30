@@ -126,6 +126,16 @@ export const reportsApi = {
   departments: () => api.get('/api/reports/departments'),
 }
 
+// ---- Admin Management (Admins roster) ----
+export const adminsApi = {
+  list: (params) => api.get('/api/admins', params),
+  add: (body) => api.post('/api/admins', body),
+  deactivate: (adminId) => api.patch(`/api/admins/${adminId}/deactivate`, {}),
+  activate: (adminId) => api.patch(`/api/admins/${adminId}/activate`, {}),
+  remove: (adminId, confirmEmail) =>
+    request(`/api/admins/${adminId}`, { method: 'DELETE', body: JSON.stringify({ confirmEmail }) }),
+}
+
 // ---- Clinic Schedule & Settings ----
 export const clinicScheduleApi = {
   list: (params) => api.get('/clinic-schedule', params),
