@@ -134,6 +134,7 @@ export const adminsApi = {
   activate: (adminId) => api.patch(`/api/admins/${adminId}/activate`, {}),
   remove: (adminId, confirmEmail) =>
     request(`/api/admins/${adminId}`, { method: 'DELETE', body: JSON.stringify({ confirmEmail }) }),
+  updateProfile: (adminId, body) => api.patch(`/api/admins/${adminId}/profile`, body),
 }
 
 // ---- Clinic Schedule & Settings ----

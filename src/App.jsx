@@ -15,6 +15,7 @@ const Logbook = lazy(() => import('./pages/admin/Logbook.jsx'))
 const ClinicSchedule = lazy(() => import('./pages/admin/ClinicSchedule.jsx'))
 const Reports = lazy(() => import('./pages/admin/Reports.jsx'))
 const Admins = lazy(() => import('./pages/admin/Admins.jsx'))
+const AdminProfile = lazy(() => import('./pages/admin/Profile.jsx'))
 const AdminStudentRecord = lazy(() => import('./pages/admin/StudentRecord.jsx'))
 const MedicalCertificate = lazy(() => import('./pages/admin/MedicalCertificate.jsx'))
 const MedicalSummary = lazy(() => import('./pages/admin/MedicalSummary.jsx'))
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="clinic-schedule" element={<ClinicSchedule />} />
         <Route path="reports" element={<Reports />} />
         <Route path="admins" element={<Admins />} />
+        <Route path="profile" element={<AdminProfile />} />
       </Route>
 
       {/* STUDENT */}

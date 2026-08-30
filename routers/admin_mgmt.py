@@ -256,3 +256,48 @@ def delete_admin(admin_id):
         supabase.table("admin_accounts").delete().eq("admin_id", admin_id)
     )
     return jsonify({"success": True, "message": "Admin deleted"}), 200
+
+
+# ============================================================
+# PROFILE UPDATE (self or any active admin)
+# ============================================================
+
+
+@admin_mgmt_bp.route("/admins/<admin_id>/profile", methods=["PATCH"])
+@require_admin
+@handle_errors("update admin profile error")
+def update_admin_profile(admin_id):
+    body = request.get_json(silent=True) or {}
+
+    updates = {}
+    if "first_name" in body:
+        first_name = (body.get("first_name") or "").strip()
+        if not first_name:
+            return error_response("First name is required.", 400)
+        updates["first_name"] = first_name
+    if "last_name" in body:
+        last_name = (body.get("last_name") or "").strip()
+        if not last_name:
+            return error_response("Last name is required.", 400)
+        updates["last_name"] = last_name
+    if "license_no" in body:
+        updates["license_no"] = (body.get("license_no") or "").strip() or None
+
+    # Role is read-only in the UI — block any attempt to change it here.
+    if "role" in body:
+        return error_response("Role cannot be changed here. Use Admins management.", 400)
+
+    if not updates:
+        return error_response("No fields to update.", 400)
+
+    resp = execute_with_retry(
+        supabase.table("admin_accounts").select("admin_id").eq("admin_id", admin_id).limit(1)
+    )
+    if not resp.data:
+        return error_response("Admin not found", 404)
+
+    updated = execute_with_retry(
+        supabase.table("admin_accounts").update(updates).eq("admin_id", admin_id).select("*")
+    )
+    row = (updated.data or [None])[0]
+    return jsonify({"success": True, "message": "Profile updated", "admin": row}), 200
