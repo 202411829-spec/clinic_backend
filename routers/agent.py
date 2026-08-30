@@ -26,6 +26,35 @@ def _admin_key() -> str:
     )
 
 
+def _resolve_admin_id() -> str | None:
+    """Resolve the current admin's admin_id from app_accounts for audit logging."""
+    key = _admin_key()
+    if not key or key == "anon":
+        return None
+    try:
+        r = execute_with_retry(
+            supabase.table("app_accounts")
+            .select("admin_id")
+            .eq("auth_user_id", key)
+            .limit(1)
+        )
+        if r.data and r.data[0].get("admin_id"):
+            return str(r.data[0]["admin_id"])
+        email = (getattr(g, "user", {}) or {}).get("email") or ""
+        if email:
+            r2 = execute_with_retry(
+                supabase.table("app_accounts")
+                .select("admin_id")
+                .eq("email", email.strip().lower())
+                .limit(1)
+            )
+            if r2.data and r2.data[0].get("admin_id"):
+                return str(r2.data[0]["admin_id"])
+    except Exception:
+        pass
+    return None
+
+
 def _check_rate_limit(admin_key: str) -> bool:
     now = time.time()
     window_start = now - AGENT_RATE_WINDOW_SECONDS
@@ -413,17 +442,18 @@ def _handle_cancel_appointments(args: dict):
         if found == 0:
             return {
                 "success": True, "preview": True, "found": 0,
-                "preview": [], "requiresConfirm": False,
+                "previewData": [], "requiresConfirm": False,
                 "message": "No matching appointments found — no changes needed.",
             }, 200
         return {
             "success": True, "preview": True, "found": found,
-            "preview": preview_rows, "requiresConfirm": True,
+            "previewData": preview_rows, "requiresConfirm": True,
             "message": f"Found {found} appointment(s). Cancel all {found}?",
         }, 200
 
     # Confirm path — execute cancellation via status history + current_status
     cancelled = 0
+    admin_id_for_audit = _resolve_admin_id()
     for r in rows:
         appt_id = r.get("appointment_id")
         try:
@@ -433,7 +463,7 @@ def _handle_cancel_appointments(args: dict):
                 "previous_status": prev,
                 "new_status": "cancelled",
                 "remarks": "Cancelled via Clinic Assistant",
-                "changed_by_admin_id": None,
+                "changed_by_admin_id": admin_id_for_audit,
             }))
             execute_with_retry(
                 supabase.table("appointments")
@@ -508,7 +538,7 @@ def _handle_update_clinic_settings(args: dict):
     if is_preview:
         return {
             "success": True, "preview": True, "requiresConfirm": True,
-            "preview": {
+            "previewData": {
                 "current": {
                     "work_start": str(cur_start)[:5],
                     "work_end": str(cur_end)[:5],
@@ -592,7 +622,7 @@ def _handle_deactivate_admin(args: dict):
     if is_preview:
         return {
             "success": True, "preview": True, "found": True, "requiresConfirm": True,
-            "preview": {
+            "previewData": {
                 "email": row.get("email"),
                 "role": row.get("role"),
                 "status": "active" if row.get("is_active") else "pending",
@@ -733,7 +763,7 @@ def agent_chat():
         return jsonify(result), status
 
     # Write tools return preview envelopes — surface them to the chat caller
-    if result.get("preview") is True:
+    if result.get("preview") is True or result.get("requiresConfirm") is True:
         return jsonify({
             "success": True,
             "reply": result.get("message", "Preview ready."),
