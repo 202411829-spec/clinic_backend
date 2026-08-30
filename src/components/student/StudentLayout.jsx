@@ -11,7 +11,7 @@ import { masterlistApi } from "../../lib/api.js";
 
 // The one student page that is always reachable — the rest (Dashboard / Book
 // / Feedback) stay locked behind the complete-your-record gate below.
-const RECORD_PATH = "/student/record";
+const RECORD_PATH = "/student/profile";
 
 // Lightweight loader shown in the main pane while profile completeness is
 // being determined, so the gate never flash-redirects blind before it knows.

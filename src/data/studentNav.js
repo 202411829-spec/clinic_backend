@@ -5,5 +5,5 @@
 export const studentMainNav = [
   { label: "Dashboard", to: "/student/dashboard", icon: "grid" },
   { label: "Book", to: "/student/book", icon: "calendar" },
-  { label: "Record", to: "/student/record", icon: "user" },
+  { label: "Profile", to: "/student/profile", icon: "user" },
 ];

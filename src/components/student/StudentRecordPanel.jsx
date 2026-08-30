@@ -103,7 +103,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   if (!student) {
     return (
       <div className="bg-white rounded-2xl border border-gray-300 p-8 text-center text-sm text-gray-400">
-        Loading your record…
+        Loading your profile…
       </div>
     );
   }
@@ -179,7 +179,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <span className="flex items-start gap-2">
             <NavIcon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              <span className="font-semibold">Complete your record to unlock the portal.</span>{" "}
+              <span className="font-semibold">Complete your profile to unlock the portal.</span>{" "}
               Only this page is available until your profile below is filled in.
             </span>
           </span>

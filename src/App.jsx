@@ -102,7 +102,8 @@ export default function App() {
       >
         <Route path="dashboard" element={<StudentDashboard />} />
         <Route path="book" element={<StudentBook />} />
-        <Route path="record" element={<StudentRecord />} />
+        <Route path="profile" element={<StudentRecord />} />
+        <Route path="record" element={<Navigate to="/student/profile" replace />} />
         <Route path="feedback" element={<StudentFeedback />} />
       </Route>
 
