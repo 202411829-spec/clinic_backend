@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
-import AddAdminModal from './AddAdminModal.jsx'
 
 function StatusBadge({ status }) {
   const map = { pending: 'bg-amber-100 text-amber-700', active: 'bg-green-100 text-green-700', inactive: 'bg-gray-100 text-gray-600' }
@@ -16,7 +15,6 @@ export default function AdminsPanel() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showAdd, setShowAdd] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [confirmEmail, setConfirmEmail] = useState('')
   const [error, setError] = useState('')
@@ -74,7 +72,6 @@ export default function AdminsPanel() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Admins</h1>
-        <button onClick={() => setShowAdd(true)} className="rounded-xl bg-gc-accent px-5 py-2.5 text-sm font-semibold text-white">Add Admin</button>
       </div>
 
       <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Search email, name, role…" className="w-full max-w-md rounded-xl border border-gray-200 px-4 py-2.5 text-sm" />
@@ -118,8 +115,6 @@ export default function AdminsPanel() {
         <span className="text-sm">Page {page} of {totalPages} ({total} total)</span>
         <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-lg border px-3 py-1 text-sm disabled:opacity-40">Next</button>
       </div>
-
-      <AddAdminModal open={showAdd} onClose={() => setShowAdd(false)} onCreated={fetchAdmins} />
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
