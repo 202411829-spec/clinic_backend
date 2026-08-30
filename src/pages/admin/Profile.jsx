@@ -89,9 +89,9 @@ export default function AdminProfile() {
 
   const isIncomplete =
     !admin ||
-    admin.first_name === '' ||
-    admin.last_name === '' ||
-    !admin.license_no
+    !admin.first_name?.trim() ||
+    !admin.last_name?.trim() ||
+    !admin.license_no?.trim()
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
