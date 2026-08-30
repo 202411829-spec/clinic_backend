@@ -4,7 +4,7 @@ import logging
 from flask import Blueprint, jsonify, request, g
 
 from database import supabase
-from routers.auth_guard import require_admin, sanitize_search
+from routers.auth_guard import require_auth, require_admin, sanitize_search
 from routers.helpers import execute_with_retry, error_response, handle_errors
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,82 @@ def list_admins():
         "page": page,
         "page_size": page_size,
         "admins": admins,
+    }), 200
+
+
+@admin_mgmt_bp.route("/admins/me", methods=["GET"])
+@require_auth
+@handle_errors("get own admin profile error")
+def get_own_admin_profile():
+    """Return the authenticated caller's own admin record.
+
+    Uses ``require_auth`` (not ``require_admin``) so that pending users
+    (is_active=False) can still retrieve their profile — the AdminLayout
+    component needs this to distinguish "pending" from "not an admin".
+    """
+    auth_user_id = g.user.get("id")
+    email = (g.user.get("email") or "").strip().lower()
+
+    admin_row = None
+
+    # Primary: resolve via app_accounts by auth_user_id → admin_id
+    if auth_user_id:
+        acct_resp = execute_with_retry(
+            supabase.table("app_accounts")
+            .select("admin_id")
+            .eq("auth_user_id", auth_user_id)
+            .limit(1)
+        )
+        if acct_resp.data and acct_resp.data[0].get("admin_id"):
+            admin_id = acct_resp.data[0]["admin_id"]
+            resp = execute_with_retry(
+                supabase.table("admin_accounts")
+                .select("*")
+                .eq("admin_id", admin_id)
+                .limit(1)
+            )
+            if resp.data:
+                admin_row = resp.data[0]
+
+    # Fallback: resolve by email (case-insensitive)
+    if admin_row is None and email:
+        resp = execute_with_retry(
+            supabase.table("admin_accounts")
+            .select("*")
+            .ilike("email", email)
+            .limit(1)
+        )
+        if resp.data:
+            admin_row = resp.data[0]
+
+    if admin_row is None:
+        return jsonify({"success": False, "error": "Admin profile not found"}), 404
+
+    # Check if an app_accounts row exists (needed for _derive_status)
+    has_app_account = False
+    aid = admin_row.get("admin_id")
+    if aid:
+        acct = execute_with_retry(
+            supabase.table("app_accounts")
+            .select("account_id")
+            .eq("admin_id", aid)
+            .limit(1)
+        )
+        has_app_account = bool(acct.data)
+
+    return jsonify({
+        "success": True,
+        "admin": {
+            "admin_id": admin_row.get("admin_id"),
+            "email": admin_row.get("email"),
+            "username": admin_row.get("username"),
+            "first_name": admin_row.get("first_name"),
+            "last_name": admin_row.get("last_name"),
+            "role": admin_row.get("role"),
+            "license_no": admin_row.get("license_no"),
+            "is_active": admin_row.get("is_active"),
+            "status": _derive_status(bool(admin_row.get("is_active")), has_app_account),
+        },
     }), 200
 
 
