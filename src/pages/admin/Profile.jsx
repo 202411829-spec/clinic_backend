@@ -120,12 +120,17 @@ export default function AdminProfile() {
           )}
 
           <div className="space-y-4 rounded-2xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="mt-1 font-medium text-gray-900">{admin.email}</p>
+              </div>
               <div>
                 <p className="text-sm text-gray-500">Role</p>
-                <RoleBadge role={admin.role} />
+                <div className="mt-1">
+                  <RoleBadge role={admin.role} />
+                </div>
               </div>
-              <p className="text-sm text-gray-500">{admin.email}</p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
