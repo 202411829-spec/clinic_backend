@@ -11,10 +11,10 @@ const STEPS = [
 ]
 
 const inputClass =
-  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20'
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20'
 
 const primaryBtnClass =
-  'w-full rounded-xl bg-gc-accent py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60'
+  'w-full rounded-xl bg-gc-green-700 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60'
 
 export default function AdminSignUp() {
   const navigate = useNavigate()
@@ -145,7 +145,7 @@ export default function AdminSignUp() {
 
   const card = (
     <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl shadow-black/5">
-      <p className="text-xs font-bold tracking-[0.15em] text-gc-accent uppercase">Admin Portal</p>
+      <p className="text-xs font-bold tracking-[0.15em] text-gc-green-700 uppercase">Admin Portal</p>
       <h1 className="mt-2 text-2xl font-extrabold text-gc-green-700">Admin Sign Up</h1>
       <p className="mt-1 text-sm text-gray-500">Create a request — an existing admin will review it.</p>
 
@@ -158,13 +158,13 @@ export default function AdminSignUp() {
               <span
                 className={[
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                  active || done ? 'bg-gc-accent text-white' : 'bg-gray-100 text-gray-400',
+                  active || done ? 'bg-gc-green-700 text-white' : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
                 {s.id}
               </span>
               <span className={`text-xs font-semibold ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>{s.label}</span>
-              {idx < STEPS.length - 1 && <span className={`h-0.5 flex-1 ${done ? 'bg-gc-accent' : 'bg-gray-100'}`} />}
+              {idx < STEPS.length - 1 && <span className={`h-0.5 flex-1 ${done ? 'bg-gc-green-700' : 'bg-gray-100'}`} />}
             </li>
           )
         })}
@@ -228,7 +228,7 @@ export default function AdminSignUp() {
               type="button"
               onClick={handleResend}
               disabled={busy}
-              className="mt-2 text-xs font-semibold text-gc-accent hover:text-gc-green-600 disabled:opacity-60"
+              className="mt-2 text-xs font-semibold text-gc-green-700 hover:text-gc-green-800 disabled:opacity-60"
             >
               Resend code
             </button>
@@ -345,7 +345,7 @@ export default function AdminSignUp() {
                     setFieldError('')
                   }}
                   placeholder="At least 8 characters"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-11 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-11 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20"
                 />
                 <button
                   type="button"
@@ -398,7 +398,7 @@ export default function AdminSignUp() {
 
       <p className="mt-6 text-center text-sm text-gray-600">
         Already have an account?{' '}
-        <Link to="/admin/login" className="font-semibold text-gc-accent hover:text-gc-green-600">
+        <Link to="/admin/login" className="font-semibold text-gc-green-700 hover:text-gc-green-800">
           Log in
         </Link>
       </p>
