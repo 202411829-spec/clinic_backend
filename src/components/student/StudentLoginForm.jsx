@@ -78,7 +78,7 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
               setUsername(e.target.value)
               setFieldError('')
             }}
-            placeholder="202311330 or 202311330@gordoncollege.edu.ph"
+            placeholder="Email/ Student ID"
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
           />
         </div>
