@@ -12,15 +12,40 @@ import { EyeIcon, EyeOffIcon } from '../icons.jsx'
  * `align="center"` -> mobile / bottom-sheet layout (headings centered)
  * `align="left"`   -> desktop split layout (headings left-aligned)
  */
+const STUDENT_ID_RE = /^[a-zA-Z0-9]+$/
+const SCHOOL_EMAIL_RE = /^[^\s@]+@gordoncollege\.edu\.ph$/i
+
 export default function StudentLoginForm({ align = 'left', onSubmit, loading = false, error = '' }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [fieldError, setFieldError] = useState('')
 
   const isCentered = align === 'center'
 
+  function validateUsername(value) {
+    const trimmed = value.trim()
+    if (!trimmed) return 'Enter your student ID or school email.'
+    if (trimmed.includes('@')) {
+      if (!SCHOOL_EMAIL_RE.test(trimmed)) {
+        return 'Use your Gordon College email (ending in @gordoncollege.edu.ph).'
+      }
+      return ''
+    }
+    if (!STUDENT_ID_RE.test(trimmed)) {
+      return 'Enter a valid student ID (letters and numbers only).'
+    }
+    return ''
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
+    const validationError = validateUsername(username)
+    if (validationError) {
+      setFieldError(validationError)
+      return
+    }
+    setFieldError('')
     onSubmit?.({ username, password })
   }
 
@@ -41,7 +66,7 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
       <div className="mt-7 space-y-5">
         <div>
           <label htmlFor="student-username" className="block text-sm font-semibold text-gray-900 mb-1.5">
-            Username
+            Student ID or Email
           </label>
           <input
             id="student-username"
@@ -49,8 +74,11 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
             type="text"
             autoComplete="username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Email/ ID/ Registration Number"
+            onChange={(e) => {
+              setUsername(e.target.value)
+              setFieldError('')
+            }}
+            placeholder="202311330 or 202311330@gordoncollege.edu.ph"
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
           />
         </div>
@@ -88,9 +116,9 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
         </div>
       </div>
 
-      {error ? (
+      {fieldError || error ? (
         <p role="alert" className="mt-4 text-sm font-medium text-red-600">
-          {error}
+          {fieldError || error}
         </p>
       ) : null}
 

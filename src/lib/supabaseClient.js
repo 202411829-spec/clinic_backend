@@ -28,8 +28,11 @@ export async function adminSignIn(username, password) {
 }
 
 /**
- * Signs a student in using their Gordon College username (mapped to
- * <username>@gordoncollege.edu.ph) and password.
+ * Signs a student in using either their Gordon College student ID OR their
+ * full @gordoncollege.edu.ph email, plus password.
+ *
+ *   "202311330"                       -> "202311330@gordoncollege.edu.ph"
+ *   "202311330@gordoncollege.edu.ph"  -> used as-is (trimmed + lowercased)
  *
  * Same pattern as adminSignIn — swap to a backend /auth/student/login
  * endpoint later if extra checks (role verification, audit logging, etc.)
@@ -40,7 +43,8 @@ export async function studentSignIn(username, password) {
     throw new Error('Supabase is not configured yet. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.')
   }
 
-  const email = `${username}@gordoncollege.edu.ph`
+  const value = (username ?? '').trim()
+  const email = value.includes('@') ? value.toLowerCase() : `${value}@gordoncollege.edu.ph`
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
