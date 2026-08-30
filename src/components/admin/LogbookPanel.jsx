@@ -413,38 +413,53 @@ export default function LogbookPanel({
         <p className="hidden print:block text-sm text-gray-600 mb-4">
           {printSummary}
         </p>
-        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse print:min-w-full">
+        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse print:min-w-0 print:table-fixed print:w-full print:text-[9.5px] print:leading-tight">
+          {/* Print-only column widths — keeps the table within the printable
+              page width instead of letting long cell content push columns
+              past the page edge (browsers clip overflow when printing,
+              they don't add horizontal scroll). Text wraps at spaces only
+              (no forced mid-word breaking). Ignored on screen. */}
+          <colgroup>
+            <col className="print:w-[14%]" />
+            <col className="print:w-[16%]" />
+            <col className="print:w-[6%]" />
+            <col className="print:w-[18%]" />
+            <col className="print:w-[6%]" />
+            <col className="print:w-[15%]" />
+            <col className="print:w-[12%]" />
+            <col className="print:w-[13%]" />
+          </colgroup>
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2 px-4 md:px-2 font-semibold border border-gray-300">Date / Time</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Name</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Age</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Dept. & Course</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap">Sex</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Reason</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Complaint</th>
-              <th className="py-2 px-2 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal">Medicine</th>
+              <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border border-gray-300 print:whitespace-normal">Date / Time</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. & Course</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody>
             {pageRows.map((row) => (
               <tr key={row.id}>
-                <td className="py-2.5 px-4 md:px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
+                <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.dateTime}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.name}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">{row.age}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">{row.deptCourse}</td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.name}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.deptCourse}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.sex}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.reason}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.complaint}
                 </td>
-                <td className="py-2.5 px-2 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.medicine}
                 </td>
               </tr>

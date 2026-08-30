@@ -35,61 +35,68 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
+  // Split "8:00 AM - 9:00 AM" into its start/end halves so we can force
+  // exactly 2 lines every time ("8:00 AM -" / "9:00 AM"), instead of
+  // leaving it to the browser to wrap wherever it runs out of width —
+  // that produced inconsistent 2-vs-3-line rows and awkward mid-time
+  // breaks like "11:00 -" / "AM". whitespace-nowrap on each half also
+  // guarantees "11:00 AM" itself never splits across lines.
+  const [startLabel, endLabel] = String(block.time).split(" - ");
+
   return (
     <div className="relative w-full">
-      <div className="flex items-center justify-between gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5">
-        <span className="text-sm font-semibold text-gray-800 leading-tight whitespace-nowrap">
-          {block.time}
+      <div className="grid grid-cols-[1fr_84px_36px] items-center gap-3 border border-gray-200 rounded-2xl overflow-visible px-4 py-2.5">
+        {/* Fixed 2-line time label. The Slots/Action columns are fixed-width
+            grid tracks, so they stay pantay (aligned) on every row and
+            vertically centered against the time label, regardless of
+            digit count (84px comfortably fits "999 Slots", 3 digits). */}
+        <div className="text-sm font-semibold text-gray-800 leading-snug">
+          <div className="whitespace-nowrap">{startLabel} -</div>
+          <div className="whitespace-nowrap">{endLabel}</div>
+        </div>
+
+        <span className="text-xs font-semibold text-gray-500 text-right whitespace-nowrap">
+          {block.capacity} Slot{block.capacity === 1 ? "" : "s"}
         </span>
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Slots are set once per generated schedule and stay fixed per block,
-              regardless of later time edits on this or other blocks. Fixed
-              width (regardless of 1, 2, or 3-digit counts) keeps this label
-              — and the ⋮ menu button next to it — aligned the same way on
-              every row. */}
-          <span className="text-xs font-semibold text-gray-500 whitespace-nowrap text-right w-[70px] shrink-0">
-            {block.capacity} Slot{block.capacity === 1 ? "" : "s"}
-          </span>
 
-          <div className="relative" ref={menuWrapRef}>
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label={`Actions for ${block.time}`}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
+        <div className="relative justify-self-center" ref={menuWrapRef}>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={`Actions for ${block.time}`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10 leading-none text-lg"
+          >
+            <NavIcon name="dots" />
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
             >
-              <NavIcon name="dots" />
-            </button>
-
-            {menuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onToggleEdit(block.id);
+                }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
               >
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onToggleEdit(block.id);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Edit
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete(block.id);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
-              </div>
-            )}
-          </div>
+                Edit
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete(block.id);
+                }}
+                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -452,7 +459,7 @@ export default function ClinicScheduleFullPanel() {
               <div>
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-1">
                   Slots per time block
-                  <InfoDot label="Automatically calculated from the number of students divided across your available time blocks." />
+                  <InfoDot label="Fixed at 13 slots per time block, the same for every block regardless of the number of students entered." />
                 </span>
                 <input
                   readOnly
@@ -488,7 +495,15 @@ export default function ClinicScheduleFullPanel() {
                 Time Block Preview
               </h3>
             </div>
-            <div className="space-y-2 overflow-y-auto overflow-x-hidden pr-1 -mr-1 flex-1 min-h-0">
+            {/* Real (non-canceled) right padding here — not the old
+                pr-1/-mr-1 net-zero trick. That trick assumed a scrollbar
+                that reserves its own layout space; on an overlay-style
+                scrollbar (floats on top of content instead of taking
+                space) it did nothing, so the scrollbar rendered directly
+                on top of the ⋮ action button and hid it on some rows.
+                This reserves genuine empty space so the scrollbar always
+                has clear room and never covers the button. */}
+            <div className="space-y-2 overflow-y-auto overflow-x-hidden pr-3 flex-1 min-h-0">
               {blocks.map((block) => (
                 <TimeBlockRow
                   key={block.id}
