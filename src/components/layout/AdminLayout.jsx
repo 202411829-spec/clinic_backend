@@ -7,6 +7,8 @@ import MobileMenuHandle from '../admin/MobileMenuHandle.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { adminsApi } from '../../lib/api.js'
 import Pending from '../../pages/admin/Pending.jsx'
+import AgentBubble from '../agent/AgentBubble.jsx'
+import AgentPanel from '../agent/AgentPanel.jsx'
 
 // Medical Certificate / Medical Summary are printable official documents —
 // TopBar already hides itself there, so the mobile nav handle should too.
@@ -19,6 +21,7 @@ export default function AdminLayout() {
   const { email, loading: authLoading } = useAuth()
   const [checkingPending, setCheckingPending] = useState(true)
   const [isPending, setIsPending] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
 
   // After login, fetch own admin record to check is_active. Inactive admins
   // (is_active === false or status !== 'active') see the Pending page instead.
@@ -93,6 +96,23 @@ export default function AdminLayout() {
           )}
         </main>
       </div>
+      {!isPending && !checkingPending && (
+        <>
+          <AgentBubble isPending={isPending} open={agentOpen} onClick={() => setAgentOpen((v) => !v)} />
+          <AgentPanel
+            open={agentOpen}
+            onClose={() => setAgentOpen(false)}
+            onClear={() => {}}
+            history={[]}
+            preview={null}
+            onSend={async () => {}}
+            onConfirm={async () => {}}
+            onDismissPreview={() => {}}
+            error={null}
+            loading={false}
+          />
+        </>
+      )}
     </div>
   )
 }
