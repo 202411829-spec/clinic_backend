@@ -56,12 +56,14 @@ function mapResponse(json) {
     count: b.count,
     percent: b.percent,
   }));
-  data.complaint.rows = (json.complaint_breakdown || []).map((b) => ({
-    label: b.label,
-    value: pct(b),
-    count: b.count,
-    percent: b.percent,
-  }));
+  data.complaint.rows = (json.complaint_breakdown || [])
+    .filter((b) => String(b.label).trim().toLowerCase() !== "no complaint logged")
+    .map((b) => ({
+      label: b.label,
+      value: pct(b),
+      count: b.count,
+      percent: b.percent,
+    }));
   data.sex.rows = (json.sex_breakdown || []).map((b) => ({
     label: b.label,
     value: pct(b),
