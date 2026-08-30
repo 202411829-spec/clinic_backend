@@ -387,6 +387,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     [filteredSlots]
   );
   const hasAppointments = totalBookings > 0;
+  const isToday = toYMD(selectedDate) === toYMD(new Date())
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
@@ -404,7 +405,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
         </span>
       </div>
 
-      <AppointmentsSummary counts={summaryCounts} />
+      {isToday && <AppointmentsSummary counts={summaryCounts} />}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
