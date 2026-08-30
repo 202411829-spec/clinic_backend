@@ -14,6 +14,7 @@ from routers.feedback import feedback_bp
 from routers.masterlist import blueprint as masterlist_bp
 from routers.student_record import student_record_bp
 from routers.reports import blueprint as reports_bp
+from routers.admin_mgmt import admin_mgmt_bp
 
 app = Flask(__name__)
 
@@ -54,6 +55,7 @@ app.register_blueprint(feedback_bp)
 app.register_blueprint(masterlist_bp)
 app.register_blueprint(student_record_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(admin_mgmt_bp)
 
 # =========================
 # ROOT + HEALTH CHECK
