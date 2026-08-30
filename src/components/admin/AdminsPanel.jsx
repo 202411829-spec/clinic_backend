@@ -122,8 +122,9 @@ export default function AdminsPanel() {
             <h3 className="font-bold">{confirmDelete.status === 'pending' ? 'Reject request?' : 'Delete admin?'}</h3>
             <p className="mt-1 text-sm text-gray-600">Type <span className="font-semibold">{confirmDelete.email}</span> to confirm.</p>
             <input value={confirmEmail} onChange={e => setConfirmEmail(e.target.value)} placeholder={confirmDelete.email} className="mt-3 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm" />
+            {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
             <div className="mt-4 flex gap-3">
-              <button onClick={() => { setConfirmDelete(null); setConfirmEmail('') }} className="flex-1 rounded-xl border py-2.5 text-sm font-semibold">Cancel</button>
+              <button onClick={() => { setConfirmDelete(null); setConfirmEmail(''); setError('') }} className="flex-1 rounded-xl border py-2.5 text-sm font-semibold">Cancel</button>
               <button onClick={() => handleDelete(confirmDelete)} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white">{confirmDelete.status === 'pending' ? 'Reject' : 'Delete'}</button>
             </div>
           </div>
