@@ -612,7 +612,7 @@ def get_appointment(appointment_id):
 @require_auth
 @handle_errors("Time slot error")
 def get_time_slots():
-
+    formatted_slots = []
     schedule_id = request.args.get("schedule_id")
     requested_date = request.args.get("date")
 
@@ -787,11 +787,11 @@ def get_time_slots():
                     "bookings": bookings
                 })
 
-        return jsonify({
-            "success": True,
-            "count": len(formatted_slots),
-            "slots": formatted_slots
-        })
+            return jsonify({
+                "success": True,
+                "count": len(formatted_slots),
+                "slots": formatted_slots
+            })
 
     # ----------------------------------------------------
     # Fetch time slots (filtered by schedule_id / date's schedule)
