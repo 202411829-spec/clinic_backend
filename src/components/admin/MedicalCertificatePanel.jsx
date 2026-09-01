@@ -30,14 +30,26 @@ function pronounFor(sex) {
 // print output, where three of these stack on a single portrait A4 page.
 function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark, purpose, issuedOn, copyLabel, copyNumber }) {
   return (
-    <div className="border border-gray-400 rounded-lg p-2.5 relative flex flex-col text-[9px] leading-snug">
-      <p className="absolute top-1.5 right-2 text-[8px] text-gray-500">{copyNumber}</p>
-      <p className="absolute top-1.5 left-2 text-[8px] font-semibold text-gray-500 uppercase tracking-wide">
-        {copyLabel}
-      </p>
+    <div className="border border-gray-400 rounded-lg p-2.5 flex flex-col text-[9px] leading-snug">
+      {/* In-flow header row instead of absolutely-positioned labels — the
+          old version overlapped the seal row underneath it once font
+          metrics shifted even slightly (webfont vs. fallback, or
+          html2canvas's own text measurement), which is why it was hard to
+          read in the downloaded PDF. This guarantees clear separation. */}
+      <div className="flex items-center justify-between text-[8px] font-bold text-gray-600 uppercase tracking-wide">
+        <span>{copyLabel}</span>
+        <span>{copyNumber}</span>
+      </div>
 
-      <div className="flex items-start gap-1 mt-2">
-        <div className="flex items-start gap-1 shrink-0">
+      {/* Three equal flex-1 columns (left seals / center text / right seal)
+          instead of shrink-0 side columns — the old version had 2 seals on
+          the left (~68px) vs. 1 on the right (~32px), so the "flex-1"
+          middle column wasn't actually centered on the card: it sat
+          measurably left of the "Office of Student Welfare..." line below,
+          which *is* centered on the full card width. Equal-width columns
+          make both lines land on the same center axis. */}
+      <div className="flex items-start gap-1 mt-1.5">
+        <div className="flex-1 flex items-start gap-1">
           <img src={gordonCollegeSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
           <img src={oswsSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
         </div>
@@ -48,7 +60,9 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
           </p>
           <p className="text-[7px] text-gray-600 leading-tight">Tel. No.: (047) 222-4080</p>
         </div>
-        <img src={healthServicesSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
+        <div className="flex-1 flex items-start justify-end">
+          <img src={healthServicesSeal} alt="" className="w-8 h-8 object-contain shrink-0" />
+        </div>
       </div>
 
       <div className="text-center mt-0.5">
@@ -84,9 +98,14 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
         <span className="block border-b border-gray-400 min-h-[10px] text-gray-700">{diagnosis}</span>
       </div>
 
-      <div className="flex items-start gap-1 mb-1">
-        <span className="font-semibold text-gray-800 shrink-0">Final Remark:</span>
-        <span className="flex-1 border-b border-gray-400 min-h-[10px] text-gray-700">{finalRemark}</span>
+      {/* Block layout (matches Diagnosis above) instead of `flex-1` — flex-grow
+          stretching isn't reliably computed by html2canvas's manual layout
+          pass, so the old flex-1 version rendered as a short line hugging
+          the label instead of stretching to the edge of the box in the
+          downloaded PDF, even though it looked fine on screen/print. */}
+      <div className="mb-1">
+        <span className="font-semibold text-gray-800 block">Final Remark:</span>
+        <span className="block border-b border-gray-400 min-h-[10px] text-gray-700">{finalRemark}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -199,6 +218,26 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
 
       const node = printRef.current;
       if (!node) return;
+
+      // html2canvas paints whatever is on screen *right now* — if the Inter
+      // webfont (loaded from Google Fonts, see index.html) hasn't finished
+      // downloading yet, or an <img> seal hasn't decoded yet, it silently
+      // falls back to a system font / blank image for this snapshot only.
+      // The actual "Print" button doesn't have this problem because the
+      // browser's native print pipeline always waits for both. Waiting on
+      // document.fonts.ready + decoding every <img> here closes that gap so
+      // the download reliably matches the print output.
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+      await Promise.all(
+        Array.from(node.querySelectorAll("img")).map((img) =>
+          img.decode ? img.decode().catch(() => {}) : Promise.resolve()
+        )
+      );
+      // One extra frame so the browser has actually painted the settled
+      // fonts/images before we snapshot.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
 
       const canvas = await html2canvas(node, {
         scale: 3,

@@ -8,7 +8,6 @@ import WalkInVisitForm from "./WalkInVisitForm.jsx";
 import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
 import { formatMDY, isoToMDY } from "../../lib/calendar.js";
-import { pdfLetterhead } from "../../lib/pdf.js";
 
 const PAGE_SIZE = 20;
 
@@ -178,149 +177,83 @@ export default function LogbookFullPanel() {
     window.print();
   }
 
-  // Generates an A4-portrait PDF in the same visual language as ReportsFullPanel:
-  // Reports' letterhead + "Clinic Logbook" title + filter metadata, then the
-  // boxed logbook table (header + visible rows) with a small page-number footer.
+  // Off-screen node holding an exact replica of the print layout (see
+  // printRef below) — snapshotted with html2canvas so the download is
+  // pixel-for-pixel what "Print" produces, instead of a hand-drawn jsPDF
+  // table. The old approach drew every row at a fixed 7mm height and let
+  // jsPDF's own text-wrapping kick in independently of that height, so any
+  // cell whose text wrapped to 2+ lines (long complaint/medicine text,
+  // narrow columns) overlapped the row below it — that's the "siksikan"
+  // (cramped/overlapping) look. Snapshotting real, wrapped DOM/CSS avoids
+  // that entirely: each row is exactly as tall as its content needs.
+  const printRef = useRef(null);
+
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
-      const { jsPDF } = await import("jspdf");
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const node = printRef.current;
+      if (!node) return;
+
+      // Wait for the Inter webfont + seal images to finish loading/decoding
+      // before snapshotting — otherwise html2canvas can capture a frame
+      // that's still on a fallback font or a blank image, which is the
+      // other common cause of the download not matching the real print.
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+      await Promise.all(
+        Array.from(node.querySelectorAll("img")).map((img) =>
+          img.decode ? img.decode().catch(() => {}) : Promise.resolve()
+        )
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      let y = 18;
+      const margin = 10; // matches the .print-a4-portrait / @page margin
+      const imgWidth = 210 - margin * 2; // 190mm
+      const pageHeightMm = 297 - margin * 2; // 277mm
+      const pxPerMm = canvas.width / imgWidth;
+      const pageHeightPx = Math.floor(pageHeightMm * pxPerMm);
 
-      // Letterhead — shared helper (now embeds the same three seal images
-      // used on-screen/print, so the download matches the printed page).
-      y = await pdfLetterhead(doc, y);
+      // The table can run longer than one A4 page (up to 20 rows per
+      // logbook page) — slice the tall canvas into page-height chunks and
+      // add one image per PDF page, instead of squashing everything onto a
+      // single sheet.
+      let renderedPx = 0;
+      let pageNum = 0;
+      while (renderedPx < canvas.height) {
+        const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx);
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        sliceCanvas
+          .getContext("2d")
+          .drawImage(canvas, 0, renderedPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
 
-      // Title — mirrors Reports' "Clinic Report" line.
-      doc.setFontSize(16);
-      doc.setFont(undefined, "bold");
-      doc.text("Clinic Logbook", 14, y);
-      y += 8;
+        if (pageNum > 0) doc.addPage();
+        doc.addImage(
+          sliceCanvas.toDataURL("image/png"),
+          "PNG",
+          margin,
+          margin,
+          imgWidth,
+          sliceHeightPx / pxPerMm
+        );
 
-      // Metadata — mirrors Reports' "Period:"/"Department:" lines.
-      doc.setFontSize(10);
-      doc.setFont(undefined, "normal");
-      doc.setTextColor("#000000");
-      doc.text(`Date: ${dateFrom ? isoToMDY(dateFrom) : "All"} to ${dateTo ? isoToMDY(dateTo) : "All"}`, 14, y);
-      y += 5;
-      doc.text(`Department: ${departmentLabel || "All"}`, 14, y);
-      y += 5;
-      doc.text(`Course: ${courseLabel || "All"}`, 14, y);
-      y += 5;
-      doc.text(`Reason: ${reasonLabel || "All Reasons"}`, 14, y);
-      if (search) {
-        y += 5;
-        doc.text(`Search: ${search}`, 14, y);
-      }
-      y += 5;
-      doc.text(`Total entries: ${totalEntries}`, 14, y);
-      y += 10;
-
-      const margin = 14;
-      const pageW = 210 - margin * 2;
-      const cols = [
-        { label: "Date & Time", w: 22 },
-        { label: "Student ID", w: 18 },
-        { label: "Name", w: 26 },
-        { label: "Age", w: 9 },
-        { label: "Dept / Course", w: 26 },
-        { label: "Sex", w: 10 },
-        { label: "Reason", w: 24 },
-        { label: "Complaint", w: 24 },
-        { label: "Medicine", w: 21 },
-      ];
-      // Give the widest free column whatever's left so the widths total pageW.
-      cols[8].w += pageW - cols.reduce((sum, c) => sum + c.w, 0);
-      const colX = [];
-      let x = margin;
-      cols.forEach((c) => { colX.push(x); x += c.w; });
-      const headerH = 7;
-      const rowH = 7;
-      let pageNum = 1;
-
-      function drawHeaderRow(top) {
-        doc.setFillColor("#F3F4F6");
-        doc.rect(margin, top, pageW, headerH, "F");
-        doc.setFontSize(7);
-        doc.setFont(undefined, "bold");
-        doc.setTextColor("#374151");
-        cols.forEach((c, i) => {
-          doc.text(c.label, colX[i] + 1, top + 4.4);
-        });
-      }
-
-      function drawFooter(pageNum) {
-        doc.setFontSize(7);
-        doc.setFont(undefined, "normal");
-        doc.setTextColor("#9CA3AF");
-        doc.text(String(pageNum), 105, 290, { align: "center" });
-      }
-
-      // Full cell borders (header + every row + every column), matching the
-      // "border border-gray-300" grid on the on-screen table. headerH and
-      // rowH are equal (7mm), so a uniform step from top to bottom lines up
-      // with every row boundary in between.
-      function drawGridLines(top, bottom) {
-        doc.setDrawColor("#D1D5DB");
-        doc.setLineWidth(0.15);
-        for (let ly = top; ly < bottom - 0.01; ly += rowH) {
-          doc.line(margin, ly, margin + pageW, ly);
-        }
-        doc.line(margin, bottom, margin + pageW, bottom);
-        const rightEdge = margin + pageW;
-        [...colX, rightEdge].forEach((cx) => doc.line(cx, top, cx, bottom));
-      }
-
-      function drawTable(startTop) {
-        drawHeaderRow(startTop);
-        let ty = startTop + headerH;
-        let pageTop = startTop;
-
-        doc.setFontSize(7.5);
-        doc.setFont(undefined, "normal");
-        if (entries.length === 0) {
-          doc.setTextColor("#111827");
-          doc.text("No logbook entries to display.", margin, ty + 6);
-          drawGridLines(pageTop, ty);
-          drawFooter(pageNum);
-          return;
-        }
-        entries.forEach((entry) => {
-          if (ty > 283) {
-            drawGridLines(pageTop, ty);
-            drawFooter(pageNum);
-            doc.addPage();
-            pageNum += 1;
-            ty = 18;
-            pageTop = ty;
-            drawHeaderRow(ty);
-            ty += headerH;
-          }
-          doc.setTextColor("#111827");
-          doc.text(String(entry.dateTime), colX[0] + 1, ty + 4, { maxWidth: cols[0].w - 2 });
-          doc.text(String(entry.studentId), colX[1] + 1, ty + 4, { maxWidth: cols[1].w - 2 });
-          doc.text(String(entry.name), colX[2] + 1, ty + 4, { maxWidth: cols[2].w - 2 });
-          doc.text(String(entry.age), colX[3] + 1, ty + 4, { maxWidth: cols[3].w - 2 });
-          doc.text(String(entry.deptCourse), colX[4] + 1, ty + 4, { maxWidth: cols[4].w - 2 });
-          doc.text(String(entry.sex), colX[5] + 1, ty + 4, { maxWidth: cols[5].w - 2 });
-          doc.text(String(entry.reason), colX[6] + 1, ty + 4, { maxWidth: cols[6].w - 2 });
-          doc.text(String(entry.complaint), colX[7] + 1, ty + 4, { maxWidth: cols[7].w - 2 });
-          doc.text(String(entry.medicine), colX[8] + 1, ty + 4, { maxWidth: cols[8].w - 2 });
-          ty += rowH;
-        });
-        drawGridLines(pageTop, ty);
-        drawFooter(pageNum);
-      }
-
-      let tableStart = y;
-      if (tableStart > 283 - headerH) {
-        drawFooter(pageNum);
-        doc.addPage();
+        renderedPx += sliceHeightPx;
         pageNum += 1;
-        tableStart = 18;
       }
-      drawTable(tableStart);
 
       doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
     } catch (err) {
@@ -355,7 +288,7 @@ export default function LogbookFullPanel() {
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
         CLINIC LOGBOOK
       </h2>
-      <p className="hidden print:block text-sm text-gray-600 mb-4">
+      <p className="hidden print:block print:text-xs text-gray-600 mb-4">
         {printSummary}
       </p>
 
@@ -445,7 +378,7 @@ export default function LogbookFullPanel() {
           walk-in form are all print:hidden, and the layout's sidebar/topbar
           already carry print:hidden. */}
       <div className="overflow-x-auto -mx-4 md:mx-0 print:overflow-visible print:mx-0">
-        <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:table-fixed print:text-[9.5px] print:leading-tight">
+        <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:table-fixed print:text-[9.5px] print:leading-snug">
           {/* Print-only column widths — forces the table to stay within the
               190mm printable width (see .print-a4-portrait in index.css)
               instead of letting long content push columns off the page.
@@ -466,15 +399,15 @@ export default function LogbookFullPanel() {
           </colgroup>
           <thead>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
+              <th className="py-2 px-4 md:px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody>
@@ -487,18 +420,18 @@ export default function LogbookFullPanel() {
             ) : (
               entries.map((entry) => (
                 <tr key={entry.id}>
-                  <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300">
+                  <td className="py-2.5 px-4 md:px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300">
                     <div className="font-medium whitespace-nowrap print:whitespace-normal">{entry.dept}</div>
                     <div className="text-xs print:text-[9px] text-gray-500 whitespace-nowrap print:whitespace-normal">{entry.course}</div>
                   </td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.reason}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 max-w-xs truncate print:max-w-none print:overflow-visible print:text-clip print:whitespace-normal">{entry.complaint}</td>
-                  <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.medicine}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.reason}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 max-w-xs truncate print:max-w-none print:overflow-visible print:text-clip print:whitespace-normal">{entry.complaint}</td>
+                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.medicine}</td>
                 </tr>
               ))
             )}
@@ -546,6 +479,76 @@ export default function LogbookFullPanel() {
           reasonRecords={reasonRecords}
         />
       )}
+
+      {/* ---------- PDF-export-only: exact replica of the print layout ----------
+          Kept off-screen (not display:none) so html2canvas can still capture
+          it for the "Download PDF" button — display:none elements have no
+          layout box to snapshot. Uses the *same* plain (non print:-prefixed)
+          classes the real print output resolves to, so what gets downloaded
+          is identical to what "Print" produces, row heights included. */}
+      <div
+        ref={printRef}
+        className="flex flex-col bg-white fixed top-0 -left-[9999px] w-[190mm] p-0"
+      >
+        <Letterhead className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-300" />
+        <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+          CLINIC LOGBOOK
+        </h2>
+        <p className="text-xs text-gray-600 mb-4">{printSummary}</p>
+
+        <table className="w-full table-fixed border-collapse text-[9.5px] leading-snug">
+          <colgroup>
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "13%" }} />
+          </colgroup>
+          <thead>
+            <tr className="text-left bg-gray-50">
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Date & Time</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Student ID</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Name</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Age</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Dept / Course</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Sex</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Reason</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Complaint</th>
+              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Medicine</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-8 text-center text-gray-400 border border-gray-300">
+                  No logbook entries found
+                </td>
+              </tr>
+            ) : (
+              entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.dateTime}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 font-medium whitespace-normal">{entry.studentId}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.name}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.age}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300">
+                    <div className="font-medium whitespace-normal">{entry.dept}</div>
+                    <div className="text-[9px] text-gray-500 whitespace-normal">{entry.course}</div>
+                  </td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.sex}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.reason}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.complaint}</td>
+                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.medicine}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
