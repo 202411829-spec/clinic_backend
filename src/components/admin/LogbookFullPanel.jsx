@@ -188,8 +188,9 @@ export default function LogbookFullPanel() {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       let y = 18;
 
-      // Letterhead — shared helper.
-      y = pdfLetterhead(doc, y);
+      // Letterhead — shared helper (now embeds the same three seal images
+      // used on-screen/print, so the download matches the printed page).
+      y = await pdfLetterhead(doc, y);
 
       // Title — mirrors Reports' "Clinic Report" line.
       doc.setFontSize(16);
@@ -256,24 +257,43 @@ export default function LogbookFullPanel() {
         doc.text(String(pageNum), 105, 290, { align: "center" });
       }
 
+      // Full cell borders (header + every row + every column), matching the
+      // "border border-gray-300" grid on the on-screen table. headerH and
+      // rowH are equal (7mm), so a uniform step from top to bottom lines up
+      // with every row boundary in between.
+      function drawGridLines(top, bottom) {
+        doc.setDrawColor("#D1D5DB");
+        doc.setLineWidth(0.15);
+        for (let ly = top; ly < bottom - 0.01; ly += rowH) {
+          doc.line(margin, ly, margin + pageW, ly);
+        }
+        doc.line(margin, bottom, margin + pageW, bottom);
+        const rightEdge = margin + pageW;
+        [...colX, rightEdge].forEach((cx) => doc.line(cx, top, cx, bottom));
+      }
+
       function drawTable(startTop) {
         drawHeaderRow(startTop);
         let ty = startTop + headerH;
+        let pageTop = startTop;
 
         doc.setFontSize(7.5);
         doc.setFont(undefined, "normal");
         if (entries.length === 0) {
           doc.setTextColor("#111827");
           doc.text("No logbook entries to display.", margin, ty + 6);
+          drawGridLines(pageTop, ty);
           drawFooter(pageNum);
           return;
         }
         entries.forEach((entry) => {
           if (ty > 283) {
+            drawGridLines(pageTop, ty);
             drawFooter(pageNum);
             doc.addPage();
             pageNum += 1;
             ty = 18;
+            pageTop = ty;
             drawHeaderRow(ty);
             ty += headerH;
           }
@@ -289,6 +309,7 @@ export default function LogbookFullPanel() {
           doc.text(String(entry.medicine), colX[8] + 1, ty + 4, { maxWidth: cols[8].w - 2 });
           ty += rowH;
         });
+        drawGridLines(pageTop, ty);
         drawFooter(pageNum);
       }
 

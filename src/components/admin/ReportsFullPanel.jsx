@@ -259,7 +259,9 @@ export default function ReportsFullPanel() {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       let y = 18;
 
-      y = pdfLetterhead(doc, y);
+      // Letterhead — shared helper (now embeds the same three seal images
+      // used on-screen/print, so the download matches the printed page).
+      y = await pdfLetterhead(doc, y);
 
       // ── Title ────────────────────────────────────────────────────
       doc.setFontSize(13);
@@ -278,12 +280,18 @@ export default function ReportsFullPanel() {
       );
       y += 7;
 
-      // ── Helper: bordered table row ───────────────────────────────
+      // ── Helper: bordered table row (full cell grid, matching the
+      // border-gray-400/300 table used on-screen/print) ────────────────
+      const summaryLx = 14;
+      const summaryMidX = 105; // matches the on-screen w-1/2 split
+      const summaryRx = 196;
+      const summaryRowH = 5;
+      let summaryTop = y - 3.5;
+
       function drawRow(label, value, isHeader = false) {
-        const lx = 14;
-        const vx = 105;
-        const rx = 196;
-        const rowH = 5;
+        const lx = summaryLx;
+        const rx = summaryRx;
+        const rowH = summaryRowH;
 
         if (isHeader) {
           doc.setFillColor(240, 240, 240);
@@ -293,10 +301,6 @@ export default function ReportsFullPanel() {
         doc.setFont(undefined, isHeader ? "bold" : "normal");
         doc.text(label, lx + 1, y);
         doc.text(String(value), rx - 1, y, { align: "right" });
-
-        // bottom border
-        doc.setDrawColor(180);
-        doc.line(lx, y + 1.5, rx, y + 1.5);
         y += rowH;
       }
 
@@ -307,12 +311,25 @@ export default function ReportsFullPanel() {
       y += 5;
 
       doc.setFontSize(9);
+      summaryTop = y - 3.5;
       drawRow("Metric", "Value", true);
       drawRow("Total Consultations", totalConsultations.toLocaleString());
       drawRow("Total Students", totalStudents.toLocaleString());
       drawRow("Top Complaint", topComplaint);
       drawRow("Date Range", periodLabel);
       drawRow("Department", department);
+
+      // Full grid over the summary table: outer box, horizontal row lines,
+      // and one vertical divider at the label/value midpoint.
+      doc.setDrawColor(160);
+      doc.setLineWidth(0.15);
+      const summaryBottom = y - 3.5;
+      for (let ly = summaryTop; ly <= summaryBottom + 0.01; ly += summaryRowH) {
+        doc.line(summaryLx, ly, summaryRx, ly);
+      }
+      doc.line(summaryLx, summaryTop, summaryLx, summaryBottom);
+      doc.line(summaryMidX, summaryTop, summaryMidX, summaryBottom);
+      doc.line(summaryRx, summaryTop, summaryRx, summaryBottom);
       y += 4;
 
       // ── Breakdown tables ─────────────────────────────────────────
@@ -337,35 +354,57 @@ export default function ReportsFullPanel() {
         y += 5;
 
         const lx = 14;
-        const cx = 130;
+        const div1 = 134; // Label / Count boundary
+        const div2 = 166; // Count / Percent boundary
         const rx = 196;
+        const bkRowH = 5;
+        let bkTop = y - 3.5;
 
         // Table header
         doc.setFontSize(9);
         doc.setFillColor(240, 240, 240);
-        doc.rect(lx, y - 3.5, rx - lx, 5, "F");
+        doc.rect(lx, y - 3.5, rx - lx, bkRowH, "F");
         doc.setFont(undefined, "bold");
         doc.text("Label", lx + 1, y);
-        doc.text("Count", cx, y);
+        doc.text("Count", div2 - 1, y, { align: "right" });
         doc.text("Percent", rx - 1, y, { align: "right" });
-        doc.setDrawColor(180);
-        doc.line(lx, y + 1.5, rx, y + 1.5);
-        y += 5;
+        y += bkRowH;
+
+        function drawBkGrid(top, bottom) {
+          doc.setDrawColor(180);
+          doc.setLineWidth(0.15);
+          for (let ly = top; ly <= bottom + 0.01; ly += bkRowH) {
+            doc.line(lx, ly, rx, ly);
+          }
+          [lx, div1, div2, rx].forEach((vx) => doc.line(vx, top, vx, bottom));
+        }
 
         // Table rows
         doc.setFont(undefined, "normal");
-        section.rows.forEach((row) => {
+        const rowsToRender = section.rows.length ? section.rows : [null];
+        rowsToRender.forEach((row) => {
           if (y > 270) {
+            // Close out the grid drawn so far before breaking to a new page.
+            drawBkGrid(bkTop, y - 3.5);
             doc.addPage();
             y = 18;
+            bkTop = y - 3.5;
           }
-          doc.text(String(row.label), lx + 1, y);
-          doc.text(String(row.count ?? row.value), cx, y);
-          doc.text(row.percent != null ? `${row.percent}%` : "—", rx - 1, y, { align: "right" });
-          doc.setDrawColor(220);
-          doc.line(lx, y + 1.5, rx, y + 1.5);
-          y += 5;
+          if (row === null) {
+            doc.setFont(undefined, "italic");
+            doc.setTextColor(150);
+            doc.text("No data available", lx + 1, y);
+            doc.setFont(undefined, "normal");
+            doc.setTextColor("#000000");
+          } else {
+            doc.text(String(row.label), lx + 1, y);
+            doc.text(String(row.count ?? row.value), div2 - 1, y, { align: "right" });
+            doc.text(row.percent != null ? `${row.percent}%` : "—", rx - 1, y, { align: "right" });
+          }
+          y += bkRowH;
         });
+
+        drawBkGrid(bkTop, y - 3.5);
         y += 4;
       });
 
