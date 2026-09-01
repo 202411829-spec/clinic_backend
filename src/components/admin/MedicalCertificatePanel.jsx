@@ -382,9 +382,18 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
         ref={printRef}
         className="flex flex-col gap-3 bg-white fixed top-0 -left-[9999px] w-[190mm] print-a4-portrait print-cert-grid print:static print:left-auto print:top-auto print:w-auto"
       >
-        {COPY_LABELS.map((label, i) => (
-          <CertificateCopy key={label} {...copyProps} copyLabel={label} copyNumber={i + 1} />
-        ))}
+        {COPY_LABELS.flatMap((label, i) => {
+          const nodes = [];
+          if (i > 0) {
+            nodes.push(
+              <div key={`${label}-cut`} className="print-cut-line" aria-hidden="true">
+                <span className="print-cut-line-scissor">✂</span>
+              </div>
+            );
+          }
+          nodes.push(<CertificateCopy key={label} {...copyProps} copyLabel={label} copyNumber={i + 1} />);
+          return nodes;
+        })}
       </div>
     </div>
   );

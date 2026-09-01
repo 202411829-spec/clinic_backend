@@ -1,13 +1,13 @@
 // src/components/admin/ReportsFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import NavIcon from "./NavIcon";
-import PeriodDropdown from "./PeriodDropdown";
-import SelectDateCalendar from "./SelectDateCalendar";
+import NavIcon from "./NavIcon.jsx";
+import PeriodDropdown from "./PeriodDropdown.jsx";
+import SelectDateCalendar from "./SelectDateCalendar.jsx";
 import Letterhead from "./Letterhead.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { masterlistApi, reportsApi } from "../../lib/api.js";
-import { formatMDY, getPeriodLabel, shiftByPeriod, toYMD } from "../../lib/calendar";
+import { formatMDY, getPeriodLabel, shiftByPeriod, toYMD } from "../../lib/calendar.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
 
 // ─── Colour tokens (reuse brand palette, no new primaries) ───────────
@@ -441,7 +441,7 @@ export default function ReportsFullPanel() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             {/* Date navigator */}
-            <div className="flex items-center gap-1.5 flex-1 min-w-0" ref={pickerRef}>
+            <div className="relative flex items-center gap-1.5 flex-1 min-w-0" ref={pickerRef}>
               {period !== "All Time" && (
                 <button
                   onClick={() => shiftDay(-1)}

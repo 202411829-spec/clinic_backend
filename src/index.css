@@ -144,6 +144,29 @@
   }
 
   .print-cert-grid > * + * {
-    margin-top: 3mm !important;
+    margin-top: 4mm !important;
+  }
+
+  /* Dashed "cut here" guide printed between each certificate copy so the
+     three copies can be trimmed apart after printing. Screen-only styling
+     doesn't matter here since this whole block is off-screen except when
+     printing / exporting to PDF. */
+  .print-cut-line {
+    display: block !important;
+    position: relative;
+    height: 0;
+    border-top: 1px dashed #9ca3af;
+  }
+
+  .print-cut-line-scissor {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, -50%) rotate(90deg);
+    background: #ffffff;
+    padding: 0 2mm;
+    font-size: 8px;
+    color: #9ca3af;
+    line-height: 1;
   }
 }

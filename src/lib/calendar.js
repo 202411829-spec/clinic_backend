@@ -71,12 +71,12 @@ export function getAcademicYearLabel(date) {
   return `AY ${startYear}-${startYear + 1}`;
 }
 
-/** Rough PH term for `date`: "1st Semester", "2nd Semester", or "Summer Term". */
+/** Rough PH term for `date`: "1st Semester", "2nd Semester", or "Midyear". */
 export function getSemesterLabel(date) {
   const m = date.getMonth(); // 0-indexed
   if (m >= 7 && m <= 11) return "1st Semester"; // Aug–Dec
   if (m === 0 || (m >= 1 && m <= 4)) return "2nd Semester"; // Jan–May
-  return "Summer Term"; // Jun–Jul
+  return "Midyear"; // Jun–Jul
 }
 
 /** Human label for the currently selected reporting period. */
