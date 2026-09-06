@@ -100,7 +100,7 @@ export default function AdminProfile() {
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
 
       {error && (
-        <p role="alert" className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <p role="alert" className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 animate-fade-in-up">
           {error}
         </p>
       )}
@@ -108,18 +108,18 @@ export default function AdminProfile() {
       {admin && !loading && (
         <>
           {isIncomplete && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 animate-fade-in-up">
               Complete your profile — add your name and license number.
             </div>
           )}
 
           {saved && (
-            <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+            <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700 animate-fade-in-up">
               Profile saved.
             </div>
           )}
 
-          <div className="space-y-4 rounded-2xl border border-gray-200 p-6">
+          <div className="card-hover space-y-4 rounded-2xl border border-gray-200 p-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-sm text-gray-500">Email</p>
@@ -168,9 +168,16 @@ export default function AdminProfile() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="rounded-xl bg-gc-accent px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="btn-press rounded-xl bg-gc-accent px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:active:scale-100"
               >
-                {saving ? 'Saving…' : 'Save changes'}
+                {saving ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Saving…
+                  </span>
+                ) : (
+                  'Save changes'
+                )}
               </button>
             </div>
           </div>

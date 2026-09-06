@@ -48,7 +48,7 @@ export default function PeriodDropdown({ value, onChange }) {
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 md:left-0 z-20 mt-2 w-48 rounded-3xl border-2 border-gc-green bg-white p-2 shadow-lg"
+          className="absolute right-0 md:left-0 z-20 mt-2 w-48 rounded-3xl border-2 border-gc-green bg-white p-2 shadow-lg origin-top animate-scale-in motion-reduce:animate-none"
         >
           {REPORT_PERIODS.map((period) => (
             <button

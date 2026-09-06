@@ -68,7 +68,7 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
           <div
             ref={menuRef}
             style={{ position: "fixed", top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden"
+            className="z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden origin-top animate-scale-in motion-reduce:animate-none"
           >
             {statusOptions.map((opt) => (
               <button

@@ -52,7 +52,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
     >
       {/* Backdrop — covers entire viewport, click to close */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-fade-in motion-reduce:animate-none"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -61,7 +61,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
       <div
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100 p-4"
+        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 animate-scale-in motion-reduce:animate-none"
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold tracking-wide text-gray-800">
@@ -69,7 +69,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
           </h3>
           <button
             onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="btn-press w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             aria-label="Close"
           >
             <NavIcon name="x" className="w-3.5 h-3.5" />
@@ -133,13 +133,13 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+            className="btn-press flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 rounded-lg bg-gc-green py-2 text-sm font-semibold text-white hover:bg-gc-green-600"
+            className="btn-press flex-1 rounded-lg bg-gc-green py-2 text-sm font-semibold text-white hover:bg-gc-green-600"
           >
             Save
           </button>

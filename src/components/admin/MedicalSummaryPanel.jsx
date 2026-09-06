@@ -350,7 +350,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       <div className="flex flex-col gap-4 print:hidden">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700"
+          className="btn-press flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700"
         >
           <ChevronLeftIcon className="h-4 w-4" />
           Back
@@ -374,13 +374,13 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
         <div className="grid grid-cols-3 md:flex md:items-center gap-2">
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             Medical Certificate
           </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
           >
             <NavIcon name="printer" className="w-4 h-4" />
             Print
@@ -388,7 +388,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           <button
             onClick={handleDownloadPdf}
             disabled={downloading}
-            className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
+            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
           >
             <NavIcon name="download" className="w-4 h-4" />
             {downloading ? "Preparing…" : "Download PDF"}

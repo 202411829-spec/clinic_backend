@@ -391,11 +391,11 @@ export default function ForgotPasswordForm({
       </div>
 
       {info && !message ? (
-        <p className="mt-4 text-sm font-medium text-gc-green-700">{info}</p>
+        <p className="mt-4 text-sm font-medium text-gc-green-700 animate-fade-in-up">{info}</p>
       ) : null}
 
       {message ? (
-        <p role="alert" className="mt-4 text-sm font-medium text-red-600">
+        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
           {message}
         </p>
       ) : null}
@@ -403,7 +403,7 @@ export default function ForgotPasswordForm({
       <button
         type="submit"
         disabled={isBusy}
-        className={`mt-7 w-full rounded-xl ${cfg.bgAccent} py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors ${cfg.hoverBgAccent} focus:outline-none focus:ring-2 ${cfg.ringAccentStrong} disabled:cursor-not-allowed disabled:opacity-60`}
+        className={`btn-press mt-7 w-full rounded-xl ${cfg.bgAccent} py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors ${cfg.hoverBgAccent} focus:outline-none focus:ring-2 ${cfg.ringAccentStrong} disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100`}
       >
         {isBusy
           ? 'Please wait…'

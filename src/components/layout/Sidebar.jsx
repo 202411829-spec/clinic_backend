@@ -25,12 +25,13 @@ const MANAGEMENT_ITEMS = [
   { to: '/admin/profile', label: 'Profile', Icon: MasterlistIcon },
 ]
 
-function NavItem({ to, label, Icon }) {
+function NavItem({ to, label, Icon, delayMs }) {
   return (
     <NavLink
       to={to}
+      style={delayMs ? { animationDelay: `${delayMs}ms` } : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 ease-smooth ${
+        `flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 ease-smooth animate-fade-in-up motion-reduce:animate-none ${
           isActive ? 'bg-gc-green-600' : 'hover:bg-white/5 hover:translate-x-0.5'
         }`
       }
@@ -42,9 +43,15 @@ function NavItem({ to, label, Icon }) {
 }
 
 function NavContent() {
+  // Sidebar mounts once per session (it lives outside the routed <Outlet />,
+  // so it never remounts on navigation) — a one-time staggered entrance for
+  // the nav items is basically free and only ever plays on first load.
+  const allItems = [...MAIN_ITEMS, ...MANAGEMENT_ITEMS]
+  const delayFor = (item) => allItems.indexOf(item) * 35
+
   return (
     <>
-      <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
+      <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center animate-fade-in-up">
         <div className="flex items-center justify-center gap-2">
           <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 object-contain" />
           {/* health-services-logo.png has more padding baked into the source
@@ -68,7 +75,7 @@ function NavContent() {
           <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MAIN</p>
           <div className="space-y-1">
             {MAIN_ITEMS.map((item) => (
-              <NavItem key={item.to} {...item} />
+              <NavItem key={item.to} {...item} delayMs={delayFor(item)} />
             ))}
           </div>
         </div>
@@ -76,7 +83,7 @@ function NavContent() {
           <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MANAGEMENT</p>
           <div className="space-y-1">
             {MANAGEMENT_ITEMS.map((item) => (
-              <NavItem key={item.to} {...item} />
+              <NavItem key={item.to} {...item} delayMs={delayFor(item)} />
             ))}
           </div>
         </div>

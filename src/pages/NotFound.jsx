@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center animate-fade-in-up">
       <p className="text-sm font-semibold uppercase tracking-wide text-gc-accent">
         Error 404
       </p>
@@ -14,7 +14,7 @@ export default function NotFound() {
       </p>
       <Link
         to="/admin/login"
-        className="mt-6 rounded-lg bg-gc-green-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gc-green-800"
+        className="btn-press mt-6 rounded-lg bg-gc-green-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gc-green-800"
       >
         Back to login
       </Link>

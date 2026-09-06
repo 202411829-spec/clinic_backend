@@ -21,9 +21,9 @@ export default function Pending() {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center bg-gray-50 p-6 sm:min-h-[70vh]">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm border border-gray-100">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm border border-gray-100 animate-fade-in-up">
         {/* Icon */}
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 animate-scale-in">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-7 w-7 text-amber-600"
@@ -57,14 +57,14 @@ export default function Pending() {
           <button
             type="button"
             onClick={handleRefresh}
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gc-accent/20 sm:flex-none"
+            className="btn-press inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gc-accent/20 sm:flex-none"
           >
             Refresh
           </button>
           <button
             type="button"
             onClick={handleLogout}
-            className="inline-flex flex-1 items-center justify-center rounded-xl bg-gc-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 sm:flex-none"
+            className="btn-press inline-flex flex-1 items-center justify-center rounded-xl bg-gc-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 sm:flex-none"
           >
             Log out
           </button>

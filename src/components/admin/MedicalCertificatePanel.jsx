@@ -269,7 +269,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
       {/* ---------- back ---------- */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700 print:hidden"
+        className="btn-press flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700 print:hidden"
       >
         <ChevronLeftIcon className="h-4 w-4" />
         Back
@@ -280,13 +280,13 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
         <button
           onClick={handleSendEmail}
           disabled={sending}
-          className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
+          className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
         >
           {sending ? "Opening…" : "Send through email"}
         </button>
         <button
           onClick={() => window.print()}
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
         >
           <NavIcon name="printer" className="w-4 h-4" />
           Print (3 copies, A4 portrait)
@@ -294,7 +294,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
         <button
           onClick={handleDownloadPdf}
           disabled={downloadingPdf}
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60"
+          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
         >
           <NavIcon name="download" className="w-4 h-4" />
           {downloadingPdf ? "Preparing…" : "Download PDF"}
@@ -302,7 +302,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
       </div>
 
       {/* ---------- certificate card (screen: editable single form) ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:hidden">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6 print:hidden">
         <div className="flex items-center gap-2 mb-4">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
             <NavIcon name="calendar" className="w-4 h-4" />

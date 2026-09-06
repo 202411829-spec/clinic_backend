@@ -218,12 +218,17 @@ function GroupBar({ children }) {
 function SaveButton({ children, onClick, saved, saving, disabled }) {
   return (
     <div className="flex items-center justify-end gap-3">
-      {saved && <span className="text-xs font-semibold text-gc-green">Saved ✓</span>}
-      {saving && <span className="text-xs font-semibold text-gray-500">Saving…</span>}
+      {saved && <span className="text-xs font-semibold text-gc-green animate-fade-in-up">Saved ✓</span>}
+      {saving && (
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 animate-fade-in">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+          Saving…
+        </span>
+      )}
       <button
         onClick={onClick}
         disabled={disabled || saving}
-        className="text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-press text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
       >
         {children}
       </button>
@@ -737,7 +742,7 @@ export default function StudentRecordPanel({ student }) {
   return (
     <div className="flex flex-col gap-5 pb-10">
       {/* ---------- student info card ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gc-green text-white text-xl font-bold flex items-center justify-center shrink-0">
             {initials(student.name)}
@@ -773,7 +778,7 @@ export default function StudentRecordPanel({ student }) {
 
       {/* ---------- annual examination history ---------- */}
       <div className="flex flex-col md:flex-row gap-4 md:items-start">
-        <section className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+        <section className="card-hover flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
@@ -785,7 +790,7 @@ export default function StudentRecordPanel({ student }) {
             </div>
             <button
               onClick={handleAddAnnualExamination}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+              className="btn-press w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
             >
               + Add Annual Examination
             </button>
@@ -837,13 +842,13 @@ export default function StudentRecordPanel({ student }) {
         <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate?year=${activeYear}`, { state: { year: activeYear } })}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             Medical Certificate
           </button>
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-summary`)}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+            className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
             Medical Summary
           </button>
@@ -874,7 +879,7 @@ export default function StudentRecordPanel({ student }) {
       )}
 
       {/* ---------- physical examinations ---------- */}
-      <section ref={physicalExamRef} className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section ref={physicalExamRef} className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader
           icon="user"
           title="Physical Examinations"
@@ -1045,7 +1050,7 @@ export default function StudentRecordPanel({ student }) {
                       <button
                         type="button"
                         onClick={addExtraOthersFinding}
-                        className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
+                        className="btn-press inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
                       >
                         + Add
                       </button>
@@ -1065,7 +1070,7 @@ export default function StudentRecordPanel({ student }) {
       </section>
 
       {/* ---------- laboratory results ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader
           icon="chart"
           title="Laboratory Results"
@@ -1194,7 +1199,7 @@ export default function StudentRecordPanel({ student }) {
             <button
               type="button"
               onClick={addExtraLabOther}
-              className="mt-3 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
+              className="btn-press mt-3 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-1.5 rounded-lg hover:opacity-90"
             >
               + Add
             </button>
@@ -1209,7 +1214,7 @@ export default function StudentRecordPanel({ student }) {
       </section>
 
       {/* ---------- diagnosis and final remark ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader icon="info" title="Diagnosis and Final Remark" />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

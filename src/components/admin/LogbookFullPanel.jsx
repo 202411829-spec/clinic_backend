@@ -282,7 +282,7 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
       {/* print-only formal letterhead — shared component */}
       <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">

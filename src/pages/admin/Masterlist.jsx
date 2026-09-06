@@ -203,7 +203,7 @@ export default function Masterlist() {
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody key={`${page}-${debouncedSearch}-${departmentId}-${courseId}-${yearLevel}-${sortBy}-${sortDir}`} className="animate-fade-in">
               {loading ? (
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400">
@@ -218,7 +218,7 @@ export default function Masterlist() {
                 </tr>
               ) : (
                 rows.map((student) => (
-                  <tr key={student.student_id} className="border-t border-gray-100">
+                  <tr key={student.student_id} className="row-hover border-t border-gray-100 hover:bg-gray-50">
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gc-green-700 text-xs font-bold text-white">
@@ -347,7 +347,7 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
           <div
             ref={menuRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg"
+            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg origin-top animate-scale-in motion-reduce:animate-none"
           >
             <button
               onClick={() => {
@@ -382,7 +382,7 @@ function PageButton({ children, active, disabled, onClick }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${
+      className={`btn-press flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${
         active
           ? 'border-gc-green-700 bg-gc-green-700 text-white'
           : 'border-gray-200 text-gray-600 hover:border-gc-green-700 disabled:cursor-not-allowed disabled:opacity-40'

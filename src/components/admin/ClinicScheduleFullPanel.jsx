@@ -346,7 +346,7 @@ export default function ClinicScheduleFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       {/* header */}
       <div className="flex items-center gap-2 mb-3">
         <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">

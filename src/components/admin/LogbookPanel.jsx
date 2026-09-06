@@ -316,7 +316,7 @@ export default function LogbookPanel({
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
       {/* Print-only: hide every surrounding widget and dashboard chrome so that
           the printed page contains ONLY this widget's table. */}
       <style>{`

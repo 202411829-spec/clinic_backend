@@ -41,7 +41,7 @@ export default function AgentPanel({
         onClick={onClose}
         className="absolute inset-0 bg-black/20 md:hidden"
       />
-      <div className="relative flex h-[85vh] max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gc-green-100 bg-white shadow-2xl md:h-[520px] md:w-[380px] md:rounded-2xl">
+      <div className="relative flex h-[85vh] max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gc-green-100 bg-white shadow-2xl md:h-[520px] md:w-[380px] md:rounded-2xl animate-fade-in-up [animation-duration:0.22s] motion-reduce:animate-none">
         <div className="flex items-center justify-between bg-gc-green-700 px-4 py-3 text-white">
           <div>
             <p className="text-sm font-bold">Clinic Assistant</p>
@@ -51,7 +51,7 @@ export default function AgentPanel({
             <button
               type="button"
               onClick={onClear}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-white/90 hover:bg-white/15"
+              className="btn-press rounded-lg px-2 py-1 text-xs font-semibold text-white/90 hover:bg-white/15"
             >
               Clear
             </button>
@@ -59,7 +59,7 @@ export default function AgentPanel({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-lg p-1 hover:bg-white/15"
+              className="btn-press rounded-lg p-1 hover:bg-white/15"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -84,9 +84,10 @@ export default function AgentPanel({
             <div
               key={idx}
               className={
-                m.role === 'user'
+                (m.role === 'user'
                   ? 'ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-gc-green-700 px-3 py-2 text-sm text-white'
-                  : 'mr-auto max-w-[80%] rounded-2xl rounded-bl-sm border border-gc-green-100 bg-white px-3 py-2 text-sm text-gray-900'
+                  : 'mr-auto max-w-[80%] rounded-2xl rounded-bl-sm border border-gc-green-100 bg-white px-3 py-2 text-sm text-gray-900') +
+                ' animate-fade-in-up motion-reduce:animate-none'
               }
             >
               {m.content}
@@ -110,7 +111,7 @@ export default function AgentPanel({
         </div>
 
         {error && (
-          <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+          <div className="mx-3 mb-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700 animate-fade-in-up">
             {error}
           </div>
         )}
@@ -132,7 +133,7 @@ export default function AgentPanel({
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="h-11 rounded-xl bg-gc-green-700 px-5 text-sm font-semibold text-white hover:bg-gc-green-800 disabled:opacity-60"
+            className="btn-press h-11 rounded-xl bg-gc-green-700 px-5 text-sm font-semibold text-white hover:bg-gc-green-800 disabled:opacity-60 disabled:active:scale-100"
           >
             Send
           </button>

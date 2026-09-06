@@ -107,7 +107,7 @@ function mapResponse(json) {
 // ─── KPI summary card ─────────────────────────────────────────────────
 function KpiCard({ label, value, badge, icon }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-6 flex items-center gap-4 animate-fade-in-up">
+    <div className="card-hover bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-6 flex items-center gap-4 animate-fade-in-up print:hover:transform-none">
       {icon && (
         <span className={`w-11 h-11 rounded-xl ${GREEN_LIGHT} ${GREEN_TEXT} flex items-center justify-center shrink-0`}>
           {icon}

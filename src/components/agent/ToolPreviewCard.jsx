@@ -12,7 +12,7 @@ export default function ToolPreviewCard({ preview, onYes, onNo, busy }) {
     (cardData && typeof cardData === "object" && !Array.isArray(cardData) && cardData.current)
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 animate-fade-in-up motion-reduce:animate-none">
       <p className="text-sm font-semibold text-amber-900">
         {preview.tool === "cancel_appointments" && `Found ${found ?? rows.length} appointment(s)`}
         {preview.tool === "deactivate_admin" && `Deactivate ${cardData?.email || preview.args?.admin_id}?`}
@@ -54,7 +54,7 @@ export default function ToolPreviewCard({ preview, onYes, onNo, busy }) {
             type="button"
             onClick={onYes}
             disabled={busy}
-            className="flex-1 rounded-xl bg-gc-green-700 px-3 py-2 text-sm font-semibold text-white hover:bg-gc-green-800 disabled:opacity-60"
+            className="btn-press flex-1 rounded-xl bg-gc-green-700 px-3 py-2 text-sm font-semibold text-white hover:bg-gc-green-800 disabled:opacity-60 disabled:active:scale-100"
           >
             Yes
           </button>
@@ -62,7 +62,7 @@ export default function ToolPreviewCard({ preview, onYes, onNo, busy }) {
             type="button"
             onClick={onNo}
             disabled={busy}
-            className="flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-60"
+            className="btn-press flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-60 disabled:active:scale-100"
           >
             No
           </button>

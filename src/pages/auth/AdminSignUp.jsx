@@ -14,7 +14,7 @@ const inputClass =
   'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20'
 
 const primaryBtnClass =
-  'w-full rounded-xl bg-gc-green-700 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60'
+  'btn-press w-full rounded-xl bg-gc-green-700 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100'
 
 export default function AdminSignUp() {
   const navigate = useNavigate()
@@ -144,7 +144,7 @@ export default function AdminSignUp() {
   }
 
   const card = (
-    <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl shadow-black/5">
+    <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl shadow-black/5 animate-fade-in-up motion-reduce:animate-none">
       <p className="text-xs font-bold tracking-[0.15em] text-gc-green-700 uppercase">Admin Portal</p>
       <h1 className="mt-2 text-2xl font-extrabold text-gc-green-700">Admin Sign Up</h1>
       <p className="mt-1 text-sm text-gray-500">Create a request — an existing admin will review it.</p>
@@ -157,29 +157,30 @@ export default function AdminSignUp() {
             <li key={s.id} className="flex flex-1 items-center gap-2">
               <span
                 className={[
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-200',
                   active || done ? 'bg-gc-green-700 text-white' : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
                 {s.id}
               </span>
-              <span className={`text-xs font-semibold ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>{s.label}</span>
-              {idx < STEPS.length - 1 && <span className={`h-0.5 flex-1 ${done ? 'bg-gc-green-700' : 'bg-gray-100'}`} />}
+              <span className={`text-xs font-semibold transition-colors duration-200 ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>{s.label}</span>
+              {idx < STEPS.length - 1 && <span className={`h-0.5 flex-1 transition-colors duration-300 ${done ? 'bg-gc-green-700' : 'bg-gray-100'}`} />}
             </li>
           )
         })}
       </ol>
 
-      {info && !message ? <p className="mt-4 text-sm font-medium text-gc-green-700">{info}</p> : null}
+      {info && !message ? <p className="mt-4 text-sm font-medium text-gc-green-700 animate-fade-in-up">{info}</p> : null}
       {message ? (
-        <p role="alert" className="mt-4 text-sm font-medium text-red-600">
+        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
           {message}
         </p>
       ) : null}
 
       <form
+        key={step}
         onSubmit={step === 1 ? handleEmailSubmit : step === 2 ? handleCodeSubmit : handleProfileSubmit}
-        className="mt-6 space-y-4"
+        className="mt-6 space-y-4 animate-fade-in-up motion-reduce:animate-none"
       >
         {step === 1 && (
           <div>
@@ -228,7 +229,7 @@ export default function AdminSignUp() {
               type="button"
               onClick={handleResend}
               disabled={busy}
-              className="mt-2 text-xs font-semibold text-gc-green-700 hover:text-gc-green-800 disabled:opacity-60"
+              className="btn-press mt-2 text-xs font-semibold text-gc-green-700 hover:text-gc-green-800 disabled:opacity-60"
             >
               Resend code
             </button>
@@ -243,7 +244,7 @@ export default function AdminSignUp() {
                 setInfo('')
               }}
               disabled={busy}
-              className="mt-2 w-full text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
+              className="btn-press mt-2 w-full text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
             >
               Back
             </button>
@@ -388,7 +389,7 @@ export default function AdminSignUp() {
                 setInfo('')
               }}
               disabled={busy}
-              className="w-full text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
+              className="btn-press w-full text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
             >
               Back
             </button>

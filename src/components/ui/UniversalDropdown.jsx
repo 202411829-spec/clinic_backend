@@ -64,7 +64,7 @@ export default function UniversalDropdown({
       {open && !disabled && (
         <div
           role="listbox"
-          className={`absolute left-0 right-0 md:left-0 md:right-auto z-50 mt-2 w-full min-w-[12rem] max-h-60 overflow-y-auto rounded-3xl border-2 border-gc-green bg-white p-2 shadow-lg ${panelClassName}`}
+          className={`absolute left-0 right-0 md:left-0 md:right-auto z-50 mt-2 w-full min-w-[12rem] max-h-60 overflow-y-auto rounded-3xl border-2 border-gc-green bg-white p-2 shadow-lg origin-top animate-scale-in motion-reduce:animate-none ${panelClassName}`}
         >
           {showPlaceholderOption && (
             <button

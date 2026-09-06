@@ -15,20 +15,20 @@ export default function WalkInVisitForm({
   reasonRecords,
 }) {
   return (
-    <div className="mt-4 pt-4 border-t-2 border-gray-300 print:hidden">
+    <div className="mt-4 pt-4 border-t-2 border-gray-300 print:hidden animate-fade-in-up motion-reduce:animate-none">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold text-gray-800">Add Walk-in Visit</h2>
         <button
           onClick={handleClose}
           aria-label="Close"
-          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="btn-press w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
         >
           <span aria-hidden className="text-base leading-none">&times;</span>
         </button>
       </div>
 
       {walkInError && (
-        <p className="mb-3 text-sm font-semibold text-red-600">{walkInError}</p>
+        <p className="mb-3 text-sm font-semibold text-red-600 animate-fade-in-up">{walkInError}</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -85,7 +85,7 @@ export default function WalkInVisitForm({
                 {medTags.map((tag, i) => (
                   <span
                     key={i}
-                    className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full"
+                    className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full animate-scale-in"
                   >
                     {tag.name} x{tag.quantity}
                   </span>
@@ -105,7 +105,7 @@ export default function WalkInVisitForm({
               />
               <button
                 onClick={handleAddMedicine}
-                className="shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
+                className="btn-press shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
               >
                 + Add
               </button>
@@ -117,13 +117,13 @@ export default function WalkInVisitForm({
       <div className="mt-4 flex flex-col-reverse md:flex-row md:justify-end gap-2">
         <button
           onClick={handleClose}
-          className="text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+          className="btn-press text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2.5 rounded-lg hover:bg-gray-50"
         >
           Cancel
         </button>
         <button
           onClick={handleAddWalkIn}
-          className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+          className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
         >
           + Add Walk-in Visit
         </button>
