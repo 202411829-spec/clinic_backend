@@ -5,8 +5,8 @@
 // with a single "Edit" action instead of print/PDF export).
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "../admin/NavIcon";
-import { computeAge } from "../../data/studentRecordSample";
+import NavIcon from "../admin/NavIcon.jsx";
+import { computeAge } from "../../data/studentRecordSample.js";
 import EditStudentInfoModal from "./EditStudentInfoModal";
 import { recordsApi, masterlistApi } from "../../lib/api.js";
 import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
@@ -167,7 +167,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       <div className="flex items-center justify-end">
         <button
           onClick={handleEditClick}
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-full hover:opacity-90 shadow-sm"
+          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-full hover:opacity-90 shadow-sm"
         >
           <NavIcon name="edit" className="w-4 h-4" />
           Edit
@@ -175,7 +175,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       </div>
 
       {status === "incomplete" && (
-        <div className="flex items-start justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3">
+        <div className="flex items-start justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-start gap-2">
             <NavIcon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
@@ -187,7 +187,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
             <button
               type="button"
               onClick={() => recheck()}
-              className="shrink-0 text-sm font-semibold text-amber-900 underline underline-offset-2 hover:opacity-75"
+              className="btn-press shrink-0 text-sm font-semibold text-amber-900 underline underline-offset-2 hover:opacity-75"
             >
               Retry
             </button>
@@ -196,7 +196,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {savedNotice && (
-        <div className="flex items-start justify-between gap-3 bg-gc-green/5 border border-gc-green/20 text-gc-green text-sm rounded-xl px-4 py-3">
+        <div className="flex items-start justify-between gap-3 bg-gc-green/5 border border-gc-green/20 text-gc-green text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-center gap-2">
             <NavIcon name="check" className="w-4 h-4 shrink-0" />
             Your student information has been updated.
@@ -204,7 +204,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <button
             onClick={() => setSavedNotice(false)}
             aria-label="Dismiss"
-            className="shrink-0 text-gc-green/70 hover:text-gc-green"
+            className="btn-press shrink-0 text-gc-green/70 transition-colors hover:text-gc-green"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>
@@ -212,7 +212,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {saveError && (
-        <div className="flex items-start justify-between gap-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
+        <div className="flex items-start justify-between gap-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-center gap-2">
             <NavIcon name="x" className="w-4 h-4 shrink-0" />
             {saveError}
@@ -220,7 +220,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <button
             onClick={() => setSaveError(null)}
             aria-label="Dismiss"
-            className="shrink-0 text-red-400 hover:text-red-600"
+            className="btn-press shrink-0 text-red-400 transition-colors hover:text-red-600"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>
@@ -228,7 +228,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {/* ---------- student information + emergency contact ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader icon="user" title="Student Information" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
@@ -255,16 +255,17 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       </section>
 
       {/* ---------- medical history ---------- */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
         <SectionHeader icon="medical-cross" title="Medical History" />
 
         <SubLabel>Medical Conditions</SubLabel>
         {conditions.length > 0 ? (
           <div className="flex flex-wrap gap-2 mb-5">
-            {conditions.map((c) => (
+            {conditions.map((c, i) => (
               <span
                 key={c}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100"
+                style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 animate-fade-in-up motion-reduce:animate-none"
               >
                 {c}
               </span>

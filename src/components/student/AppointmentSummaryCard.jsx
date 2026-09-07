@@ -40,7 +40,7 @@ export default function AppointmentSummaryCard({
   const canBook = Boolean(date && time && reason) && !booking && !disabled;
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <div className="border-l-4 border-gc-accent pl-3 mb-3">
         <h2 className="font-bold text-gray-800 text-xs md:text-sm tracking-wide">
           APPOINTMENT SUMMARY
@@ -54,7 +54,7 @@ export default function AppointmentSummaryCard({
       </div>
 
       {disabled && disabledReason && (
-        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 animate-fade-in-up motion-reduce:animate-none">
           {disabledReason}
         </p>
       )}
@@ -63,13 +63,20 @@ export default function AppointmentSummaryCard({
         disabled={!canBook}
         onClick={onBook}
         className={[
-          "w-full mt-4 rounded-lg py-2.5 text-sm font-bold transition-colors",
+          "btn-press w-full mt-4 rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
           canBook
             ? "bg-gc-green text-white hover:bg-gc-green-600"
             : "bg-gray-200 text-gray-400 cursor-not-allowed",
         ].join(" ")}
       >
-        {booking ? loadingLabel : actionLabel}
+        {booking ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            {loadingLabel}
+          </span>
+        ) : (
+          actionLabel
+        )}
       </button>
     </section>
   );

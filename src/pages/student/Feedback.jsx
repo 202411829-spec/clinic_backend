@@ -77,7 +77,7 @@ export default function Feedback() {
   return (
     <div className="pt-2 md:pt-4 pb-6 md:pb-10 space-y-4 md:space-y-6 max-w-3xl mx-auto">
       {/* Header */}
-      <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
         <div className="flex items-center gap-3">
           <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
             <NavIcon name="feedback" className="w-5 h-5" />
@@ -94,10 +94,10 @@ export default function Feedback() {
       </section>
 
       {/* Submit form */}
-      <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
         {justSubmitted && (
-          <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-gc-green/10 border border-gc-green/20 px-4 py-3">
-            <span className="w-5 h-5 rounded-full bg-gc-green text-white flex items-center justify-center shrink-0 mt-0.5">
+          <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-gc-green/10 border border-gc-green/20 px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
+            <span className="w-5 h-5 rounded-full bg-gc-green text-white flex items-center justify-center shrink-0 mt-0.5 animate-scale-in">
               <NavIcon name="check" className="w-3 h-3" />
             </span>
             <p className="text-sm font-medium text-gc-green">
@@ -141,20 +141,28 @@ export default function Feedback() {
           </div>
 
           {error && (
-            <p className="text-xs font-medium text-red-600 -mt-2">{error}</p>
+            <p className="text-xs font-medium text-red-600 -mt-2 animate-fade-in-up">{error}</p>
           )}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-gc-green py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30"
+            disabled={submitting}
+            className="btn-press w-full rounded-xl bg-gc-green py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
           >
-            Submit Feedback
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                Submitting…
+              </span>
+            ) : (
+              'Submit Feedback'
+            )}
           </button>
         </form>
       </section>
 
       {/* History */}
-      <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
         <h3 className="font-bold text-gray-800 text-sm tracking-wide mb-4">
           YOUR PREVIOUS FEEDBACK
         </h3>
@@ -170,10 +178,13 @@ export default function Feedback() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {history.map((f) => (
+            {/* Bounded per-student list, so a one-time staggered entrance
+                stays cheap — transform/opacity only. */}
+            {history.map((f, i) => (
               <li
                 key={f.id}
-                className="rounded-xl border border-gray-100 bg-gray-50/60 p-4"
+                style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+                className="row-hover rounded-xl border border-gray-100 bg-gray-50/60 p-4 animate-fade-in-up motion-reduce:animate-none"
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <StarRating value={f.rating} readOnly size="w-4 h-4" />

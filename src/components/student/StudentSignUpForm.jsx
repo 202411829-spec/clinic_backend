@@ -172,24 +172,27 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
             <li key={s.id} className="flex flex-1 items-center gap-2">
               <span
                 className={[
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                  active || done ? 'bg-gc-accent text-white' : 'bg-gray-100 text-gray-400',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-300',
+                  active ? 'bg-gc-accent text-white animate-scale-in' : done ? 'bg-gc-accent text-white' : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
                 {s.id}
               </span>
-              <span className={`text-xs font-semibold ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>
+              <span className={`text-xs font-semibold transition-colors duration-300 ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>
                 {s.label}
               </span>
               {idx < STEPS.length - 1 && (
-                <span className={`h-0.5 flex-1 ${done ? 'bg-gc-accent' : 'bg-gray-100'}`} />
+                <span className={`h-0.5 flex-1 transition-colors duration-300 ${done ? 'bg-gc-accent' : 'bg-gray-100'}`} />
               )}
             </li>
           )
         })}
       </ol>
 
-      <div className="mt-7 space-y-5">
+      {/* key={step} remounts this wrapper on every step change so switching
+          Email -> Verify -> Password replays a quick settle-in transition —
+          transform/opacity only, so it stays cheap. */}
+      <div key={step} className="mt-7 space-y-5 animate-fade-in-up motion-reduce:animate-none">
         {step === 1 && (
           <div>
             <label htmlFor="signup-email" className="block text-sm font-semibold text-gray-900 mb-1.5">
@@ -305,11 +308,11 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
       </div>
 
       {info && !message ? (
-        <p className="mt-4 text-sm font-medium text-gc-green-700">{info}</p>
+        <p className="mt-4 text-sm font-medium text-gc-green-700 animate-fade-in-up">{info}</p>
       ) : null}
 
       {message ? (
-        <p role="alert" className="mt-4 text-sm font-medium text-red-600">
+        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
           {message}
         </p>
       ) : null}
@@ -317,15 +320,20 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
       <button
         type="submit"
         disabled={isBusy}
-        className="mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-press mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
       >
-        {isBusy
-          ? 'Please wait…'
-          : step === 1
-            ? 'Continue'
-            : step === 2
-              ? 'Verify code'
-              : 'Create account'}
+        {isBusy ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            Please wait…
+          </span>
+        ) : step === 1 ? (
+          'Continue'
+        ) : step === 2 ? (
+          'Verify code'
+        ) : (
+          'Create account'
+        )}
       </button>
 
       {step > 1 && (
@@ -337,7 +345,7 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
             setInfo('')
           }}
           disabled={isBusy}
-          className="mt-3 w-full text-center text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
+          className="btn-press mt-3 w-full text-center text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
         >
           Back
         </button>

@@ -1,8 +1,8 @@
 // src/components/student/NotificationsPanel.jsx
 import { useEffect, useState } from "react";
-import NavIcon from "../admin/NavIcon";
-import { useAppointment } from "../../context/AppointmentContext";
-import { useAuth } from "../../context/AuthContext";
+import NavIcon from "../admin/NavIcon.jsx";
+import { useAppointment } from "../../context/AppointmentContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { notificationsApi } from "../../lib/api.js";
 
 export default function NotificationsPanel() {
@@ -31,7 +31,7 @@ export default function NotificationsPanel() {
   const notifications = [...liveNotifications, ...history];
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+    <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
       <div className="flex items-start gap-3 mb-4">
         <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
           <NavIcon name="bell" className="w-5 h-5" />
@@ -47,10 +47,13 @@ export default function NotificationsPanel() {
       </div>
 
       <div className="border border-gray-200 rounded-2xl overflow-hidden">
+        {/* Small, bounded list (session notifications), so a one-time
+            staggered entrance per item stays cheap — transform/opacity only. */}
         {notifications.map((n, i) => (
           <div
             key={n.id ?? `n-${i}`}
-            className={`flex items-start gap-3 px-5 py-4 ${
+            style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+            className={`row-hover flex items-start gap-3 px-5 py-4 animate-fade-in-up motion-reduce:animate-none ${
               i !== notifications.length - 1 ? "border-b border-gray-200" : ""
             }`}
           >

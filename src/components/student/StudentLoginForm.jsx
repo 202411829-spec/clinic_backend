@@ -117,7 +117,7 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
       </div>
 
       {fieldError || error ? (
-        <p role="alert" className="mt-4 text-sm font-medium text-red-600">
+        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
           {fieldError || error}
         </p>
       ) : null}
@@ -125,9 +125,16 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
       <button
         type="submit"
         disabled={loading}
-        className="mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-press mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
       >
-        {loading ? 'Logging in…' : 'Login'}
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            Logging in…
+          </span>
+        ) : (
+          'Login'
+        )}
       </button>
 
       <p className="mt-5 text-xs leading-relaxed text-gray-500">

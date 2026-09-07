@@ -9,11 +9,14 @@ function SlotBar({ slot }) {
   return (
     <div className="h-1 w-full rounded-full bg-gray-100 overflow-hidden flex">
       <div
-        className="bg-red-500"
+        className="bg-red-500 transition-[width] duration-300 ease-smooth"
         style={{ width: `${full ? 100 : bookedPct}%` }}
       />
       {!full && (
-        <div className="bg-gc-green" style={{ width: `${100 - bookedPct}%` }} />
+        <div
+          className="bg-gc-green transition-[width] duration-300 ease-smooth"
+          style={{ width: `${100 - bookedPct}%` }}
+        />
       )}
     </div>
   );
@@ -63,7 +66,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   // Loading state
   if (status === "loading") {
     return (
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
         <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
           Select Time
         </h2>
@@ -78,7 +81,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   // Error state
   if (status === "error") {
     return (
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
         <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
           Select Time
         </h2>
@@ -94,7 +97,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   // Empty state
   if (!slots || slots.length === 0) {
     return (
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
         <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
           Select Time
         </h2>
@@ -110,7 +113,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
 
   // Ready state with slots
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
         Select Time
       </h2>
@@ -123,12 +126,14 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
       </div>
 
       <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-        {slots.map((slot) => {
+        {/* Bounded per-page list, so a one-time staggered entrance stays
+            cheap — transform/opacity only. */}
+        {slots.map((slot, i) => {
           const full = isSlotFull(slot);
           const selected = selectedTime === slot.time;
 
           const btnClass = [
-            "w-full text-left rounded-xl border px-3.5 py-3 transition-colors",
+            "btn-press w-full text-left rounded-xl border px-3.5 py-3 transition-all duration-200 animate-fade-in-up motion-reduce:animate-none disabled:active:scale-100",
             full
               ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-70"
               : selected
@@ -142,6 +147,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
               type="button"
               disabled={full}
               onClick={() => onSelectTime(slot.time)}
+              style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
               className={btnClass}
             >
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">

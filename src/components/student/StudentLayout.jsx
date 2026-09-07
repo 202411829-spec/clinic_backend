@@ -17,7 +17,7 @@ const RECORD_PATH = "/student/profile";
 // being determined, so the gate never flash-redirects blind before it knows.
 function CompletenessLoader() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-24">
+    <div className="flex flex-col items-center justify-center gap-3 py-24 animate-fade-in">
       <svg
         className="w-8 h-8 animate-spin text-gc-green"
         viewBox="0 0 24 24"
@@ -118,7 +118,17 @@ export default function StudentLayout() {
           showLogout={false}
         />
         <main className="px-4 md:px-8 pb-10 print:p-0">
-          {checking ? <CompletenessLoader /> : <Outlet />}
+          {checking ? (
+            <CompletenessLoader />
+          ) : (
+            // key={pathname} remounts this wrapper on every route change so
+            // Dashboard/Book/Record/Feedback each replay the same subtle
+            // "settle in" transition automatically — transform/opacity only,
+            // so it stays smooth and never slows navigation down.
+            <div key={location.pathname} className="animate-fade-in-up print:animate-none">
+              <Outlet />
+            </div>
+          )}
         </main>
       </div>
     </div>

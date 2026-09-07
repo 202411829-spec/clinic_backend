@@ -22,7 +22,7 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
     : studentMainNav.filter((item) => item.to === "/student/record");
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-col items-center gap-2.5 px-4 pt-6 pb-5">
+      <div className="flex flex-col items-center gap-2.5 px-4 pt-6 pb-5 animate-fade-in-up">
         <div className="flex items-center gap-3">
           <img
             src="/gordon-college-badge.png"
@@ -52,18 +52,23 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
         <p className="px-4 text-[11px] font-bold tracking-wider text-white/80 uppercase mb-2">
           Main
         </p>
+        {/* Sidebar mounts once per session (outside the routed <Outlet />),
+            so a one-time staggered entrance for the nav items is basically
+            free and only ever plays on first load — same pattern as the
+            admin sidebar. Transform/opacity only, GPU-composited. */}
         <ul className="space-y-1">
-          {visibleNav.map((item) => (
+          {visibleNav.map((item, i) => (
             <li key={item.to}>
               <NavLink
                 to={item.to}
                 onClick={onNavigate}
+                style={{ animationDelay: `${i * 35}ms` }}
                 className={({ isActive }) =>
                   [
-                    "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors",
+                    "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-smooth animate-fade-in-up motion-reduce:animate-none",
                     isActive
                       ? "bg-gc-green text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
-                      : "text-white/95 hover:bg-black/10",
+                      : "text-white/95 hover:bg-black/10 hover:translate-x-0.5",
                   ].join(" ")
                 }
               >
@@ -76,7 +81,7 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
       </nav>
 
       <div className="px-2 pb-2">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white/95 [&>button]:transition-colors [&>button:hover]:bg-black/10 [&_svg]:h-[18px] [&_svg]:w-[18px]">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white/95 [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-black/10 [&_svg]:h-[18px] [&_svg]:w-[18px]">
           <LogoutMenu redirectTo="/student/login" />
         </div>
       </div>
@@ -88,7 +93,7 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
             onClick={onNavigate}
             className={({ isActive }) =>
               [
-                "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-colors",
+                "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-all duration-200",
                 isActive
                   ? "bg-gc-green text-white"
                   : "text-white/95 bg-gc-green-800 hover:bg-gc-green-900",
@@ -102,7 +107,7 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
         <NavLink
           to="/student/about"
           onClick={onNavigate}
-          className="flex items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white hover:bg-gc-green-900 border-t border-white/10"
+          className="btn-press flex items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white transition-all duration-200 hover:bg-gc-green-900 border-t border-white/10"
         >
           <NavIcon name="info" className="w-[18px] h-[18px]" />
           <span>About</span>

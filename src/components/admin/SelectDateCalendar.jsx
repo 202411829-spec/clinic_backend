@@ -137,7 +137,7 @@ export default function SelectDateCalendar({
       : selectedDate;
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
         Select Date
       </h2>
@@ -147,7 +147,7 @@ export default function SelectDateCalendar({
           onClick={goPrev}
           disabled={isMonthMode ? !canGoPrev : !canShiftPrevDay}
           aria-label={isMonthMode ? "Previous month" : "Previous day"}
-          className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors ${
+          className={`btn-press w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors disabled:active:scale-100 ${
             (isMonthMode ? !canGoPrev : !canShiftPrevDay)
               ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
               : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
@@ -165,7 +165,7 @@ export default function SelectDateCalendar({
           onClick={goNext}
           disabled={isMonthMode ? !canGoNext : !canShiftNextDay}
           aria-label={isMonthMode ? "Next month" : "Next day"}
-          className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors ${
+          className={`btn-press w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors disabled:active:scale-100 ${
             (isMonthMode ? !canGoNext : !canShiftNextDay)
               ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
               : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
@@ -175,7 +175,7 @@ export default function SelectDateCalendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-2 text-center">
+      <div key={`${viewYear}-${viewMonth}`} className="grid grid-cols-7 gap-y-2 text-center animate-fade-in motion-reduce:animate-none">
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
@@ -195,11 +195,11 @@ export default function SelectDateCalendar({
                 <button
                   onClick={() => pickDay(day)}
                   disabled={disabled}
-                  className={`w-8 h-8 rounded-full text-sm font-semibold transition-colors ${
+                  className={`btn-press w-8 h-8 rounded-full text-sm font-semibold transition-colors disabled:active:scale-100 ${
                     disabled
                       ? "text-gray-300 bg-gray-50 cursor-not-allowed opacity-60"
                       : selected
-                        ? "bg-gc-accent text-white shadow-sm"
+                        ? "bg-gc-accent text-white shadow-sm animate-scale-in"
                         : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >

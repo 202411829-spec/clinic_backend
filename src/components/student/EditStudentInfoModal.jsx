@@ -6,9 +6,9 @@
 // can update its local state. Swap the fake submit for a real Supabase
 // write once that's wired up.
 import { useRef, useState } from "react";
-import NavIcon from "../admin/NavIcon";
-import { computeAge } from "../../data/studentRecordSample";
-import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample";
+import NavIcon from "../admin/NavIcon.jsx";
+import { computeAge } from "../../data/studentRecordSample.js";
+import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample.js";
 import { masterlistApi } from "../../lib/api.js";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
@@ -369,18 +369,18 @@ function StepIndicator({ step }) {
         <div key={s.n} className="flex items-start">
           <div className="flex flex-col items-center gap-1.5 w-16 sm:w-24">
             <div
-              className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+              className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors duration-300 ${
                 step > s.n
                   ? "bg-gc-green text-white"
                   : step === s.n
-                  ? "bg-gc-green text-white"
+                  ? "bg-gc-green text-white animate-scale-in"
                   : "bg-gray-100 text-gray-400"
               }`}
             >
               {step > s.n ? <NavIcon name="check" className="w-4 h-4" /> : s.n}
             </div>
             <span
-              className={`text-[10px] sm:text-xs font-semibold text-center leading-tight ${
+              className={`text-[10px] sm:text-xs font-semibold text-center leading-tight transition-colors duration-300 ${
                 step === s.n ? "text-gc-green" : "text-gray-400"
               }`}
             >
@@ -389,7 +389,7 @@ function StepIndicator({ step }) {
           </div>
           {i < STEPS.length - 1 && (
             <div
-              className={`w-4 sm:w-10 h-0.5 mt-4 md:mt-4.5 rounded-full ${
+              className={`w-4 sm:w-10 h-0.5 mt-4 md:mt-4.5 rounded-full transition-colors duration-300 ${
                 step > s.n ? "bg-gc-green" : "bg-gray-200"
               }`}
             />
@@ -620,7 +620,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
       <button
         type="button"
         onClick={onNext}
-        className="w-full sm:w-auto sm:self-end sm:px-10 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg hover:opacity-90"
+        className="btn-press w-full sm:w-auto sm:self-end sm:px-10 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
       >
         Next: Medical History
       </button>
@@ -724,7 +724,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold bg-gray-100 text-gray-600 px-5 py-3 rounded-lg hover:bg-gray-200"
+          className="btn-press flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold bg-gray-100 text-gray-600 px-5 py-3 rounded-lg transition-colors hover:bg-gray-200"
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
           Back
@@ -732,7 +732,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
         <button
           type="button"
           onClick={onNext}
-          className="flex-1 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg hover:opacity-90"
+          className="btn-press flex-1 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
         >
           Next: Data Privacy
         </button>
@@ -786,7 +786,7 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
       {submitError && (
         <div
           role="alert"
-          className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3"
+          className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none"
         >
           <NavIcon name="x" className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{submitError}</span>
@@ -798,7 +798,7 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
           type="button"
           onClick={onBack}
           disabled={isSaving}
-          className={`flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold px-5 py-3 rounded-lg transition-colors ${
+          className={`btn-press flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold px-5 py-3 rounded-lg transition-colors disabled:active:scale-100 ${
             isSaving
               ? "bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -812,7 +812,7 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
           disabled={!form.consent || isSaving}
           onClick={onSubmit}
           aria-busy={isSaving}
-          className={`flex-1 inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3 rounded-lg transition-colors ${
+          className={`btn-press flex-1 inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3 rounded-lg transition-colors disabled:active:scale-100 ${
             isSaving
               ? "bg-gc-green text-white opacity-50 cursor-not-allowed"
               : form.consent
@@ -942,7 +942,7 @@ export default function EditStudentInfoModal({
         type="button"
         onClick={onClose}
         disabled={isSaving}
-        className={`inline-flex items-center gap-1.5 text-sm font-semibold w-fit ${
+        className={`btn-press inline-flex items-center gap-1.5 text-sm font-semibold w-fit transition-colors ${
           isSaving
             ? "text-gray-400 opacity-50 cursor-not-allowed"
             : "text-gray-500 hover:text-gc-green"
@@ -952,7 +952,7 @@ export default function EditStudentInfoModal({
         Back
       </button>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-300">
+      <div className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300">
         <div className="px-5 md:px-8 pt-5 md:pt-6">
           <h2 className="font-bold text-gray-800 text-lg md:text-xl">Edit Student Information</h2>
           <p className="text-xs text-gray-400 mt-0.5">Step {step} of 3</p>
@@ -960,7 +960,10 @@ export default function EditStudentInfoModal({
 
         <StepIndicator step={step} />
 
-        <div className="px-5 md:px-8 py-6">
+        {/* key={step} remounts this wrapper on every step change so
+            switching Personal -> Medical -> Privacy replays a quick
+            settle-in transition — transform/opacity only, so it stays cheap. */}
+        <div key={step} className="px-5 md:px-8 py-6 animate-fade-in-up motion-reduce:animate-none">
           {step === 1 && (
             <StepPersonal
               form={form}

@@ -22,8 +22,8 @@ function getTomorrow() {
 
 function SuccessPanel({ rescheduling, onDone }) {
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center max-w-md mx-auto">
-      <div className="w-14 h-14 rounded-full bg-gc-accent/10 text-gc-accent flex items-center justify-center mx-auto mb-4">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center max-w-md mx-auto animate-fade-in-up motion-reduce:animate-none">
+      <div className="w-14 h-14 rounded-full bg-gc-accent/10 text-gc-accent flex items-center justify-center mx-auto mb-4 animate-scale-in">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -45,7 +45,7 @@ function SuccessPanel({ rescheduling, onDone }) {
       <button
         type="button"
         onClick={onDone}
-        className="w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white hover:bg-gc-green-600"
+        className="btn-press w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white transition-colors hover:bg-gc-green-600"
       >
         Back to Dashboard
       </button>
@@ -358,22 +358,22 @@ const [slots, setSlots] = useState([]);
       {isBookingBlocked && (
         <div
           role="alert"
-          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 animate-fade-in-up motion-reduce:animate-none"
         >
           <p className="font-semibold">You already have an active appointment (pending).</p>
           <p className="mt-1">Please wait until it is completed or cancelled before booking again.</p>
-          <Link to="/student/dashboard" className="mt-2 inline-block font-semibold text-amber-900 underline underline-offset-2">
+          <Link to="/student/dashboard" className="mt-2 inline-block font-semibold text-amber-900 underline underline-offset-2 transition-colors hover:text-amber-700">
             View upcoming appointment
           </Link>
         </div>
       )}
       {bookingError && (
-        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-fade-in-up motion-reduce:animate-none">
           {bookingError}
         </div>
       )}
       {pendingCheckStatus === "loading" && !isReschedule && (
-        <p className="mb-4 text-xs text-gray-400">Checking existing appointments…</p>
+        <p className="mb-4 text-xs text-gray-400 animate-fade-in">Checking existing appointments…</p>
       )}
 
       {/* ---------- Mobile: one step at a time ---------- */}
@@ -381,6 +381,10 @@ const [slots, setSlots] = useState([]);
         <p className="text-center font-bold text-gray-800 text-sm mb-3">{pageTitle}</p>
         <BookingStepIndicator step={step} onStepClick={setStep} />
 
+        {/* key={step} remounts this wrapper on every mobile step change so
+            Date -> Time -> Reason -> Confirmation each replay a quick
+            settle-in transition — transform/opacity only, so it stays cheap. */}
+        <div key={step} className="animate-fade-in-up motion-reduce:animate-none">
         {step === 1 && (
           <div className="space-y-4">
             <SelectDateCalendar
@@ -393,7 +397,7 @@ const [slots, setSlots] = useState([]);
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white hover:bg-gc-green-600"
+              className="btn-press w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white transition-colors hover:bg-gc-green-600"
             >
               Next: Select Time
             </button>
@@ -413,7 +417,7 @@ const [slots, setSlots] = useState([]);
               disabled={!selectedTime}
               onClick={() => setStep(3)}
               className={[
-                "w-full rounded-lg py-2.5 text-sm font-bold transition-colors",
+                "btn-press w-full rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
                 selectedTime
                   ? "bg-gc-green text-white hover:bg-gc-green-600"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed",
@@ -432,7 +436,7 @@ const [slots, setSlots] = useState([]);
               disabled={!reasonId}
               onClick={() => setStep(4)}
               className={[
-                "w-full rounded-lg py-2.5 text-sm font-bold transition-colors",
+                "btn-press w-full rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
                 reasonId
                   ? "bg-gc-green text-white hover:bg-gc-green-600"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed",
@@ -460,6 +464,7 @@ const [slots, setSlots] = useState([]);
             }
           />
         )}
+        </div>
       </div>
 
       {/* ---------- Desktop: all panels visible at once ---------- */}

@@ -11,7 +11,7 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
   // If reasons aren't loaded yet, show a loading state
   if (!reasons || reasons.length === 0) {
     return (
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
         <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
           Select Reason
         </h2>
@@ -23,7 +23,7 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
         Select Reason
       </h2>

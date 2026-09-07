@@ -46,11 +46,11 @@ export default function BookingStepIndicator({ step, onStepClick }) {
               aria-label={`Step ${n}: ${label}`}
               aria-current={active ? "step" : undefined}
               className={[
-                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
+                "btn-press w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors duration-300",
                 completed
                   ? "bg-gc-green text-white cursor-pointer"
                   : active
-                  ? "bg-gc-accent text-white"
+                  ? "bg-gc-accent text-white animate-scale-in"
                   : "bg-gray-200 text-gray-400",
                 !clickable ? "cursor-default" : "",
               ].join(" ")}
@@ -59,7 +59,7 @@ export default function BookingStepIndicator({ step, onStepClick }) {
             </button>
             <span
               className={[
-                "text-[10px] font-semibold text-center leading-tight",
+                "text-[10px] font-semibold text-center leading-tight transition-colors duration-300",
                 active || completed ? "text-gray-700" : "text-gray-400",
               ].join(" ")}
             >
