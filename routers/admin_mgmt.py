@@ -58,19 +58,28 @@ def list_admins():
     page_size = max(1, min(page_size, 100))
     search = sanitize_search(request.args.get("search"))
 
-    # Fetch admin_accounts with pagination; need total count for header
-    query = supabase.table("admin_accounts").select("*", count="exact").order("created_at", desc=True)
+    # "roster" (default) = active admins/staff shown in the main table.
+    # "pending" = the Requests queue (new signups + accounts awaiting
+    # re-approval). Anything else falls back to "roster".
+    view = (request.args.get("view") or "roster").strip().lower()
+    if view not in ("roster", "pending"):
+        view = "roster"
+
+    # Fetch every admin_accounts row matching the search rather than paging
+    # at the DB level. Status is derived from a second table (app_accounts),
+    # so the roster/pending split has to happen after that lookup — doing it
+    # here (instead of client-side, post-pagination) keeps "total" and the
+    # page slice consistent with what's actually displayed. A single campus
+    # clinic's admin/staff roster is small (tens of rows), so fetching it in
+    # full is cheap and simpler than expressing the join as SQL filters.
+    query = supabase.table("admin_accounts").select("*").order("created_at", desc=True)
     if search:
         like = f"%{search}%"
         query = query.or_(
             f"email.ilike.{like},username.ilike.{like},first_name.ilike.{like},last_name.ilike.{like},role.ilike.{like}"
         )
-    start = (page - 1) * page_size
-    end = start + page_size - 1
-    query = query.range(start, end)
     resp = execute_with_retry(query)
     rows = resp.data or []
-    total = resp.count or 0
 
     # Need has_app_account per row: fetch app_accounts admin_ids in one query
     admin_ids = [r["admin_id"] for r in rows if r.get("admin_id") is not None]
@@ -81,10 +90,10 @@ def list_admins():
         )
         has_account = {r["admin_id"] for r in (acct_resp.data or []) if r.get("admin_id")}
 
-    admins = []
+    enriched = []
     for r in rows:
         aid = r.get("admin_id")
-        admins.append({
+        enriched.append({
             "admin_id": aid,
             "username": r.get("username"),
             "email": r.get("email"),
@@ -96,12 +105,25 @@ def list_admins():
             "status": _derive_status(bool(r.get("is_active")), aid in has_account),
         })
 
+    counts = {
+        "active": sum(1 for a in enriched if a["status"] == "active"),
+        "pending": sum(1 for a in enriched if a["status"] == "pending"),
+    }
+
+    wanted_status = "pending" if view == "pending" else "active"
+    matching = [a for a in enriched if a["status"] == wanted_status]
+    total = len(matching)
+    start = (page - 1) * page_size
+    end = start + page_size
+    admins = matching[start:end]
+
     return jsonify({
         "success": True,
         "count": len(admins),
         "total": total,
         "page": page,
         "page_size": page_size,
+        "counts": counts,
         "admins": admins,
     }), 200
 

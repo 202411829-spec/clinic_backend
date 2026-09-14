@@ -20,7 +20,20 @@ function redirectToLogin() {
   window.location.assign(isAdminArea ? '/admin/login' : '/student/login')
 }
 
-async function request(path, { params, headers, ...options } = {}) {
+// Guards against a pile of parallel 401s (e.g. a page firing several
+// requests at once after the tab wakes up) each kicking off their own
+// refresh — every caller awaits the same in-flight refresh instead.
+let refreshInFlight = null
+
+function refreshSessionOnce() {
+  if (!refreshInFlight) {
+    refreshInFlight = (supabase?.auth.refreshSession() ?? Promise.resolve({ data: null, error: new Error('no client') }))
+      .finally(() => { refreshInFlight = null })
+  }
+  return refreshInFlight
+}
+
+async function request(path, { params, headers, ...options } = {}, _retried = false) {
   const url = new URL(path, API_BASE_URL)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -41,8 +54,25 @@ async function request(path, { params, headers, ...options } = {}) {
     },
   })
 
-  // Expired/invalid session — clear local auth state and bounce to login.
   if (response.status === 401) {
+    // A 401 doesn't always mean the session is truly over — the access
+    // token can go stale on its own (e.g. the browser throttles Supabase's
+    // background refresh timer while a tab is backgrounded or the device
+    // sleeps), even though the refresh token is still perfectly valid.
+    // Try one silent refresh + retry before treating this as a real
+    // logout; only bounce to the login screen if the refresh itself
+    // fails, or if this request has already been retried once.
+    if (!_retried) {
+      try {
+        const { data, error } = await refreshSessionOnce()
+        if (!error && data?.session) {
+          return request(path, { params, headers, ...options }, true)
+        }
+      } catch {
+        // fall through to sign-out below
+      }
+    }
+
     await supabase?.auth.signOut().catch(() => {})
     redirectToLogin()
     throw new Error('Your session has expired. Please sign in again.')

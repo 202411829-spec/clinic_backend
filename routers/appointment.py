@@ -513,7 +513,14 @@ def get_appointments():
         )
 
     if student_id:
-        query = query.eq("student_id", student_id)
+        # student_id is stored normalized (normalize_student_id: stripped +
+        # uppercased) at insert time — see create_appointment(). The raw
+        # query param from the frontend is the lowercase email local-part
+        # (e.g. "test001"), so filtering with it as-is against a
+        # case-sensitive Postgres .eq() silently returns zero rows even
+        # when the student genuinely has appointments. Normalize the same
+        # way before filtering so this matches what's actually stored.
+        query = query.eq("student_id", normalize_student_id(student_id))
     if date_from:
         query = query.gte("appointment_date", date_from)
 
