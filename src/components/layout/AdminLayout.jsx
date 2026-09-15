@@ -142,7 +142,14 @@ export default function AdminLayout() {
 
       <div className="flex flex-1 flex-col overflow-y-auto bg-white lg:rounded-tl-[48px] lg:rounded-bl-[48px] print:overflow-visible print:rounded-none">
         <TopBar />
-        <main className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
+        {/* pt-6/pt-7 added: the sticky TopBar (z-20) and the page's own
+            header row used to sit with zero gap between them. Anything that
+            pokes above its own box — like the amber "1" count badge on the
+            Requests button, offset -top-1.5 — poked straight into the
+            TopBar's paint area and got covered, since the TopBar's stacking
+            context wins. This gives enough clearance that no badge, tooltip,
+            or dropdown opening upward from the first row can reach it. */}
+        <main className="px-4 pb-4 pt-6 lg:px-10 lg:pb-6 lg:pt-7 print:px-0 print:pb-0 print:pt-0">
           {checkingPending ? (
             // Only this content area shows the loading state — Sidebar and
             // TopBar above are already mounted and visible, so switching

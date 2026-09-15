@@ -29,12 +29,14 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="pt-2 md:pt-1 space-y-3 md:space-y-3">
+    // space-y-5 (up from space-y-3): the panels are now visually heavier
+    // (rounded-panel + shadow-e2 instead of a thin bordered box), so they
+    // need a bit more air between them or they read as stacked rather than
+    // separate sections.
+    <div className="space-y-5">
       <div>
-        <h1 className="text-xl md:text-lg font-bold text-gc-green">Dashboard</h1>
-        <p className="text-xs md:text-xs text-gray-500">
-          Overview of today's clinic activity.
-        </p>
+        <h1 className="font-serif text-3xl font-semibold text-ink-900">Dashboard</h1>
+        <p className="mt-1 text-base text-ink-500">Overview of today's clinic activity.</p>
       </div>
 
       <LogbookPanel

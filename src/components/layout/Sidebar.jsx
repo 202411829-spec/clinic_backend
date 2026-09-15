@@ -7,9 +7,14 @@ import {
   ClinicScheduleIcon,
   ReportsIcon,
   ShieldIcon,
-  InfoIcon,
 } from '../icons.jsx'
 import LogoutMenu from '../LogoutMenu.jsx'
+
+// Back on the Gordon College green (#044B0E) instead of the near-black shell.
+// To keep it from going flat the way the original did, the refinement moves
+// into contrast and weight rather than hue: inactive labels sit at 75% white
+// (not 55%), the active row gets a white rail plus a light plate, and type is
+// back up to 15px with 20px icons so the rail is comfortable to read all day.
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -19,96 +24,97 @@ const MAIN_ITEMS = [
 ]
 
 const MANAGEMENT_ITEMS = [
-  { to: '/admin/clinic-schedule', label: 'Clinic Schedule', Icon: ClinicScheduleIcon },
+  { to: '/admin/clinic-schedule', label: 'Clinic schedule', Icon: ClinicScheduleIcon },
   { to: '/admin/reports', label: 'Reports', Icon: ReportsIcon },
   { to: '/admin/admins', label: 'Admins', Icon: ShieldIcon },
-  { to: '/admin/profile', label: 'Profile', Icon: MasterlistIcon },
 ]
 
-function NavItem({ to, label, Icon, delayMs }) {
+function NavItem({ to, label, Icon, count }) {
   return (
     <NavLink
       to={to}
-      style={delayMs ? { animationDelay: `${delayMs}ms` } : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 ease-smooth animate-fade-in-up motion-reduce:animate-none ${
-          isActive ? 'bg-gc-green-600' : 'hover:bg-white/5 hover:translate-x-0.5'
-        }`
+        [
+          'group relative flex items-center gap-3 rounded-control px-3.5 py-2.5',
+          'text-[15px] font-semibold transition-colors duration-150',
+          isActive ? 'text-white' : 'text-white/75 hover:bg-white/10 hover:text-white',
+        ].join(' ')
       }
     >
-      <Icon className="h-5 w-5 shrink-0 transition-transform duration-200" />
-      {label}
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <>
+              {/* White rail, not green — a green marker is invisible on a green
+                  sidebar, which is why the original active state had to fill
+                  the entire row in a lighter green just to be legible. */}
+              <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-white" />
+              <span className="absolute inset-0 rounded-control bg-white/[0.14]" />
+            </>
+          )}
+          <Icon className="relative h-5 w-5 shrink-0" />
+          <span className="relative flex-1">{label}</span>
+          {count != null && (
+            <span className="tnum relative rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white">
+              {count}
+            </span>
+          )}
+        </>
+      )}
     </NavLink>
   )
 }
 
-function NavContent() {
-  // Sidebar mounts once per session (it lives outside the routed <Outlet />,
-  // so it never remounts on navigation) — a one-time staggered entrance for
-  // the nav items is basically free and only ever plays on first load.
-  const allItems = [...MAIN_ITEMS, ...MANAGEMENT_ITEMS]
-  const delayFor = (item) => allItems.indexOf(item) * 35
-
+function NavContent({ todayCount }) {
   return (
     <>
-      <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center animate-fade-in-up">
-        <div className="flex items-center justify-center gap-2">
-          <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 object-contain" />
-          {/* health-services-logo.png has more padding baked into the source
-              file than gordon-college-logo.png, so the seal itself renders
-              visibly smaller at the same box size. Scaling it up slightly
-              makes the two seals read as the same size side by side. */}
-          <img
-            src="/health-services-logo.png"
-            alt="Health Services Unit seal"
-            className="h-16 w-16 object-contain scale-[1.08]"
-          />
+      <div className="px-5 pb-6 pt-7">
+        <div className="flex items-center gap-3">
+          {/* No tile/plate behind the seal — it sits straight on the sidebar
+              green so the seal's own colour reads as part of the brand
+              surface instead of sitting in a separate white/tinted box. */}
+          <img src="/gordon-college-logo.png" alt="" className="h-11 w-11 shrink-0 object-contain" />
+          <div className="min-w-0">
+            <p className="font-serif text-[19px] font-semibold leading-tight text-white">Gordon College</p>
+            <p className="truncate text-[13px] leading-tight text-white/70">Health Services Unit</p>
+          </div>
         </div>
-        <p className="mt-2 text-sm font-extrabold leading-tight text-white">GORDON COLLEGE</p>
-        <p className="text-[11px] leading-tight text-white/80">Clinic Appointment System</p>
-        <p className="mt-2 text-xs font-bold tracking-widest text-white">ADMIN PORTAL</p>
-        <div className="mt-4 h-px w-full bg-white/20" />
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">
-        <div>
-          <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MAIN</p>
-          <div className="space-y-1">
-            {MAIN_ITEMS.map((item) => (
-              <NavItem key={item.to} {...item} delayMs={delayFor(item)} />
-            ))}
-          </div>
+      <nav className="flex-1 overflow-y-auto px-3">
+        <div className="space-y-1">
+          {MAIN_ITEMS.map((item) => (
+            <NavItem
+              key={item.to}
+              {...item}
+              count={item.label === 'Appointments' ? todayCount : undefined}
+            />
+          ))}
         </div>
-        <div>
-          <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MANAGEMENT</p>
-          <div className="space-y-1">
-            {MANAGEMENT_ITEMS.map((item) => (
-              <NavItem key={item.to} {...item} delayMs={delayFor(item)} />
-            ))}
-          </div>
+
+        <p className="px-3.5 pb-2 pt-7 text-[13px] font-semibold text-white/55">Management</p>
+        <div className="space-y-1">
+          {MANAGEMENT_ITEMS.map((item) => (
+            <NavItem key={item.to} {...item} />
+          ))}
         </div>
       </nav>
 
-      <div className="px-3 pb-2">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-3 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-white/5 [&_svg]:h-5 [&_svg]:w-5">
+      <div className="border-t border-white/15 p-3">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-control [&>button]:px-3.5 [&>button]:py-2.5 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white/75 [&>button:hover]:bg-white/10 [&>button:hover]:text-white [&_svg]:h-5 [&_svg]:w-5">
           <LogoutMenu redirectTo="/admin/login" />
         </div>
-      </div>
-
-      <div className="bg-gc-green-800 px-3 py-3">
-        <button className="btn-press flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-white/5">
-          <InfoIcon className="h-5 w-5" />
-          About
-        </button>
       </div>
     </>
   )
 }
 
-export default function Sidebar() {
+export default function Sidebar({ todayCount }) {
   return (
-    <aside className="hidden h-screen w-64 shrink-0 flex-col bg-gc-green-700 lg:flex">
-      <NavContent />
+    <aside className="hidden h-screen w-[264px] shrink-0 flex-col bg-brand-900 lg:flex">
+      <NavContent todayCount={todayCount} />
     </aside>
   )
 }
+
+export { NavContent }

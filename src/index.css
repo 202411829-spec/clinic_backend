@@ -9,82 +9,160 @@
     height: 100%;
   }
 
+  html {
+    /* cv05 = straight-tailed l (avoids l/1/I confusion in student numbers),
+       ss03 = curved-tail y. Small choices that matter in a records system. */
+    font-feature-settings: 'cv05' 1, 'ss03' 1;
+  }
+
   body {
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    color: theme('colors.ink.800');
+    background: theme('colors.shell');
   }
 
-  /* Give every interactive element a smooth default transition so the
-     many existing `hover:bg-*` / `hover:text-*` utilities across the
-     admin panels (Appointments, Logbook, Masterlist, Reports, etc.)
-     ease into place instead of snapping instantly. Only cheap,
-     compositor-friendly properties are listed, and print is excluded
-     since it doesn't need any of this. Scoped to interactive elements
-     only, so it never touches layout-heavy containers. */
+  /* Numerals in tables, IDs, times and counts must align vertically.
+     Proportional figures make a column of student numbers look ragged, which
+     is the single cheapest-looking thing a data-dense product can do. */
+  table,
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
+  }
+
+  /* One visible, consistent keyboard focus ring everywhere. Nurses tab through
+     these forms all day; the browser default was being suppressed piecemeal. */
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.600');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Transitions on interactive elements only — and deliberately NOT on `tr`,
+     which previously animated every row of every table on every repaint. */
   button,
   a,
   [role='button'],
   input,
   select,
-  textarea,
-  tr {
-    transition-property: background-color, color, border-color, box-shadow, transform, opacity;
+  textarea {
+    transition-property: background-color, color, border-color, box-shadow, opacity;
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  ::selection {
+    background: theme('colors.brand.100');
+    color: theme('colors.brand.950');
+  }
 }
 
-@media print {
-  button,
-  a,
-  [role='button'],
-  input,
-  select,
-  textarea,
-  tr {
-    transition: none !important;
+@layer components {
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  /* The shadow tokens carry their own hairline ring, so panels never also take
+     a `border` class — that's what caused the doubled 2px edges before. */
+  .panel {
+    @apply overflow-hidden rounded-panel bg-white shadow-e2;
+  }
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4;
+  }
+  .panel-title {
+    @apply text-lg font-semibold text-ink-900;
+  }
+  .panel-sub {
+    @apply text-xs text-ink-500;
+  }
+
+  /* ── Controls ──────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-control px-3.5 py-2
+           text-sm font-medium disabled:pointer-events-none disabled:opacity-45;
+  }
+  .btn-primary {
+    @apply btn bg-brand-900 text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950;
+  }
+  .btn-secondary {
+    @apply btn border border-ink-200 bg-white text-ink-700 shadow-e1 hover:bg-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
+  }
+  .btn-danger {
+    @apply btn bg-signal-rose text-white shadow-e1 hover:brightness-95;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .field {
+    @apply w-full rounded-control border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900
+           placeholder:text-ink-400 focus:border-brand-600 focus:outline-none
+           focus:ring-2 focus:ring-brand-600/15 disabled:bg-ink-50 disabled:text-ink-400;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-ink-600;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+  /* Horizontal hairlines only. Vertical rules turn a table into a grid of
+     boxes and make dense data much harder to scan across. */
+  .t-head {
+    @apply border-b border-ink-100 text-xs font-medium text-ink-500;
+  }
+  .t-head th {
+    @apply px-3 py-2.5 text-left font-medium first:pl-5 last:pr-5;
+  }
+  .t-body {
+    @apply divide-y divide-ink-100 text-sm;
+  }
+  .t-body td {
+    @apply px-3 py-3 text-ink-600 first:pl-5 last:pr-5;
+  }
+  .t-body tr:hover {
+    background-color: theme('colors.ink.50' / 70%);
+  }
+  .t-key {
+    @apply font-medium text-ink-900;
   }
 }
 
 @layer utilities {
-  /* Autofill fix so Chrome doesn't paint inputs yellow */
-  input:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0px 1000px white inset;
+  /* Chrome autofill would otherwise paint fields pale yellow. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset;
+    -webkit-text-fill-color: theme('colors.ink.900');
   }
 
-  /* ---------- shared UI-refinement utilities ----------
-     Small, reusable classes so every panel/card/button in the admin
-     portal can opt into the same subtle motion language instead of each
-     page hand-rolling its own transition classes. All of these only
-     animate `transform`/`opacity`/`box-shadow`, which the browser can
-     composite on the GPU — no layout recalculation, so they stay smooth
-     even on low-end laptops and don't slow the app down. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
+  }
 
-  /* Cards/panels: gentle lift + shadow on hover */
+  /* Deprecated. Kept as a harmless no-op so unmigrated panels still compile.
+     Lifting every card on hover was scattered motion with no meaning — a panel
+     that isn't clickable shouldn't respond to the pointer at all. Delete once
+     the `card-hover` class is gone from every component. */
   .card-hover {
-    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
-  }
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px -8px rgba(4, 75, 14, 0.25);
   }
 
-  /* Buttons/icon-buttons: quick tactile press feedback */
   .btn-press {
-    transition: transform 0.12s ease-out, opacity 0.12s ease-out;
+    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .btn-press:active {
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
 
-  /* Table rows: subtle highlight instead of an abrupt background swap */
   .row-hover {
-    transition: background-color 0.15s ease-out;
+    transition: background-color 0.12s ease-out;
   }
 }
 
-/* Respect the OS-level "reduce motion" setting — turn every custom
-   animation/transition into an instant state change instead of removing
+/* Respect the OS reduce-motion setting: instant state change, never lost
    functionality. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -97,16 +175,13 @@
   }
 }
 
-/* ---------- print stylesheet ----------
-   Referenced by MedicalCertificatePanel / MedicalSummaryPanel / ReportsFullPanel.
-   Without this, the admin layout's on-screen scroll container (h-screen +
-   overflow-y-auto in AdminLayout.jsx) stays fixed-height during print, so the
-   browser only prints whatever currently fits in that one scrolled viewport
-   and silently drops everything below the fold. This resets height/overflow
-   to their natural values for print so content paginates across as many
-   physical pages as it needs, and locks the printable documents to A4
-   portrait sizing (matching the 10mm margin used by the "Download PDF"
-   exporters). */
+/* ─────────────────────────────────────────────────────────────────────────────
+   PRINT — carried over unchanged from the previous stylesheet. This is
+   load-bearing for MedicalCertificatePanel / MedicalSummaryPanel /
+   ReportsFullPanel: without it the admin layout's h-screen + overflow-y-auto
+   scroll container stays fixed-height during print, so the browser prints only
+   what fits in one scrolled viewport and silently drops the rest.
+   ───────────────────────────────────────────────────────────────────────────── */
 @media print {
   @page {
     size: A4 portrait;
@@ -118,28 +193,40 @@
   #root {
     height: auto !important;
     overflow: visible !important;
+    background: #fff !important;
+  }
+
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  tr {
+    transition: none !important;
+  }
+
+  /* Panels are screen furniture; on paper the document is the object. */
+  .panel {
+    box-shadow: none !important;
+    border-radius: 0 !important;
   }
 
   .print-a4-portrait {
-    width: 190mm; /* A4 210mm minus the 10mm @page margin on each side */
+    width: 190mm; /* A4 210mm minus the 10mm @page margin each side */
     margin: 0 auto;
   }
 
   /* Medical Certificate only: let the 3 stacked copies size themselves
-     naturally (their real content is short — well under a third of a page
-     each) instead of forcing each into an exact fraction of the sheet.
-     Forcing exact heights via CSS Grid `fr` tracks or fixed-height Flexbox
-     items turned out unreliable across print pagination: browsers kept
-     over-allocating height per row (pushing each copy onto its own page)
-     or clipping the footer when a row's forced height came in a hair short.
-     Plain block stacking with a small gap avoids both problems — content
-     defines its own height, all 3 comfortably fit within one A4 page, and
-     max-height + overflow here is only a safety net in case a diagnosis/
-     remark ever runs unusually long. This never touches Medical Summary or
-     Reports, which use the separate .print-a4-portrait class above. */
+     naturally rather than forcing each into an exact fraction of the sheet.
+     Grid `fr` tracks and fixed-height flex items both proved unreliable across
+     print pagination — browsers over-allocated height per row (pushing copies
+     onto separate pages) or clipped the footer when a row came up short. Plain
+     block stacking avoids both; max-height is only a safety net for an
+     unusually long diagnosis. */
   .print-cert-grid {
     display: block !important;
-    max-height: 277mm; /* A4 297mm minus the 10mm @page margin top/bottom */
+    max-height: 277mm;
     overflow: hidden;
   }
 
@@ -147,10 +234,7 @@
     margin-top: 4mm !important;
   }
 
-  /* Dashed "cut here" guide printed between each certificate copy so the
-     three copies can be trimmed apart after printing. Screen-only styling
-     doesn't matter here since this whole block is off-screen except when
-     printing / exporting to PDF. */
+  /* Dashed guide printed between copies so they can be trimmed apart. */
   .print-cut-line {
     display: block !important;
     position: relative;

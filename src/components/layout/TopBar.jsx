@@ -1,46 +1,62 @@
-import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeftIcon } from '../icons.jsx'
+import { useLocation } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext.jsx'
 
-// TODO: replace with the real logged-in admin once auth/session wiring
-// lands — matches the mockup's placeholder "Joseph Daniel B. Ramos / Nurse".
-const CURRENT_ADMIN = { name: 'Joseph Daniel B. Ramos', role: 'Nurse', initials: 'JR' }
-
-// Medical Certificate / Medical Summary are printable official documents
-// (letterhead layout) — the "Back" link and admin profile chip don't belong
-// on top of them, so TopBar hides itself entirely on those routes.
+// Medical Certificate / Medical Summary are printable official documents —
+// the app chrome doesn't belong on top of a letterhead.
 const HIDE_ON_PATTERNS = [/\/medical-certificate$/, /\/medical-summary$/]
 
-export default function TopBar({ showBack = true }) {
-  const navigate = useNavigate()
-  const location = useLocation()
+const CRUMBS = {
+  dashboard: 'Dashboard',
+  appointments: 'Appointments',
+  logbook: 'Logbook',
+  masterlist: 'Masterlist',
+  'clinic-schedule': 'Clinic schedule',
+  reports: 'Reports',
+  admins: 'Admins',
+  profile: 'Profile',
+}
 
-  if (HIDE_ON_PATTERNS.some((re) => re.test(location.pathname))) {
-    return null
-  }
+function initialsFrom(value = '') {
+  const source = value.includes('@') ? value.split('@')[0] : value
+  const parts = source.trim().split(/[\s._-]+/).filter(Boolean)
+  if (!parts.length) return '—'
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}
+
+export default function TopBar() {
+  const location = useLocation()
+  const { name, role, email } = useAuth() || {}
+
+  if (HIDE_ON_PATTERNS.some((re) => re.test(location.pathname))) return null
+
+  const segment = location.pathname.split('/').filter(Boolean).pop()
+  const current = CRUMBS[segment] || 'Clinic'
+  const displayName = name || email || 'Signed in'
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 lg:px-10 print:hidden">
-      {showBack ? (
-        <button
-          onClick={() => navigate(-1)}
-          className="group flex items-center gap-1 text-sm font-semibold text-gc-green-700 transition-colors duration-200 hover:text-gc-green-600"
-        >
-          <ChevronLeftIcon className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" />
-          Back
-        </button>
-      ) : (
-        <span />
-      )}
-
-      <div className="flex items-center gap-3 animate-fade-in">
-        <div className="text-right">
-          <p className="text-sm font-semibold text-gray-900">{CURRENT_ADMIN.name}</p>
-          <p className="text-xs font-semibold text-gc-accent">{CURRENT_ADMIN.role}</p>
-        </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gc-green-700 text-sm font-bold text-white transition-transform duration-200 hover:scale-105">
-          {CURRENT_ADMIN.initials}
-        </div>
+    // Sticky with a hairline and a backdrop blur — no shadow, so it never
+    // competes with the panels scrolling underneath it.
+    //
+    // The global search field is gone. Each page already has its own scoped
+    // search ("Search by name, email, or role" on Admins, and the same on
+    // Logbook and Masterlist), so a second box in the chrome was ambiguous
+    // about what it searched and just added noise.
+    <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-ink-100 bg-canvas/85 px-6 py-3.5 backdrop-blur-md print:hidden lg:px-8">
+      <div className="flex min-w-0 items-center gap-2 text-sm">
+        <span className="text-ink-400">Clinic</span>
+        <span className="text-ink-300">/</span>
+        <span className="truncate font-medium text-ink-900">{current}</span>
       </div>
-    </div>
+
+      <div className="ml-auto flex items-center gap-2.5">
+        <div className="hidden text-right sm:block">
+          <p className="text-[13px] font-medium leading-tight text-ink-900">{displayName}</p>
+          {role && <p className="text-xs leading-tight text-ink-500">{role}</p>}
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-semibold text-brand-100">
+          {initialsFrom(displayName)}
+        </span>
+      </div>
+    </header>
   )
 }
