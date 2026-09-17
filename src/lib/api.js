@@ -33,7 +33,36 @@ function refreshSessionOnce() {
   return refreshInFlight
 }
 
-async function request(path, { params, headers, ...options } = {}, _retried = false) {
+// ---- Lightweight client-side GET cache ----
+// Map keyed by `${method} ${url}` -> { data, expiresAt }
+const apiCache = new Map()
+
+// Per-route TTL registry (ms). Only GETs are cached.
+// Registry suggestion from spec:
+//   masterlist search/page (30s), departments/years (5min),
+//   reports date queries (5min), clinic settings (5min).
+const CACHE_REGISTRY = [
+  { test: (p) => p.startsWith('/api/masterlist/students'), ttl: 30_000 },
+  { test: (p) => p === '/api/masterlist/departments', ttl: 300_000 },
+  { test: (p) => p === '/api/masterlist/years', ttl: 300_000 },
+  { test: (p) => p.startsWith('/api/masterlist/courses'), ttl: 300_000 },
+  { test: (p) => p.startsWith('/api/reports'), ttl: 300_000 },
+  { test: (p) => p === '/clinic-settings', ttl: 300_000 },
+]
+
+function resolveCacheTtl(path, explicit) {
+  if (explicit != null) return explicit
+  for (const entry of CACHE_REGISTRY) {
+    if (entry.test(path)) return entry.ttl
+  }
+  return null
+}
+
+export function clearApiCache() {
+  apiCache.clear()
+}
+
+async function request(path, { params, headers, cacheTtl: explicitCacheTtl, signal, ...options } = {}, _retried = false) {
   const url = new URL(path, API_BASE_URL)
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
@@ -43,10 +72,23 @@ async function request(path, { params, headers, ...options } = {}, _retried = fa
     })
   }
 
+  const method = (options.method || 'GET').toUpperCase()
+  const effectiveTtl = method === 'GET' ? resolveCacheTtl(path, explicitCacheTtl) : null
+  const cacheKey = `${method} ${url.toString()}`
+
+  if (effectiveTtl && method === 'GET' && !_retried) {
+    const cached = apiCache.get(cacheKey)
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.data
+    }
+    if (cached) apiCache.delete(cacheKey)
+  }
+
   const accessToken = await getAccessToken()
 
   const response = await fetch(url, {
     ...options,
+    ...(signal ? { signal } : {}),
     headers: {
       'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -73,6 +115,7 @@ async function request(path, { params, headers, ...options } = {}, _retried = fa
       }
     }
 
+    clearApiCache()
     await supabase?.auth.signOut().catch(() => {})
     redirectToLogin()
     throw new Error('Your session has expired. Please sign in again.')
@@ -84,24 +127,36 @@ async function request(path, { params, headers, ...options } = {}, _retried = fa
   }
 
   if (response.status === 204) return null
-  return response.json()
+  const data = await response.json()
+  if (effectiveTtl && method === 'GET' && response.ok) {
+    apiCache.set(cacheKey, { data, expiresAt: Date.now() + effectiveTtl })
+  }
+  return data
 }
 
 export const api = {
-  get: (path, params) => request(path, { params }),
-  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
-  put: (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
-  patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  del: (path) => request(path, { method: 'DELETE' }),
+  get: (path, params, opts = {}) => request(path, { params, ...opts }),
+  post: (path, body, opts = {}) => request(path, { method: 'POST', body: JSON.stringify(body), ...opts }),
+  put: (path, body, opts = {}) => request(path, { method: 'PUT', body: JSON.stringify(body), ...opts }),
+  patch: (path, body, opts = {}) => request(path, { method: 'PATCH', body: JSON.stringify(body), ...opts }),
+  del: (path, opts = {}) => request(path, { method: 'DELETE', ...opts }),
 }
 
 // ---- Student Masterlist ----
+// Backend now wraps these in {success:true, data:...} (see routers/masterlist.py:83/118/139/155).
+// Unwrap here so callers (Masterlist.jsx, StudentRecord.jsx, studentAdapter, etc.) keep
+// receiving bare arrays/objects and don't hit `departments.map is not a function`.
+// `listStudents` keeps the pagination envelope {data,total,page,page_size} intact.
+function unwrapData(envelope) {
+  if (envelope && typeof envelope === 'object' && 'data' in envelope && 'success' in envelope) return envelope.data
+  return envelope
+}
 export const masterlistApi = {
-  listStudents: (params) => api.get('/api/masterlist/students', params),
-  getStudent: (studentId) => api.get(`/api/masterlist/students/${studentId}`),
-  listDepartments: () => api.get('/api/masterlist/departments'),
-  listCourses: (departmentId) => api.get('/api/masterlist/courses', { department_id: departmentId }),
-  listYears: () => api.get('/api/masterlist/years'),
+  listStudents: (params, opts) => api.get('/api/masterlist/students', params, opts),
+  getStudent: (studentId, opts) => api.get(`/api/masterlist/students/${studentId}`, undefined, opts).then(unwrapData),
+  listDepartments: (opts) => api.get('/api/masterlist/departments', undefined, opts).then(unwrapData),
+  listCourses: (departmentId, opts) => api.get('/api/masterlist/courses', { department_id: departmentId }, opts).then(unwrapData),
+  listYears: (opts) => api.get('/api/masterlist/years', undefined, opts).then(unwrapData),
 }
 
 // ---- Dashboard ----
@@ -115,28 +170,28 @@ export const dashboardApi = {
 //  booked, slotsLeft, full, available, bookings:[{id, appointment_id,
 //  student_id, name, age, dept, sex, reason, status, bookedAt}]}
 export const appointmentsApi = {
-  list: (params) => api.get('/appointments', params),
-  get: (appointmentId) => api.get(`/appointments/${appointmentId}`),
-  create: (body) => api.post('/appointments', body),
-  slots: (date) => api.get('/appointments/slots', { date }),
-  getStatus: (appointmentId) => api.get(`/appointments/${appointmentId}/status`),
-  updateStatus: (appointmentId, body) =>
-    api.patch(`/appointments/${appointmentId}/status`, body),
-  delete: (appointmentId) => api.del(`/appointments/${appointmentId}`),
+  list: (params, opts) => api.get('/appointments', params, opts),
+  get: (appointmentId, opts) => api.get(`/appointments/${appointmentId}`, undefined, opts),
+  create: (body, opts) => api.post('/appointments', body, opts),
+  slots: (date, opts) => api.get('/appointments/slots', { date }, opts),
+  getStatus: (appointmentId, opts) => api.get(`/appointments/${appointmentId}/status`, undefined, opts),
+  updateStatus: (appointmentId, body, opts) =>
+    api.patch(`/appointments/${appointmentId}/status`, body, opts),
+  delete: (appointmentId, opts) => api.del(`/appointments/${appointmentId}`, opts),
 }
 
 // ---- Logbook ----
 export const logbookApi = {
-  list: (params = {}) => api.get('/logbook', params),
-  byStudent: (studentId) => api.get(`/logbook/student/${studentId}`),
-  createWalkIn: (body) => api.post('/logbook/walk-in', body),
-  addMedicine: (logId, medicines) => api.post(`/logbook/${logId}/medicine`, { medicines }),
+  list: (params = {}, opts) => api.get('/logbook', params, opts),
+  byStudent: (studentId, opts) => api.get(`/logbook/student/${studentId}`, undefined, opts),
+  createWalkIn: (body, opts) => api.post('/logbook/walk-in', body, opts),
+  addMedicine: (logId, medicines, opts) => api.post(`/logbook/${logId}/medicine`, { medicines }, opts),
 }
 
 // Reference tables used by the walk-in / booking forms.
 export const referenceApi = {
-  reasons: () => api.get('/reasons'),
-  medicines: () => api.get('/medicines'),
+  reasons: (opts) => api.get('/reasons', undefined, opts),
+  medicines: (opts) => api.get('/medicines', undefined, opts),
 }
 
 // ---- Notifications (status-change history per student) ----
@@ -152,8 +207,8 @@ export const feedbackApi = {
 
 // ---- Reports ----
 export const reportsApi = {
-  get: (params) => api.get('/api/reports/', params),
-  departments: () => api.get('/api/reports/departments'),
+  get: (params, opts) => api.get('/api/reports/', params, opts),
+  departments: (opts) => api.get('/api/reports/departments', undefined, opts),
 }
 
 // ---- Admin Management (Admins roster) ----

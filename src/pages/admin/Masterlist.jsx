@@ -12,6 +12,7 @@ import {
 } from '../../components/icons.jsx'
 import NavIcon from '../../components/admin/NavIcon.jsx'
 import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
+import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
 
 const COLUMNS = [
   { key: 'name', label: 'Name', sortable: true },
@@ -84,29 +85,42 @@ export default function Masterlist() {
     setPage(1)
   }, [debouncedSearch, departmentId, courseId, yearLevel])
 
+  // Abort controller for the list fetch — a new search/page/filter change
+  // cancels the previous in-flight request so responses can't land out of order
+  // (debounce already gates how often it fires, but doesn't stop the pile-up).
+  const abortRef = useRef(null)
+
   useEffect(() => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     let cancelled = false
     setLoading(true)
     setError('')
 
     masterlistApi
-      .listStudents({
-        search: debouncedSearch || undefined,
-        department_id: departmentId || undefined,
-        course_id: courseId || undefined,
-        year_level: yearLevel || undefined,
-        sort_by: sortBy,
-        sort_dir: sortDir,
-        page,
-        page_size: PAGE_SIZE,
-      })
+      .listStudents(
+        {
+          search: debouncedSearch || undefined,
+          department_id: departmentId || undefined,
+          course_id: courseId || undefined,
+          year_level: yearLevel || undefined,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          page,
+          page_size: PAGE_SIZE,
+        },
+        { signal: controller.signal }
+      )
       .then((data) => {
         if (cancelled) return
         setRows(data.data)
         setTotal(data.total)
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message)
+        if (cancelled || err.name === 'AbortError') return
+        setError(err.message)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -114,6 +128,7 @@ export default function Masterlist() {
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [debouncedSearch, departmentId, courseId, yearLevel, sortBy, sortDir, page])
 
@@ -211,11 +226,7 @@ export default function Masterlist() {
             </thead>
             <tbody key={`${page}-${debouncedSearch}-${departmentId}-${courseId}-${yearLevel}-${sortBy}-${sortDir}`} className="tbl-animate">
               {loading ? (
-                <tr>
-                  <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400">
-                    Loading students…
-                  </td>
-                </tr>
+                <SkeletonRows rows={5} cells={COLUMNS.length} />
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400">

@@ -1,44 +1,33 @@
 # Project Progress
-Updated: 2026-08-30
+Updated: 2026-09-16 17:52
 
 ## Current Goal
-Student sign-up feature (backend + frontend) — DONE, committed, pushed, QA PASS.
+1-week scalable refactor: DB indexes, Reports fast-path, Redis + HTTP cache + gunicorn, client-side cache. All code DONE locally — awaiting manual SQL migration run, then after-indexes QA + push.
 
-## Student sign-up feature: DONE ✅
-- Backend `routers/auth.py` (`021d091`, `37397ca`, `da2850f`): `POST /api/auth/check-email`, `/send-code`, `/signup`. Domain check `@gordoncollege.edu.ph`. In-memory `_verification_codes` (5-min TTL).
-- Email delivery (`37397ca`): Gmail SMTP first (real delivery to `@gordoncollege.edu.ph` inboxes, no domain verification needed), Resend fallback, then console-log; always 200, never 500. SMTP creds in `.env`.
-- Auto-confirm fix (`da2850f`): replaced `supabase.auth.sign_up()` with `admin.create_user(..., email_confirm=True)` — removes Supabase's redundant "confirm your email" email and unblocks auto-login.
-- Frontend (`021d091`): `StudentSignUp.jsx`, `StudentSignUpForm.jsx` (3-step email→code→password), `/student/signup` route, link in `StudentLoginForm.jsx`, `authApi` in `src/lib/api.js`.
-- Auto-login bug fix (`316bacd`): was passing full email (double `@gordoncollege.edu.ph`); now passes email local part only.
-- QA PASS (no functional bugs): live end-to-end via real Supabase — signup 201, sign_in_with_password succeeds instantly (email auto-confirmed, `email_confirmed_at` set), student token accepted, build 0 errors/0 warnings.
-- Commit set: `021d091`, `37397ca`, `316bacd`, `da2850f` — all pushed, origin/main in sync.
+## Steps
+| # | Step | Owner | Status | Notes |
+|---|------|-------|--------|-------|
+| 0 | git pull + resolve merge conflicts (teammate redesign) | team-lead | DONE | 81268e5 |
+| 1 | PR #1: DB indexes + Years distinct | backend-developer | DONE | 94e6fa1 |
+| 2 | PR #2: Reports fast-path + mv_daily_reports | backend-developer | DONE | 0f6471e |
+| 3 | PR #3: Redis + HTTP cache + gunicorn/Docker | backend-developer | DONE | f8a4d32 |
+| 4 | PR #4: client TTL cache + abort + skeletons + dashboard dedupe | general | DONE | 52a2088, 4ba5cd4; build PASS |
+| 5 | Backend restart (PR #2/3 live) | team-lead | DONE | PID 24712 → 12924 |
+| 6 | QA baseline (before-indexes) | qa-tester | DONE | 7 PASS / 1 FAIL (clinic-settings header) → fixed |
+| 7 | Fix clinic-settings Cache-Control prefix | team-lead | DONE | 3566eae (main.py: "/api/clinic-settings" → "/clinic-settings") |
+| 8 | Run SQL migrations in Supabase SQL Editor | USER | PENDING | REQUIRED: docs/superpowers/migrations/2026-09-01-perf-indexes.sql + 2026-09-01-reports-fast-path.sql |
+| 9 | QA after-indexes verification (p95 < 100ms target) | qa-tester | PENDING | after step 8 |
+| 10 | Push to origin main | team-lead | PENDING | after QA green; coordinate with parallel session |
 
-## Code audit + cleanup (DONE, committed)
-- Audit (2 agents): backend + frontend — healthy (builds clean, no broken code), main issue = copy-paste duplication + dead code.
-- **Backend** (`1f1318e`): print→logging (new `routers/logging_setup.py`), removed dead code (dashboard date fns, `_is_tomorrow_date`, unused import), `_write_status` helper (3 status-write sites), `handle_errors` decorator + `error_response` (consolidated ~23 inline error blocks), shared `_SEARCH_SCAN_CAP`, `DEFAULT_SLOT_INTERVAL`/`DEFAULT_MAX_STUDENTS` constants, dept/course split helper, `_is_admin_user`→`is_admin_user`, module loggers added to all routers. QA: all items PASS (1 minor note about modules loggers — fixed). py_compile + import clean, no circular import.
-- **Frontend** (`be7e685`): extracted `WalkInVisitForm`+`useWalkInForm`, `Letterhead`, `Pagination`+`useDebouncedValue`, `pdfLetterhead` (lib/pdf.js), `format.js`/`referenceData.js`; centralized `toYMD`/`formatMDY`/`formatDisplayName`/`computeBmi`/year maps; removed dead exports incl. 7,000-row `masterlistStudents`, deleted `ComingSoon`/orphaned `Sidebar`/dead icons; nit fixes (ternary, CSS dup, SessionLoader, `NavIcon dots`). QA: build PASS 0 errors; fixed walk-in error-clear regression (round 2) + orphaned `DotsIcon` + `&#8942;` standardization.
-- Net result: ~1,800 lines removed across both subsystems. Cleanups are behavior-preserving; risky refactors (split StudentRecordPanel, collapse Appointments panels, unify sidebars/logins) deferred.
+## Baseline timings (before-indexes, fresh token, 17:40)
+- /api/masterlist/students?page=1&page_size=15 → 200, **1300 ms**
+- /api/masterlist/years → 200, **818 ms**
+- /api/reports/?date=2026-09-16 → 200, **485 ms**, Cache-Control present
+- /api/reports/?date=2026-01-01 → 200 (no 500 from new RPC guard)
+- No 401s. Health 200.
 
-## Overview doc (done)
-- `docs/OVERVIEW.md` (`c9ad457`): non-technical, high-level overview (what it does, who uses it, student & admin experience, core concepts, visit flow, how it's built, security). Pushed, in sync.
-
-## Sprint 4 (student first-login gate + logbook print design): DONE ✅
-- First-login hard gate (`95fe5bb`): derived completeness (no schema change); incomplete students forced to /student/record; dashboard/book/feedback blocked; gate lifts on save. QA PASS, 0 required corrections.
-- Logbook print/PDF unified with Reports design (`3f46fed`).
-- Both pushed to origin/main (`95fe5bb`), in sync.
-- Optional hardening noted (not applied): reject all-empty emergency-contact rows in hasEmergencyContact (profileCompleteness.js).
-
-## Performance sprints (earlier, all DONE & pushed)
-- Sprint 1 (P0): current_status denormalization + 10 indexes + kill whole-table fetches — live.
-- Sprint 2 (P1): reports SQL aggregation (RPC, live), logbook search consolidation, appointment scoping — live.
-- Sprint 3 (P1): build_student_lookup scoped per-page — pushed.
-- Remaining P2 (not started): batch medicine inserts, multi-worker Redis cache, PgBouncer, RLS.
-
-## Auth decision (deferred by user)
-- User wanted Google login broadly; then redirected focus to first-login gate. Google/OAuth integration deferred for now. Audit of current auth flow done (supabase-js signInWithPassword; auth_guard.py get_user; app_accounts link; no sign-up; manual test accounts).
-
-
-## Audit baseline (2026-08-29)
-- P0: logbook.py:167 whole-table fetch; no indexes on appointments/status_history; status resolved by Python history full-scan (helpers.py:365).
-- P1 (next sprint): SQL-side aggregation in reports; stop 7k-row student lookup per request; bound logbook search; default get_appointments/get_time_slots paged.
-- P2: batch med inserts; cache dept/course; DISTINCT year_level; multi-worker caching/PgBouncer/RLS.
+## Blockers / Decisions
+- SQL migrations MUST be run by user in Supabase SQL Editor (no dashboard/psql access here). RPC already deployed → fast-fail safe.
+- Redis: not installed locally → in-memory fallback active (log line confirms). Optional: pip install redis + REDIS_URL.
+- Model outage: opencode/muse-spark-1.2-contributor-free DOWN (encrypted_content provider error). Config switched: frontend-developer + qa-tester → mimo-v2.5-free, team-lead → big-pickle. Restart opencode to apply.
+- Local commits (NOT pushed): 81268e5, 94e6fa1, 0f6471e, f8a4d32, 52a2088, 4ba5cd4, 3566eae.

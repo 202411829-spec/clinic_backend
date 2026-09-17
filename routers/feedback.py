@@ -22,6 +22,7 @@ submitter's student_id always comes from the authenticated identity
 free-form request body value, which would violate the FK.
 """
 
+import logging
 from types import SimpleNamespace
 
 from flask import Blueprint, g, jsonify, request
@@ -29,6 +30,8 @@ from flask import Blueprint, g, jsonify, request
 from database import supabase
 from routers.helpers import execute_with_retry
 from routers.auth_guard import require_auth, resolve_student_id
+
+logger = logging.getLogger(__name__)
 
 feedback_bp = Blueprint("feedback", __name__)
 
@@ -88,7 +91,7 @@ def get_feedback(student_id):
         # Most likely cause on a fresh project: the feedback table
         # hasn't been created yet. Return an empty history instead of
         # breaking the page.
-        print("List feedback error:", repr(e))
+        logger.error("List feedback error: %r", e)
 
         return jsonify({
             "success": True,
@@ -206,7 +209,7 @@ def submit_feedback():
 
     except Exception as e:
 
-        print("Submit feedback error:", repr(e))
+        logger.error("Submit feedback error: %r", e)
 
         return jsonify({
             "success": False,

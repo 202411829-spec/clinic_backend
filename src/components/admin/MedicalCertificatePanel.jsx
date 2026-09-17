@@ -160,6 +160,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
   const [issuedOn, setIssuedOn] = useState(() => formatMDY(new Date()));
   const [sending, setSending] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [error, setError] = useState(null);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
       doc.save(`medical-certificate-${student.studentNumber || student.name}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      alert("Couldn't generate the PDF. Please try again.");
+      setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
       setDownloadingPdf(false);
     }
@@ -266,6 +267,12 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
 
   return (
     <div className="flex flex-col gap-5 pb-10 print:pb-0 print:gap-0">
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
       {/* ---------- back ---------- */}
       <button
         onClick={() => navigate(-1)}

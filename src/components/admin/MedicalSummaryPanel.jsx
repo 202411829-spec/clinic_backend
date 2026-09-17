@@ -143,6 +143,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
   const [labOpen, setLabOpen] = useState(true);
   const [diagnosisOpen, setDiagnosisOpen] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Columns = base Year I-IV (defaults) PLUS any dynamic year labels the
   // backend returns (e.g. "Year V"), so Year V+ survive in the summary too.
@@ -332,7 +333,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
       doc.save(`medical-summary-${student.studentNumber}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      alert("Couldn't generate the PDF. Please try again.");
+      setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -340,6 +341,12 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
 
   return (
     <div className="flex flex-col gap-5 pb-10 print:pb-0 print-a4-portrait">
+      {error && (
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
       {/* ---------- print-only formal letterhead — shared component ---------- */}
       <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4">

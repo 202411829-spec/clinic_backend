@@ -1,6 +1,7 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient.js'
+import { clearApiCache } from '../lib/api.js'
 
 const AuthContext = createContext(null)
 
@@ -54,6 +55,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signOut() {
+    clearApiCache()
     await supabase?.auth.signOut()
   }
 

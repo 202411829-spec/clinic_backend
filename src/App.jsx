@@ -4,6 +4,7 @@ import AdminLayout from './components/layout/AdminLayout.jsx'
 import { AppointmentProvider } from './context/AppointmentContext.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { ProfileCompletenessProvider } from './context/ProfileCompletenessContext.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 const AdminLogin = lazy(() => import('./pages/auth/AdminLogin.jsx'))
 const AdminSignUp = lazy(() => import('./pages/auth/AdminSignUp.jsx'))
@@ -65,8 +66,9 @@ function ProtectedRoute({ loginPath, children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Suspense fallback={<SessionLoader />}>
-        <Routes>
+      <ErrorBoundary>
+        <Suspense fallback={<SessionLoader />}>
+          <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
       {/* ADMIN */}
@@ -123,7 +125,8 @@ export default function App() {
       {/* Fallback so unmatched routes don't render a blank page */}
       <Route path="*" element={<NotFound />} />
       </Routes>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </AuthProvider>
   )
 }

@@ -128,6 +128,7 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gc-green-700 print:h-auto print:overflow-visible print:bg-white">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gc-green-700 focus:shadow-lg focus:ring-2 focus:ring-gc-green-700">Skip to content</a>
       <Sidebar />
 
       {!hideMobileNav && (
@@ -142,14 +143,7 @@ export default function AdminLayout() {
 
       <div className="flex flex-1 flex-col overflow-y-auto bg-white lg:rounded-tl-[48px] lg:rounded-bl-[48px] print:overflow-visible print:rounded-none">
         <TopBar />
-        {/* pt-6/pt-7 added: the sticky TopBar (z-20) and the page's own
-            header row used to sit with zero gap between them. Anything that
-            pokes above its own box — like the amber "1" count badge on the
-            Requests button, offset -top-1.5 — poked straight into the
-            TopBar's paint area and got covered, since the TopBar's stacking
-            context wins. This gives enough clearance that no badge, tooltip,
-            or dropdown opening upward from the first row can reach it. */}
-        <main className="px-4 pb-4 pt-6 lg:px-10 lg:pb-6 lg:pt-7 print:px-0 print:pb-0 print:pt-0">
+        <main id="main-content" tabIndex={-1} className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
           {checkingPending ? (
             // Only this content area shows the loading state — Sidebar and
             // TopBar above are already mounted and visible, so switching

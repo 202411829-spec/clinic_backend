@@ -1,7 +1,10 @@
+import logging
 import os
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
+
+logger = logging.getLogger(__name__)
 
 from routers.auth import auth_bp
 from routers.student import student_bp
@@ -60,6 +63,34 @@ app.register_blueprint(admin_mgmt_bp)
 app.register_blueprint(agent_bp)
 
 # =========================
+# HTTP CACHE HEADERS
+#
+# Deterministic GET endpoints (lookup tables, report data) return the
+# same response for the same query params regardless of who asks.
+# We set Cache-Control so browsers/CDNs can reuse the response,
+# reducing redundant DB round trips.  Auth-gated endpoints that return
+# user-specific data (appointments, profile, agent, admin mgmt) are
+# excluded — their responses differ per user and must not be shared.
+# =========================
+_CACHEABLE_PREFIXES = (
+    "/api/reports",
+    "/api/masterlist/departments",
+    "/api/masterlist/years",
+    "/clinic-settings",
+)
+
+
+@app.after_request
+def _add_cache_headers(response):
+    if request.method == "GET" and any(
+        request.path.startswith(p) for p in _CACHEABLE_PREFIXES
+    ):
+        response.headers["Cache-Control"] = (
+            "public, max-age=60, stale-while-revalidate=300"
+        )
+    return response
+
+# =========================
 # ROOT + HEALTH CHECK
 # =========================
 @app.route("/")
@@ -75,7 +106,7 @@ def health():
 # START SERVER
 # =========================
 if __name__ == "__main__":
-    print("Clinic Appointment Backend starting...")
+    logger.info("Clinic Appointment Backend starting...")
     app.run(
         host=os.getenv("HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "5000")),

@@ -77,9 +77,16 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
 
 function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
+  const [error, setError] = useState(null);
 
   return (
     <div className="border border-gray-200 rounded-2xl overflow-visible mb-3">
+      {error && (
+        <div role="alert" className="mx-2 mt-2 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
       <div className="relative w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white">
         <button
           onClick={() => setExpanded((v) => !v)}
@@ -171,7 +178,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                           onChange={(newStatus) =>
                             onStatusChange(slot.id, b.id, newStatus)
                           }
-                          onViewRecord={() => alert(`Viewing record for ${b.name}`)}
+                          onViewRecord={() => { console.error(`Viewing record for ${b.name}`); setError(`Viewing record for ${b.name}`); }}
                         />
                       </td>
                     </tr>

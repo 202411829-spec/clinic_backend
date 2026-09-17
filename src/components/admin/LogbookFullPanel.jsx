@@ -258,7 +258,7 @@ export default function LogbookFullPanel() {
       doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      alert("Couldn't generate the PDF. Please try again.");
+      setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
       setDownloadingPdf(false);
     }
@@ -274,7 +274,7 @@ export default function LogbookFullPanel() {
 
   if (error) {
     return (
-      <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">
+      <div role="alert" className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">
         <p className="font-semibold">Failed to load logbook</p>
         <p className="text-sm mt-1">{error}</p>
       </div>
@@ -282,7 +282,13 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+      {error && (
+        <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
       {/* print-only formal letterhead — shared component */}
       <Letterhead />
       <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">

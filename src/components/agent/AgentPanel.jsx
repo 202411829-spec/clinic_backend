@@ -22,6 +22,19 @@ export default function AgentPanel({
     }
   }, [history, preview, open])
 
+  // ESC to close
+  useEffect(() => {
+    if (!open) return undefined
+    function handleEsc(e) {
+      if (e.key === 'Escape') onClose?.()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [open, onClose])
+
+  // Focus trap: keep focus inside the dialog while open. For full trap,
+  // consider integrating focus-trap-react or manual Tab loop handling.
+
   if (!open) return null
 
   async function handleSubmit(e) {
@@ -33,7 +46,7 @@ export default function AgentPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center p-0 md:bottom-20 md:right-6 md:top-auto md:items-end md:justify-end md:p-0">
+    <div role="dialog" aria-modal="true" aria-label="Clinic Assistant" className="fixed inset-0 z-40 flex items-end justify-center p-0 md:bottom-20 md:right-6 md:top-auto md:items-end md:justify-end md:p-0">
       {/* backdrop on mobile */}
       <button
         type="button"

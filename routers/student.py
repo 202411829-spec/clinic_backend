@@ -1,8 +1,12 @@
+import logging
+
 from flask import Blueprint, jsonify, request
 
 from database import supabase
 from routers.auth_guard import require_auth, sanitize_search
 from routers.helpers import execute_with_retry
+
+logger = logging.getLogger(__name__)
 
 student_bp = Blueprint(
     "student",
@@ -75,7 +79,7 @@ def get_students():
 
     except Exception as e:
 
-        print("List students error:", repr(e))
+        logger.error("List students error: %r", e)
 
         return jsonify({
             "success": False,
@@ -123,7 +127,7 @@ def get_student(student_id):
 
     except Exception as e:
 
-        print("Get student error:", repr(e))
+        logger.error("Get student error: %r", e)
 
         return jsonify({
             "success": False,

@@ -8,11 +8,15 @@ appointments becomes a notification ("Your appointment on ...
 is now Pending"), newest first.
 """
 
+import logging
+
 from flask import Blueprint, jsonify
 
 from database import supabase
 from routers.helpers import execute_with_retry
 from routers.auth_guard import require_auth
+
+logger = logging.getLogger(__name__)
 
 notifications_bp = Blueprint("notifications", __name__)
 
@@ -129,7 +133,7 @@ def get_notifications(student_id):
 
     except Exception as e:
 
-        print("Notifications error:", repr(e))
+        logger.error("Notifications error: %r", e)
 
         return jsonify({
             "success": False,

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient.js";
+import { clearApiCache } from "../lib/api.js";
 
 function LogoutIcon(props) {
   return (
@@ -58,6 +59,7 @@ export default function LogoutMenu({
   async function handleConfirm() {
     setLoading(true);
     try {
+      clearApiCache();
       if (supabase) await supabase.auth.signOut();
     } catch (err) {
       console.error("Sign out failed:", err);

@@ -1,11 +1,11 @@
 // src/components/student/UpcomingAppointmentPanel.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "../admin/NavIcon.jsx";
-import { useAppointment } from "../../context/AppointmentContext.jsx";
+import NavIcon from "../admin/NavIcon";
+import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
-import { useAuth } from "../../context/AuthContext.jsx";
-import { toYMD } from "../../lib/calendar.js";
+import { useAuth } from "../../context/AuthContext";
+import { toYMD } from "../../lib/calendar";
 
 function formatTime(value) {
   if (!value) return "-";
@@ -34,6 +34,7 @@ function mapAppointment(a) {
 
 export default function UpcomingAppointmentPanel() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState(null);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const { appointment: contextAppt, cancelAppointment } = useAppointment();
@@ -108,15 +109,24 @@ function handleReschedule() {
         // Only clear after successful API response
         cancelAppointment();
         setUpcoming(null);
+        setError(null);
       } catch (err) {
         console.error("Failed to cancel appointment:", err);
-        alert("Failed to cancel appointment. Please try again.");
+        setError("Failed to cancel appointment. Please try again.");
       }
     }
   }
 
   return (
-    <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+    <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+      {error && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-2">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
@@ -134,7 +144,7 @@ function handleReschedule() {
               aria-label="Appointment actions"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="btn-press w-8 h-8 flex items-center justify-center rounded-full text-gc-accent transition-colors hover:bg-gc-accent/10"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10"
             >
               <NavIcon name="dots" className="w-5 h-5" />
             </button>
@@ -142,19 +152,19 @@ function handleReschedule() {
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full mt-1 z-20 w-40 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden animate-scale-in motion-reduce:animate-none origin-top-right"
+                className="absolute right-0 top-full mt-1 z-20 w-40 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
               >
                 <button
                   role="menuitem"
                   onClick={handleReschedule}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   Reschedule
                 </button>
                 <button
                   role="menuitem"
                   onClick={handleCancel}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
                 >
                   Cancel
                 </button>
@@ -165,7 +175,7 @@ function handleReschedule() {
       </div>
 
       {appt ? (
-        <div className="border border-gray-200 rounded-2xl p-5 md:p-6 flex flex-wrap md:flex-nowrap items-center gap-5 md:gap-6 animate-fade-in-up motion-reduce:animate-none">
+        <div className="border border-gray-200 rounded-2xl p-5 md:p-6 flex flex-wrap md:flex-nowrap items-center gap-5 md:gap-6">
           <div className="w-24 h-24 md:w-28 md:h-28 rounded-xl bg-gc-green-50 flex flex-col items-center justify-center shrink-0">
             <span className="text-xs md:text-sm font-bold text-gc-green tracking-wide">
               {appt.month}
@@ -208,7 +218,7 @@ function handleReschedule() {
           </p>
           <button
             onClick={() => navigate("/student/book")}
-            className="btn-press mt-4 inline-flex items-center rounded-lg bg-gc-green px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gc-green-600"
+            className="mt-4 inline-flex items-center rounded-lg bg-gc-green px-5 py-2.5 text-sm font-bold text-white hover:bg-gc-green-600"
           >
             Book an Appointment
           </button>

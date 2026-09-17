@@ -106,6 +106,7 @@ export default function LogbookPanel({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Derive departments and courses from entries
   const departments = useMemo(() => {
@@ -309,14 +310,20 @@ export default function LogbookPanel({
       doc.save("logbook-report.pdf");
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      alert("Couldn't generate the PDF. Please try again.");
+      setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
       setDownloading(false);
     }
   }
 
   return (
-    <section className="overflow-hidden rounded-panel bg-white shadow-e2 print:shadow-none print:rounded-none print:border-0">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
+      {error && (
+        <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
       {/* Print-only: hide every surrounding widget and dashboard chrome so that
           the printed page contains ONLY this widget's table. */}
       <style>{`
@@ -326,29 +333,38 @@ export default function LogbookPanel({
           #logbook-widget { position: absolute; left: 0; top: 0; width: 100%; }
         }
       `}</style>
-      <div className="flex items-center justify-between flex-wrap gap-3 border-b border-ink-100 px-5 py-4 print:hidden">
-        <div>
-          <h2 className="text-lg font-semibold text-ink-900">Logbook</h2>
-          <p className="text-xs text-ink-500">History of completed clinic visits</p>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3 print:hidden">
+        <div className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
+            <NavIcon name="book" className="w-4 h-4" />
+          </span>
+          <div>
+            <h2 className="font-bold text-gray-800 text-sm md:text-base leading-tight">
+              Logbook
+            </h2>
+            <p className="text-xs text-gray-400 leading-tight">
+              View history of completed clinic visits.
+            </p>
+          </div>
         </div>
         <button
           onClick={() => navigate("/admin/logbook")}
-          className="rounded-control px-2 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-50"
+          className="text-xs font-semibold text-gc-green flex items-center gap-1 hover:underline"
         >
-          View full logbook
+          View Full Logbook <span aria-hidden>›</span>
         </button>
       </div>
 
       {/* search + filters + export */}
-      <div className="flex flex-col gap-2 px-5 pt-4 print:hidden">
+      <div className="flex flex-col gap-2 mb-3 print:hidden">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <div className="flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3 py-2 text-sm text-ink-400 focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/15">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
             <NavIcon name="user" className="w-4 h-4 shrink-0" />
             <input
               value={search}
               onChange={updateFilter(setSearch)}
-              placeholder="Search by surname, name, student ID, or course…"
-              className="w-full outline-none placeholder:text-ink-400 text-ink-900"
+              placeholder="Search by surname, name, student ID, or course..."
+              className="w-full outline-none placeholder:text-gray-400 text-gray-900"
             />
           </div>
           <UniversalDropdown value={department} onChange={(v) => { setDepartment(v); setPage(1); }} options={departments} />
@@ -356,28 +372,28 @@ export default function LogbookPanel({
           <UniversalDropdown value={reasonFilter} onChange={(v) => { setReasonFilter(v); setPage(1); }} options={["All Reason", ...reasons]} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
             From
             <input
               type="date"
               value={dateFrom}
               onChange={updateFilter(setDateFrom)}
-              className="rounded-control border border-ink-200 px-3 py-2 text-sm text-ink-700 bg-white focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
             To
             <input
               type="date"
               value={dateTo}
               onChange={updateFilter(setDateTo)}
-              className="rounded-control border border-ink-200 px-3 py-2 text-sm text-ink-700 bg-white focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
             />
           </label>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="btn-press inline-flex items-center gap-1.5 text-xs font-medium text-ink-700 border border-ink-200 px-3 py-2 rounded-control hover:bg-ink-50"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50"
             >
               <NavIcon name="printer" className="w-4 h-4" />
               Print
@@ -385,7 +401,7 @@ export default function LogbookPanel({
             <button
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="btn-press inline-flex items-center gap-1.5 text-xs font-medium bg-brand-900 text-white px-3 py-2 rounded-control shadow-e1 hover:bg-brand-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <NavIcon name="download" className="w-4 h-4" />
               {downloading ? "Preparing…" : "Download PDF"}
@@ -395,7 +411,7 @@ export default function LogbookPanel({
       </div>
 
       {/* table — scrolls horizontally on mobile only; on desktop it just fits the panel width */}
-      <div id="logbook-widget" className="overflow-x-auto md:overflow-x-visible px-5 pt-4 print:overflow-visible print:px-0 print:pt-0">
+      <div id="logbook-widget" className="overflow-x-auto md:overflow-x-visible -mx-4 md:mx-0 print:overflow-visible print:mx-0">
         {/* print-only formal letterhead — shared component */}
         <Letterhead />
         <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
@@ -421,46 +437,43 @@ export default function LogbookPanel({
             <col className="print:w-[13%]" />
           </colgroup>
           <thead>
-            {/* Print keeps its own bordered-cell look via print: variants —
-                on screen the table drops the grid-of-boxes styling in favour
-                of a single hairline under the header and between rows. */}
-            <tr className="text-left text-xs font-medium text-ink-500 border-b border-ink-100 print:bg-gray-50 print:border print:border-gray-300">
-              <th className="py-2.5 pl-5 pr-3 md:px-3 print:px-1 print:py-1 font-medium print:border print:border-gray-300 print:whitespace-normal">Date / time</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. &amp; course</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Reason</th>
-              <th className="px-3 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Complaint</th>
-              <th className="pl-3 pr-5 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
+            <tr className="text-left text-xs text-gray-500 bg-gray-50">
+              <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border border-gray-300 print:whitespace-normal">Date / Time</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. & Course</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
-          <tbody className="tbl-animate divide-y divide-ink-100 print:divide-y-0">
+          <tbody className="tbl-animate">
             {pageRows.map((row) => (
-              <tr key={row.id} className="transition-colors hover:bg-ink-50/70 print:hover:bg-transparent">
-                <td className="tnum py-3 pl-5 pr-3 md:px-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">
+              <tr key={row.id}>
+                <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.dateTime}
                 </td>
-                <td className="px-3 py-3 print:px-1 print:py-1 font-medium text-ink-900 print:border print:border-gray-300 print:font-normal whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.name}</td>
-                <td className="tnum px-3 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
-                <td className="px-3 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.deptCourse}</td>
-                <td className="px-3 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.name}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.deptCourse}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.sex}
                 </td>
-                <td className="px-3 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.reason}
                 </td>
-                <td className="px-3 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.complaint}
                 </td>
-                <td className="pl-3 pr-5 py-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
                   {row.medicine}
                 </td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-14 text-center text-sm text-ink-500 print:border print:border-gray-300">
+                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
                   No visits match your search or filters.
                 </td>
               </tr>
@@ -475,18 +488,17 @@ export default function LogbookPanel({
         pageCount={pageCount}
         onChange={setPage}
         label={`${filtered.length} search result${filtered.length === 1 ? "" : "s"}`}
-        className="px-5 pb-4 mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 print:hidden"
+        className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 print:hidden"
       />
 
       {/* bottom trigger — hidden once the form is open */}
       {!walkIn.showWalkInForm && (
-        <div className="border-t border-ink-100 px-5 py-4 flex items-center justify-end gap-2 print:hidden">
+        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
           <button
             onClick={() => walkIn.setShowWalkInForm(true)}
-            className="btn-press inline-flex items-center gap-1.5 text-sm font-medium bg-brand-900 text-white px-3.5 py-2 rounded-control shadow-e1 hover:bg-brand-800"
+            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 6v12M6 12h12" strokeLinecap="round" /></svg>
-            Add walk-in visit
+            + Add Walk-in Visit
           </button>
         </div>
       )}

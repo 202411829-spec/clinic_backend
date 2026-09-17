@@ -39,7 +39,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1.5 z-20 w-32 overflow-hidden rounded-card bg-white shadow-e3 origin-top-right animate-pop-in motion-reduce:animate-none"
+          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
         >
           <button
             role="menuitem"
@@ -47,7 +47,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
               setOpen(false);
               onEdit();
             }}
-            className="w-full text-left px-4 py-2.5 text-sm text-ink-700 hover:bg-ink-50"
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
           >
             Edit
           </button>
@@ -57,7 +57,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
               setOpen(false);
               onDelete();
             }}
-            className="w-full text-left px-4 py-2.5 text-sm text-signal-rose hover:bg-signal-rose-bg"
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
           >
             Delete
           </button>
@@ -77,47 +77,51 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
 
 function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
   const [expanded, setExpanded] = useState(slot.bookings.length > 0);
+  const [error, setError] = useState(null);
 
   return (
-    // Each time block is a row within the shared panel now (no border/radius
-    // of its own — see the panel wrapper below), so blocks read as one
-    // continuous list rather than a stack of separate cards.
-    <div className="border-b border-ink-100 last:border-b-0">
-      <div className="relative w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-5 py-3 text-left">
+    <div className="border border-gray-200 rounded-2xl overflow-visible mb-2">
+      {error && (
+        <div role="alert" className="mx-2 mt-2 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
+      <div className="relative w-full flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 px-4 py-3 bg-white text-left">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex items-center gap-2 min-w-0 text-left"
         >
           <span
-            className={`shrink-0 text-ink-400 transition-transform duration-200 ${
+            className={`shrink-0 transition-transform text-gray-400 ${
               expanded ? "rotate-90" : ""
             }`}
           >
             ›
           </span>
-          <span className="tnum text-sm font-semibold text-ink-900 whitespace-nowrap">
+          <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
             {slot.time}
           </span>
         </button>
 
         <div className="flex items-center gap-2 pl-6 md:pl-0 shrink-0">
           <span
-            className={`tnum text-xs font-medium px-2 py-0.5 rounded-full ring-1 ring-inset whitespace-nowrap ${
+            className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${
               slot.full
-                ? "bg-signal-rose-bg text-signal-rose ring-signal-rose-ring"
-                : "bg-brand-50 text-brand-800 ring-brand-200"
+                ? "bg-red-100 text-red-600"
+                : "bg-green-100 text-green-700"
             }`}
           >
-            {slot.booked} / {slot.capacity} booked
+            {slot.booked} / {slot.capacity} Booked
           </span>
           <span
-            className={`text-xs font-medium whitespace-nowrap ${
-              slot.full ? "text-signal-rose" : "text-ink-400"
+            className={`text-xs font-semibold whitespace-nowrap ${
+              slot.full ? "text-red-500" : "text-gray-400"
             }`}
           >
             {slot.full
               ? "Full"
-              : `${slot.slotsLeft} slot${slot.slotsLeft === 1 ? "" : "s"} left`}
+              : `${slot.slotsLeft} Slot${slot.slotsLeft === 1 ? "" : "s"} Left`}
           </span>
 
           <SlotActionMenu
@@ -141,33 +145,41 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
       <div className={`expand ${expanded ? "is-open" : ""}`}>
         <div>
           {slot.bookings.length > 0 ? (
-            <div className="overflow-x-auto border-t border-ink-100">
-              <table className="w-full text-sm min-w-[640px]">
+            <div className="overflow-x-auto border-t border-gray-100">
+              <table className="w-full text-sm min-w-[560px] border-collapse">
                 <thead>
-                  <tr className="border-b border-ink-100 text-left text-xs font-medium text-ink-500">
-                    <th className="py-2.5 pl-5 pr-3 font-medium">Name</th>
-                    <th className="px-3 py-2.5 font-medium">Age</th>
-                    <th className="px-3 py-2.5 font-medium">Dept</th>
-                    <th className="px-3 py-2.5 font-medium hidden md:table-cell">Sex</th>
-                    <th className="px-3 py-2.5 font-medium">Reason</th>
-                    <th className="px-3 py-2.5 font-medium">Status</th>
-                    <th className="py-2.5 pl-3 pr-5 text-right font-medium">Action</th>
+                  <tr className="text-left text-xs text-gray-400 bg-gray-50">
+                    <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
+                      Sex
+                    </th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
+                    <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
                   </tr>
                 </thead>
-                <tbody className="tbl-animate divide-y divide-ink-100">
+                <tbody className="tbl-animate">
                   {slot.bookings.map((b) => (
-                    <tr key={b.id} className="transition-colors hover:bg-ink-50/70">
-                      <td className="py-3 pl-5 pr-3 font-medium text-ink-900">{b.name}</td>
-                      <td className="tnum px-3 py-3 text-ink-600">{b.age}</td>
-                      <td className="px-3 py-3 text-ink-600">{b.dept}</td>
-                      <td className="px-3 py-3 text-ink-600 hidden md:table-cell">{b.sex}</td>
-                      <td className="px-3 py-3 text-ink-600">{b.reason}</td>
-                      <td className="px-3 py-3"><StatusBadge status={b.status} /></td>
-                      <td className="py-3 pl-3 pr-5 text-right">
+                    <tr key={b.id} className="transition-colors hover:bg-gray-50">
+                      <td className="py-2.5 px-4 text-gray-700 border border-gray-300">{b.name}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                        {b.sex}
+                      </td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
+                      <td className="py-2.5 px-2 border border-gray-300">
+                        <StatusBadge status={b.status} />
+                      </td>
+                      <td className="py-2.5 px-4 text-right border border-gray-300">
                         <StatusMenu
                           current={b.status}
-                          onChange={(newStatus) => onStatusChange(slot.id, b.id, newStatus)}
-                          onViewRecord={() => alert(`Viewing record for ${b.name}`)}
+                          onChange={(newStatus) =>
+                            onStatusChange(slot.id, b.id, newStatus)
+                          }
+                          onViewRecord={() => { console.error(`Viewing record for ${b.name}`); setError(`Viewing record for ${b.name}`); }}
                         />
                       </td>
                     </tr>
@@ -176,7 +188,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
               </table>
             </div>
           ) : (
-            <div className="border-t border-ink-100 px-5 py-8 text-center text-sm text-ink-400">
+            <div className="border-t border-gray-100 px-4 py-6 text-center text-sm text-gray-400">
               No bookings match the current filters.
             </div>
           )}
@@ -195,24 +207,23 @@ function normalizeAppointmentStatus(value) {
   return "pending";
 }
 
-// A hairline-divided rail rather than a dotted legend bar squeezed into one
-// line — matches the StatRail used elsewhere, so "counts at a glance" always
-// looks like the same object across the app.
 function AppointmentsSummary({ counts }) {
   const items = [
-    { label: "Total", value: counts.total, tone: "text-ink-900" },
-    { label: "Pending", value: counts.pending, tone: "text-signal-amber" },
-    { label: "Completed", value: counts.completed, tone: "text-brand-700" },
-    { label: "No-show", value: counts.no_show, tone: "text-signal-rose" },
-    { label: "Cancelled", value: counts.cancelled, tone: "text-ink-400" },
+    { label: "Total", value: counts.total, dotClass: "bg-gc-green", textClass: "text-gc-green" },
+    { label: "Pending", value: counts.pending, dotClass: "bg-amber-500", textClass: "text-amber-600" },
+    { label: "Completed", value: counts.completed, dotClass: "bg-green-500", textClass: "text-green-600" },
+    { label: "No-show", value: counts.no_show, dotClass: "bg-red-500", textClass: "text-red-600" },
+    { label: "Cancelled", value: counts.cancelled, dotClass: "bg-gray-400", textClass: "text-gray-500" },
   ];
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-ink-100 rounded-card bg-ink-50/60 mb-4 overflow-hidden">
-      {items.map((item) => (
-        <div key={item.label} className="px-3 py-2.5">
-          <p className="text-2xs font-medium text-ink-500">{item.label}</p>
-          <p className={`tnum text-base font-semibold ${item.tone}`}>{item.value}</p>
-        </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-xs">
+      {items.map((item, idx) => (
+        <span key={item.label} className="inline-flex items-center gap-1.5">
+          {idx > 0 && <span className="text-gray-300 mr-1 hidden sm:inline">•</span>}
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} aria-hidden />
+          <span className="text-gray-500 font-medium">{item.label}:</span>
+          <span className={`font-bold ${item.textClass}`}>{item.value}</span>
+        </span>
       ))}
     </div>
   );
@@ -222,7 +233,6 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   const [slots, setSlots] = useState([]);
   const [dateLabel, setDateLabel] = useState("");
   const [openEditId, setOpenEditId] = useState(null);
-  const [appointmentsForCounts, setAppointmentsForCounts] = useState([]);
 
   // Search and filter state
   const [search, setSearch] = useState("");
@@ -230,28 +240,14 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   const [reasonFilter, setReasonFilter] = useState("All Reason");
 
   // Recent slots for the dashboard widget. Reasons are provided by the parent
-  // Dashboard via props (fetched once, shared).
+  // Dashboard via props (fetched once, shared). This is the single fetch for
+  // today — the summary tiles below are derived from each slot's bookings
+  // (which carry per-appointment statuses), so there's no second round-trip.
   useEffect(() => {
     appointmentsApi
       .slots(toYMD(new Date()))
       .then((res) => setSlots(res?.slots || []))
       .catch((err) => console.error("Failed to load slots:", err));
-  }, []);
-
-  // Fetch today's appointments for the summary tiles (includes all statuses).
-  useEffect(() => {
-    let cancelled = false;
-    appointmentsApi
-      .list({ date: toYMD(new Date()) })
-      .then((res) => {
-        if (!cancelled) setAppointmentsForCounts(res?.appointments || []);
-      })
-      .catch(() => {
-        if (!cancelled) setAppointmentsForCounts([]);
-      });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // Derive departments and reasons from loaded slots
@@ -298,16 +294,18 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
 
   const summaryCounts = useMemo(() => {
     const counts = { total: 0, pending: 0, completed: 0, no_show: 0, cancelled: 0 };
-    for (const a of appointmentsForCounts) {
-      const st = normalizeAppointmentStatus(a.current_status);
-      counts.total += 1;
-      if (st === "pending") counts.pending += 1;
-      else if (st === "completed") counts.completed += 1;
-      else if (st === "no_show") counts.no_show += 1;
-      else if (st === "cancelled") counts.cancelled += 1;
+    for (const slot of slots) {
+      for (const b of slot.bookings) {
+        const st = normalizeAppointmentStatus(b.status);
+        counts.total += 1;
+        if (st === "pending") counts.pending += 1;
+        else if (st === "completed") counts.completed += 1;
+        else if (st === "no_show") counts.no_show += 1;
+        else if (st === "cancelled") counts.cancelled += 1;
+      }
     }
     return counts;
-  }, [appointmentsForCounts]);
+  }, [slots]);
 
   const totalBookings = useMemo(
     () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
@@ -316,7 +314,6 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   const hasAppointments = totalBookings > 0;
 
   function handleStatusChange(slotId, bookingId, newStatus) {
-    const normalized = normalizeAppointmentStatus(newStatus);
     setSlots((prev) =>
       prev.map((slot) =>
         slot.id !== slotId
@@ -327,11 +324,6 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
                 b.id === bookingId ? { ...b, status: newStatus } : b
               ),
             }
-      )
-    );
-    setAppointmentsForCounts((prev) =>
-      prev.map((a) =>
-        String(a.appointment_id) === String(bookingId) ? { ...a, current_status: normalized } : a
       )
     );
     appointmentsApi
@@ -362,58 +354,68 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-panel bg-white shadow-e2">
-      <div className="flex items-center justify-between flex-wrap gap-3 border-b border-ink-100 px-5 py-4">
-        <div>
-          <h2 className="text-lg font-semibold text-ink-900">Appointments</h2>
-          <p className="text-xs text-ink-500">Today's appointment slots</p>
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
+            <NavIcon name="calendar" className="w-4 h-4" />
+          </span>
+          <div>
+            <h2 className="font-bold text-gray-800 text-sm md:text-base leading-tight">
+              Appointments
+            </h2>
+            <p className="text-xs text-gray-400 leading-tight">
+              Today's appointment slots
+            </p>
+          </div>
         </div>
-        <span className="text-xs font-medium text-ink-500">{dateLabel || "Today"}</span>
+        <span className="text-xs font-semibold text-gray-500">
+          {dateLabel || "Today"}
+        </span>
       </div>
 
-      <div className="px-5 pt-4">
-        <AppointmentsSummary counts={summaryCounts} />
+      <AppointmentsSummary counts={summaryCounts} />
 
-        {/* search + filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-2">
-          <div className="md:col-span-1 flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3 py-2 text-sm text-ink-400 focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/15">
-            <NavIcon name="user" className="w-4 h-4 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by surname, name, student ID, or course…"
-              className="w-full outline-none placeholder:text-ink-400 text-ink-900"
-            />
-          </div>
-          <UniversalDropdown value={department} onChange={setDepartment} options={departments} />
-          <UniversalDropdown value="All Courses" onChange={() => {}} options={["All Courses"]} />
-          <UniversalDropdown
-            value={reasonFilter}
-            onChange={setReasonFilter}
-            options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecordsForDropdown]}
+      {/* search + filters */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+        <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
+          <NavIcon name="user" className="w-4 h-4 shrink-0" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by surname, name, student ID, or course..."
+            className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
+        <UniversalDropdown
+          value={department}
+          onChange={setDepartment}
+          options={departments}
+        />
+        <UniversalDropdown value="All Courses" onChange={() => {}} options={["All Courses"]} />
+        <UniversalDropdown
+          value={reasonFilter}
+          onChange={setReasonFilter}
+          options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecordsForDropdown]}
+        />
       </div>
 
       {!hasAppointments ? (
-        <div className="py-14 text-center text-sm">
-          <p className="font-medium text-ink-900">No appointments today</p>
-          <p className="mt-1 text-ink-500">New bookings for today will appear here as they come in.</p>
+        <div className="py-12 text-center text-gray-500 text-sm">
+          No appointment today.
         </div>
       ) : (
-        <div className="border-t border-ink-100">
-          {filteredSlots.map((slot) => (
-            <SlotGroup
-              key={slot.id}
-              slot={slot}
-              onStatusChange={handleStatusChange}
-              editing={openEditId === slot.id}
-              onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
-              onSaveTimeBlock={handleSaveTimeBlock}
-              onDeleteTimeBlock={handleDeleteTimeBlock}
-            />
-          ))}
-        </div>
+        filteredSlots.map((slot) => (
+          <SlotGroup
+            key={slot.id}
+            slot={slot}
+            onStatusChange={handleStatusChange}
+            editing={openEditId === slot.id}
+            onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
+            onSaveTimeBlock={handleSaveTimeBlock}
+            onDeleteTimeBlock={handleDeleteTimeBlock}
+          />
+        ))
       )}
     </section>
   );

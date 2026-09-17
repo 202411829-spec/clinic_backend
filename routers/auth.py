@@ -293,7 +293,7 @@ def send_code():
 
     code = _generate_code()
     _verification_codes[email] = (code, time.time())
-    logger.info("DEBUG verification code for %s: %s", email, code)
+    logger.debug("DEBUG verification code for %s: %s", email, code)
 
     # --- send email: try SMTP first, then fallback to Resend ---
     smtp_ok = _send_email_via_smtp(email, code)
@@ -628,7 +628,7 @@ def forgot_send_code():
     # --- generate & store code ---
     code = _generate_code()
     _forgot_codes[email] = (code, time.time())
-    logger.info("DEBUG forgot code for %s: %s", email, code)
+    logger.debug("DEBUG forgot code for %s: %s", email, code)
 
     # --- send email: try SMTP first, then fallback to Resend ---
     smtp_ok = _send_email_via_smtp(email, code)
@@ -817,7 +817,7 @@ def admin_send_code():
 
     code = _generate_code()
     _record_admin_send(email, code)
-    logger.info("DEBUG admin signup code for %s: %s", email, code)
+    logger.debug("DEBUG admin signup code for %s: %s", email, code)
 
     smtp_ok = _send_email_via_smtp(email, code)
     if not smtp_ok:

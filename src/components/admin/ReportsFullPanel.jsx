@@ -177,6 +177,7 @@ export default function ReportsFullPanel() {
   const [departments, setDepartments] = useState([]);
   const [data, setData] = useState(EMPTY_DATA);
   const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef(null);
 
@@ -254,6 +255,7 @@ export default function ReportsFullPanel() {
 
   async function handleDownloadPdf() {
     setDownloading(true);
+    setError(null);
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -447,9 +449,10 @@ export default function ReportsFullPanel() {
       doc.text("Page 1 of 1", 105, y, { align: "center" });
 
       doc.save(`clinic-report-${formatMDY(date).replaceAll("/", "-")}.pdf`);
+      setError(null);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
-      alert("Couldn't generate the PDF. Please try again.");
+      setError("Couldn't generate the PDF. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -457,6 +460,14 @@ export default function ReportsFullPanel() {
 
   return (
     <section className="bg-gray-50/50 rounded-2xl p-4 md:p-6 print:shadow-none print:border-none print-a4-portrait">
+      {error && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-2 print:hidden">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* ═══════════════════════════════════════════════════════════════
           SCREEN DASHBOARD (hidden on print)
           ═══════════════════════════════════════════════════════════════ */}
