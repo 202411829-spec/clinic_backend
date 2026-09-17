@@ -23,7 +23,7 @@ export default function Pending() {
     <div className="flex min-h-[60vh] items-center justify-center bg-gray-50 p-6 sm:min-h-[70vh]">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm border border-gray-100 animate-fade-in-up">
         {/* Icon */}
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 animate-scale-in">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 animate-pop-in">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-7 w-7 text-amber-600"

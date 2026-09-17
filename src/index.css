@@ -150,15 +150,108 @@
   .card-hover {
   }
 
+  /* Every clickable surface — buttons, action icons, menu items — presses
+     down slightly on click and lifts a hair on hover. That one shared
+     rhythm is what makes "clickable" feel consistent across the app instead
+     of each component inventing its own hover treatment. */
   .btn-press {
-    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-press:hover {
+    transform: translateY(-1px);
   }
   .btn-press:active {
-    transform: scale(0.98);
+    transform: scale(0.98) translateY(0);
   }
 
+  /* Table rows that hold per-row actions (a menu, buttons that reveal on
+     hover). Background eases in and a 3px brand rail slides in from the left
+     edge — not just a colour swap, it gives the row a sense of "this is the
+     one currently under your pointer" so the revealed action buttons read as
+     belonging to that row. No `cursor: pointer` here — the row itself isn't
+     a link, only its buttons are; add `.row-hover--link` on rows where the
+     whole row does navigate/open something. */
   .row-hover {
-    transition: background-color 0.12s ease-out;
+    position: relative;
+    transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .row-hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: theme('colors.brand.500');
+    transform: scaleY(0);
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .row-hover:hover::before {
+    transform: scaleY(1);
+  }
+  .row-hover--link {
+    cursor: pointer;
+    transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .row-hover--link:active {
+    transform: scale(0.997);
+    background-color: theme('colors.ink.100' / 60%);
+  }
+
+  /* Icon-only action buttons (row menus, edit/delete, expand chevrons).
+     A soft scale pop on hover reads as "this is a small physical button",
+     not just a colour change on a bare glyph. */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease-out, color 0.15s ease-out,
+      transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .icon-btn:hover {
+    transform: scale(1.08);
+  }
+  .icon-btn:active {
+    transform: scale(0.94);
+  }
+
+  /* Wrap a <tbody> in this to have its rows settle in with a stagger instead
+     of popping in all at once — used when a table's data just loaded or was
+     just filtered. Covers up to 20 rows; beyond that the tail rows share the
+     last delay, which is imperceptible past a full screen of rows anyway. */
+  .tbl-animate tr {
+    animation: rowIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .tbl-animate tr:nth-child(2) { animation-delay: 0.02s; }
+  .tbl-animate tr:nth-child(3) { animation-delay: 0.04s; }
+  .tbl-animate tr:nth-child(4) { animation-delay: 0.06s; }
+  .tbl-animate tr:nth-child(5) { animation-delay: 0.08s; }
+  .tbl-animate tr:nth-child(6) { animation-delay: 0.1s; }
+  .tbl-animate tr:nth-child(7) { animation-delay: 0.12s; }
+  .tbl-animate tr:nth-child(8) { animation-delay: 0.14s; }
+  .tbl-animate tr:nth-child(9) { animation-delay: 0.16s; }
+  .tbl-animate tr:nth-child(10) { animation-delay: 0.18s; }
+  .tbl-animate tr:nth-child(n + 11) { animation-delay: 0.2s; }
+
+  /* CSS-only accordion for expand/collapse sections (time-block rows in
+     Appointments). Always mounted — grid-template-rows animates from 0fr to
+     1fr, which is the only way to transition to/from "auto" height without
+     measuring in JS. `overflow: hidden` on the inner wrapper is required for
+     the 0fr collapse to actually clip the content instead of just squeezing
+     it. */
+  .expand {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .expand.is-open {
+    grid-template-rows: 1fr;
+  }
+  .expand > div {
+    overflow: hidden;
+    min-height: 0;
   }
 }
 
@@ -204,6 +297,20 @@
   textarea,
   tr {
     transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .row-hover::before {
+    display: none !important;
+  }
+
+  /* Collapsed on-screen accordion sections (see .expand in the components
+     layer) must still print in full — a collapsed section is a screen
+     convenience, not something that should go missing from the printed
+     medical summary. */
+  .expand {
+    grid-template-rows: 1fr !important;
   }
 
   /* Panels are screen furniture; on paper the document is the object. */

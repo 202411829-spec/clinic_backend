@@ -199,7 +199,7 @@ export default function SelectDateCalendar({
                     disabled
                       ? "text-gray-300 bg-gray-50 cursor-not-allowed opacity-60"
                       : selected
-                        ? "bg-gc-accent text-white shadow-sm animate-scale-in"
+                        ? "bg-gc-accent text-white shadow-sm animate-pop-in"
                         : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >

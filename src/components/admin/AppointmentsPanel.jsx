@@ -31,7 +31,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
         aria-label="Slot actions"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="w-7 h-7 flex items-center justify-center rounded-full text-ink-500 hover:bg-ink-100 hover:text-ink-800 leading-none text-lg transition-colors"
+        className="icon-btn w-7 h-7 rounded-full text-ink-500 hover:bg-ink-100 hover:text-ink-800 leading-none text-lg"
       >
         <NavIcon name="dots" />
       </button>
@@ -154,7 +154,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                     <th className="py-2.5 pl-3 pr-5 text-right font-medium">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100">
+                <tbody className="tbl-animate divide-y divide-ink-100">
                   {slot.bookings.map((b) => (
                     <tr key={b.id} className="transition-colors hover:bg-ink-50/70">
                       <td className="py-3 pl-5 pr-3 font-medium text-ink-900">{b.name}</td>

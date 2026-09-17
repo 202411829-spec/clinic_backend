@@ -361,7 +361,7 @@ export default function AdminsPanel() {
                 <th className="px-3 py-2.5 pr-5 text-right font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ink-100">
+            <tbody className="tbl-animate divide-y divide-ink-100">
               {loading ? (
                 skeletonRows.map((_, i) => (
                   <tr key={i}>
@@ -506,7 +506,7 @@ export default function AdminsPanel() {
                       <th className="px-4 py-2.5 text-right font-medium">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-ink-100">
+                  <tbody className="tbl-animate divide-y divide-ink-100">
                     {pendingAdmins.map((a) => {
                       const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || '—'
                       return (

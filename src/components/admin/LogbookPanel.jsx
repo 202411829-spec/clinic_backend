@@ -435,7 +435,7 @@ export default function LogbookPanel({
               <th className="pl-3 pr-5 py-2.5 print:px-1 print:py-1 font-medium print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-ink-100 print:divide-y-0">
+          <tbody className="tbl-animate divide-y divide-ink-100 print:divide-y-0">
             {pageRows.map((row) => (
               <tr key={row.id} className="transition-colors hover:bg-ink-50/70 print:hover:bg-transparent">
                 <td className="tnum py-3 pl-5 pr-3 md:px-3 print:px-1 print:py-1 text-ink-600 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">

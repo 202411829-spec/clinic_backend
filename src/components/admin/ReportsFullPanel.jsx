@@ -485,7 +485,7 @@ export default function ReportsFullPanel() {
                 <button
                   onClick={() => shiftDay(-1)}
                   aria-label={`Previous ${period.toLowerCase()}`}
-                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="icon-btn w-8 h-8 shrink-0 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                 >
                   <NavIcon name="chevron-left" className="w-4 h-4" />
                 </button>
@@ -506,7 +506,7 @@ export default function ReportsFullPanel() {
                 <button
                   onClick={() => shiftDay(1)}
                   aria-label={`Next ${period.toLowerCase()}`}
-                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="icon-btn w-8 h-8 shrink-0 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                 >
                   <NavIcon name="chevron-right" className="w-4 h-4" />
                 </button>
@@ -547,7 +547,7 @@ export default function ReportsFullPanel() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                className="btn-press inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 <NavIcon name="printer" className="w-4 h-4" />
                 Print
@@ -555,7 +555,7 @@ export default function ReportsFullPanel() {
               <button
                 onClick={handleDownloadPdf}
                 disabled={downloading}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-xl hover:bg-gc-green-600 disabled:opacity-60 transition-colors"
+                className="btn-press inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-xl hover:bg-gc-green-600 disabled:opacity-60 disabled:hover:translate-y-0 transition-colors"
               >
                 <NavIcon name="download" className="w-4 h-4" />
                 {downloading ? "Preparing…" : "Download PDF"}
@@ -628,7 +628,7 @@ export default function ReportsFullPanel() {
             Executive Summary
           </h2>
           <table className="w-full text-[10px] border border-gray-400">
-            <tbody>
+            <tbody className="tbl-animate">
               {[
                 ["Total Consultations", totalConsultations.toLocaleString()],
                 ["Total Students", totalStudents.toLocaleString()],
@@ -674,7 +674,7 @@ export default function ReportsFullPanel() {
                   <th className="py-1 px-2 text-right font-semibold w-20">Percent</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="tbl-animate">
                 {section.rows.length === 0 ? (
                   <tr>
                     <td

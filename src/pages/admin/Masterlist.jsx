@@ -190,12 +190,18 @@ export default function Masterlist() {
                     <button
                       disabled={!col.sortable}
                       onClick={() => col.sortable && toggleSort(col.key)}
-                      className={`flex items-center gap-1 ${col.sortable ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`btn-press flex items-center gap-1 transition-colors duration-150 ${
+                        col.sortable ? 'cursor-pointer hover:text-gc-green-700' : 'cursor-default'
+                      }`}
                     >
                       {col.label}
                       {col.sortable && (
                         <SortIcon
-                          className={`h-3 w-3 ${sortBy === col.key ? 'text-gc-green-700' : 'text-gray-300'}`}
+                          className={`h-3 w-3 transition-transform duration-200 ${
+                            sortBy === col.key
+                              ? `text-gc-green-700 ${sortDir === 'desc' ? 'rotate-180' : ''}`
+                              : 'text-gray-300'
+                          }`}
                         />
                       )}
                     </button>
@@ -203,7 +209,7 @@ export default function Masterlist() {
                 ))}
               </tr>
             </thead>
-            <tbody key={`${page}-${debouncedSearch}-${departmentId}-${courseId}-${yearLevel}-${sortBy}-${sortDir}`} className="animate-fade-in">
+            <tbody key={`${page}-${debouncedSearch}-${departmentId}-${courseId}-${yearLevel}-${sortBy}-${sortDir}`} className="tbl-animate">
               {loading ? (
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400">
@@ -338,7 +344,12 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
 
   return (
     <div className="relative inline-block">
-      <button ref={buttonRef} onClick={onToggle} className="text-gc-green-700" aria-label="Row actions">
+      <button
+        ref={buttonRef}
+        onClick={onToggle}
+        className="icon-btn h-8 w-8 rounded-full text-gc-green-700 hover:bg-gc-green-700/10"
+        aria-label="Row actions"
+      >
         <NavIcon name="dots" className="h-5 w-5" />
       </button>
 
@@ -347,14 +358,14 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
           <div
             ref={menuRef}
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg origin-top animate-scale-in motion-reduce:animate-none"
+            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg origin-top animate-pop-in motion-reduce:animate-none"
           >
             <button
               onClick={() => {
                 onViewRecord()
                 onClose()
               }}
-              className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:pl-5"
             >
               View Record
             </button>

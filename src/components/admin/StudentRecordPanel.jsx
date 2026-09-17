@@ -256,7 +256,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
         aria-label={`Actions for ${year.label}`}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        className="icon-btn w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
       >
         <NavIcon name="dots" className="w-4 h-4" />
       </button>
@@ -264,7 +264,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-300 bg-white py-1.5 shadow-lg"
+          className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-300 bg-white py-1.5 shadow-lg origin-top-right animate-pop-in motion-reduce:animate-none"
         >
           <button
             role="menuitem"
@@ -272,7 +272,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
               onSelectYear(year.key);
               setOpen(false);
             }}
-            className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:pl-5"
           >
             {disabled ? "Add Record" : "View / Edit Record"}
           </button>
@@ -807,9 +807,9 @@ export default function StudentRecordPanel({ student }) {
                   <th className="py-2.5 px-4 font-semibold text-right whitespace-nowrap">Action</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="tbl-animate">
                 {history.map((row) => (
-                  <tr key={row.key} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/60">
+                  <tr key={row.key} className="row-hover border-b border-gray-200 last:border-b-0 transition-colors duration-150 hover:bg-gray-50/60">
                     <td className="py-2.5 px-4 text-gray-800 font-medium whitespace-nowrap">{row.label}</td>
                     <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.dateExamined}</td>
                     <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.examinedBy}</td>
@@ -861,7 +861,7 @@ export default function StudentRecordPanel({ student }) {
           <button
             key={y.key}
             onClick={() => setActiveYear(y.key)}
-            className={`shrink-0 whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
+            className={`btn-press shrink-0 whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border transition-colors ${
               activeYear === y.key
                 ? "border-gc-green text-gc-green bg-white"
                 : "border-gray-300 text-gray-500 bg-white hover:bg-gray-50"

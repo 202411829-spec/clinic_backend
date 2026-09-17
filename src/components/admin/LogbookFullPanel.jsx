@@ -410,7 +410,7 @@ export default function LogbookFullPanel() {
               <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="tbl-animate">
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
@@ -419,7 +419,7 @@ export default function LogbookFullPanel() {
               </tr>
             ) : (
               entries.map((entry) => (
-                <tr key={entry.id}>
+                <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
                   <td className="py-2.5 px-4 md:px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
                   <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
                   <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
@@ -521,7 +521,7 @@ export default function LogbookFullPanel() {
               <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Medicine</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="tbl-animate">
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-8 text-center text-gray-400 border border-gray-300">
@@ -530,7 +530,7 @@ export default function LogbookFullPanel() {
               </tr>
             ) : (
               entries.map((entry) => (
-                <tr key={entry.id}>
+                <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
                   <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.dateTime}</td>
                   <td className="px-2 py-2 text-gray-700 border border-gray-300 font-medium whitespace-normal">{entry.studentId}</td>
                   <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.name}</td>

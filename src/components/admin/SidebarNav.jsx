@@ -28,7 +28,7 @@ function NavGroup({ title, items, onNavigate }) {
               {({ isActive }) =>
                 isActive ? (
                   <>
-                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32] animate-scale-in" />
+                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32] animate-pop-in" />
                     <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
                     <span>{item.label}</span>
                   </>

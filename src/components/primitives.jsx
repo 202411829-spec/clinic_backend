@@ -63,8 +63,12 @@ export function Button({ variant = 'secondary', size = 'md', className = '', chi
   return (
     <button
       className={cx(
+        // btn-press carries the shared hover-lift/active-press motion (see
+        // index.css) so every button in the app — regardless of variant —
+        // settles and lifts on the same curve.
         'btn-press inline-flex items-center justify-center gap-1.5 rounded-control font-medium',
-        'disabled:pointer-events-none disabled:opacity-45',
+        'transition-colors duration-150',
+        'disabled:pointer-events-none disabled:opacity-45 disabled:hover:translate-y-0',
         VARIANTS[variant], SIZES[size], className
       )}
       {...rest}

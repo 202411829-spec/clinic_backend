@@ -61,7 +61,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
       <div
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 animate-scale-in motion-reduce:animate-none"
+        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 animate-pop-in motion-reduce:animate-none"
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold tracking-wide text-gray-800">

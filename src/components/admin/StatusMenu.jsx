@@ -57,7 +57,7 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
       <button
         ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
-        className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+        className="icon-btn w-7 h-7 rounded-full text-gray-500 hover:bg-gray-100"
         aria-label="Row actions"
       >
         <NavIcon name="dots" />
@@ -68,7 +68,7 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
           <div
             ref={menuRef}
             style={{ position: "fixed", top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden origin-top animate-scale-in motion-reduce:animate-none"
+            className="z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden origin-top animate-pop-in motion-reduce:animate-none"
           >
             {statusOptions.map((opt) => (
               <button
@@ -77,9 +77,9 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
                   onChange(opt);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 ${
+                className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-gray-50 hover:pl-5 ${
                   opt === current
-                    ? "bg-gc-green text-white hover:bg-gc-green"
+                    ? "bg-gc-green text-white hover:bg-gc-green hover:pl-4"
                     : "text-gray-700"
                 }`}
               >
@@ -92,7 +92,7 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
                 onViewRecord?.();
                 setOpen(false);
               }}
-              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:pl-5"
             >
               View Record
             </button>

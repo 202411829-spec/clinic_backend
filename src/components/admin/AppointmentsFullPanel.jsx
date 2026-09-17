@@ -28,7 +28,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+        className="icon-btn w-7 h-7 rounded-full text-gray-500 hover:bg-gray-100"
         aria-label="Time block actions"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -39,7 +39,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden origin-top-right animate-scale-in motion-reduce:animate-none"
+          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden origin-top-right animate-pop-in motion-reduce:animate-none"
         >
           <button
             role="menuitem"
@@ -131,56 +131,61 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
         </div>
       </div>
 
-      {expanded && slot.bookings.length > 0 && (
-        <div className="overflow-x-auto border-t border-gray-100">
-          <table className="w-full text-sm min-w-[560px] border-collapse">
-            <thead>
-              <tr className="text-left text-xs text-gray-500 bg-gray-50">
-                <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
-                <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
-                <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
-                <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
-                  Sex
-                </th>
-                <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
-                <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
-                <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slot.bookings.map((b) => (
-                <tr key={b.id}>
-                  <td className="py-2.5 px-4 text-gray-800 border border-gray-300">{b.name}</td>
-                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
-                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
-                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
-                    {b.sex}
-                  </td>
-                  <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
-                  <td className="py-2.5 px-2 border border-gray-300">
-                    <StatusBadge status={b.status} />
-                  </td>
-                  <td className="py-2.5 px-4 text-right border border-gray-300">
-                    <StatusMenu
-                      current={b.status}
-                      onChange={(newStatus) =>
-                        onStatusChange(slot.id, b.id, newStatus)
-                      }
-                      onViewRecord={() => alert(`Viewing record for ${b.name}`)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Always mounted, height animated via grid-rows (see .expand in
+          index.css) — this makes opening/closing a time block glide instead
+          of the content just popping in and out with no transition. */}
+      <div className={`expand ${expanded ? "is-open" : ""}`}>
+        <div>
+          {slot.bookings.length > 0 ? (
+            <div className="overflow-x-auto border-t border-gray-100">
+              <table className="w-full text-sm min-w-[560px] border-collapse">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 bg-gray-50">
+                    <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
+                      Sex
+                    </th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
+                    <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
+                    <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="tbl-animate">
+                  {slot.bookings.map((b) => (
+                    <tr key={b.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
+                      <td className="py-2.5 px-4 text-gray-800 border border-gray-300">{b.name}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
+                        {b.sex}
+                      </td>
+                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
+                      <td className="py-2.5 px-2 border border-gray-300">
+                        <StatusBadge status={b.status} />
+                      </td>
+                      <td className="py-2.5 px-4 text-right border border-gray-300">
+                        <StatusMenu
+                          current={b.status}
+                          onChange={(newStatus) =>
+                            onStatusChange(slot.id, b.id, newStatus)
+                          }
+                          onViewRecord={() => alert(`Viewing record for ${b.name}`)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="border-t border-gray-100 px-4 py-6 text-center text-sm text-gray-400">
+              No bookings match the current filters.
+            </div>
+          )}
         </div>
-      )}
-
-      {expanded && slot.bookings.length === 0 && (
-        <div className="border-t border-gray-100 px-4 py-6 text-center text-sm text-gray-400">
-          No bookings match the current filters.
-        </div>
-      )}
+      </div>
     </div>
   );
 }

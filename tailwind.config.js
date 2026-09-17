@@ -124,11 +124,35 @@ export default {
           '0%': { transform: 'translateY(100%)' },
           '100%': { transform: 'translateY(0)' },
         },
+        // Table rows on mount — a quick settle-in, not a bounce. Applied via
+        // `.tbl-animate tr` with a per-row stagger, so a freshly loaded or
+        // freshly filtered table reads as populated rather than snapping in.
+        rowIn: {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        // Sidebar's active-row rail grows from the middle rather than
+        // appearing instantly — the one motion cue that says "you are here"
+        // without redrawing the whole row.
+        railIn: {
+          '0%': { transform: 'translateY(-50%) scaleY(0)' },
+          '100%': { transform: 'translateY(-50%) scaleY(1)' },
+        },
+        // Every admin page mounts inside this on route change (see
+        // AdminLayout) — a small settle-in so navigating from the sidebar
+        // never feels like a hard cut between pages.
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn .16s ease-out both',
         'pop-in': 'popIn .14s cubic-bezier(.16,1,.3,1) both',
         'sheet-up': 'sheetUp .28s cubic-bezier(.16,1,.3,1) both',
+        'row-in': 'rowIn .22s cubic-bezier(.16,1,.3,1) both',
+        'rail-in': 'railIn .18s cubic-bezier(.16,1,.3,1) both',
+        'fade-in-up': 'fadeInUp .22s cubic-bezier(.16,1,.3,1) both',
       },
       transitionTimingFunction: {
         smooth: 'cubic-bezier(.4,0,.2,1)',

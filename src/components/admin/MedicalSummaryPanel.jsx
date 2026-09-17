@@ -89,7 +89,7 @@ function ChevronToggle({ open, onClick }) {
       onClick={onClick}
       aria-expanded={open}
       aria-label={open ? "Collapse section" : "Expand section"}
-      className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 shrink-0 print:hidden"
+      className="icon-btn w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 shrink-0 print:hidden"
     >
       <NavIcon
         name="chevron-right"
@@ -465,8 +465,11 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           right={<ChevronToggle open={physicalOpen} onClick={() => setPhysicalOpen((v) => !v)} />}
         />
 
-        {physicalOpen && (
-          <>
+        {/* Always mounted, height-animated via grid-rows (see .expand in
+            index.css) so collapsing this section glides instead of the
+            content just vanishing. */}
+        <div className={`expand ${physicalOpen ? "is-open" : ""}`}>
+          <div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
               Vital Signs and Measurements | Physical Findings
             </div>
@@ -480,7 +483,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="tbl-animate">
                   {[
                     ["Date", (r) => (r.dateExamined ? formatLongDateISO(r.dateExamined) : "-")],
                     ["BP (mmHg)", (r) => v(r.bp)],
@@ -528,8 +531,8 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                 </tbody>
               </table>
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </section>
 
       {/* ---------- laboratory results ---------- */}
@@ -543,12 +546,12 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           right={<ChevronToggle open={labOpen} onClick={() => setLabOpen((v) => !v)} />}
         />
 
-        {labOpen && (
-          // On screen this scrolls horizontally (overflow-x-auto + min-w) so
-          // narrow viewports can still see every column. In print that
-          // scroll affordance is meaningless — it just clips columns off the
-          // page — so print:overflow-visible + print:min-w-0/print:w-full
-          // let the table shrink to the printable width instead.
+        <div className={`expand ${labOpen ? "is-open" : ""}`}>
+          {/* On screen this scrolls horizontally (overflow-x-auto + min-w) so
+              narrow viewports can still see every column. In print that
+              scroll affordance is meaningless — it just clips columns off the
+              page — so print:overflow-visible + print:min-w-0/print:w-full
+              let the table shrink to the printable width instead. */}
           <div className="overflow-x-auto rounded-xl print:overflow-visible">
             <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
               <thead>
@@ -559,7 +562,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="tbl-animate">
                 <tr>
                   <Td>Date</Td>
                   {yearLabels.map((label) => (
@@ -627,7 +630,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </section>
 
       {/* ---------- diagnosis and final remark ---------- */}
@@ -638,7 +641,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           right={<ChevronToggle open={diagnosisOpen} onClick={() => setDiagnosisOpen((v) => !v)} />}
         />
 
-        {diagnosisOpen && (
+        <div className={`expand ${diagnosisOpen ? "is-open" : ""}`}>
           <div className="overflow-x-auto rounded-xl print:overflow-visible">
             <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
               <thead>
@@ -649,7 +652,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="tbl-animate">
                 <tr>
                   <Td>Diagnosis</Td>
                   {yearLabels.map((label) => (
@@ -688,7 +691,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </section>
     </div>
   );

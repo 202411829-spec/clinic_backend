@@ -85,7 +85,7 @@ export default function WalkInVisitForm({
                 {medTags.map((tag, i) => (
                   <span
                     key={i}
-                    className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full animate-scale-in"
+                    className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full animate-pop-in"
                   >
                     {tag.name} x{tag.quantity}
                   </span>

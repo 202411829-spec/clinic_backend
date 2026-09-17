@@ -36,8 +36,15 @@ function NavItem({ to, label, Icon, count }) {
       className={({ isActive }) =>
         [
           'group relative flex items-center gap-3 rounded-control px-3.5 py-2.5',
-          'text-[15px] font-semibold transition-colors duration-150',
-          isActive ? 'text-white' : 'text-white/75 hover:bg-white/10 hover:text-white',
+          'text-[15px] font-semibold',
+          // Colour, background and the row's own resting position all ease
+          // together on the same clock, so hovering feels like one motion
+          // rather than a colour swap plus a separate nudge.
+          'transition-[color,background-color,transform] duration-200 ease-out',
+          'active:scale-[0.985]',
+          isActive
+            ? 'text-white'
+            : 'text-white/75 hover:translate-x-0.5 hover:bg-white/10 hover:text-white',
         ].join(' ')
       }
     >
@@ -47,15 +54,18 @@ function NavItem({ to, label, Icon, count }) {
             <>
               {/* White rail, not green — a green marker is invisible on a green
                   sidebar, which is why the original active state had to fill
-                  the entire row in a lighter green just to be legible. */}
-              <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-white" />
-              <span className="absolute inset-0 rounded-control bg-white/[0.14]" />
+                  the entire row in a lighter green just to be legible. It
+                  grows in from its own centre on arrival rather than just
+                  appearing, so switching pages reads as the rail travelling
+                  to the new item. */}
+              <span className="absolute left-0 top-1/2 h-6 w-[3px] origin-center -translate-y-1/2 rounded-r-full bg-white animate-rail-in" />
+              <span className="absolute inset-0 rounded-control bg-white/[0.14] animate-fade-in" />
             </>
           )}
-          <Icon className="relative h-5 w-5 shrink-0" />
+          <Icon className="relative h-5 w-5 shrink-0 transition-transform duration-200 ease-out group-hover:scale-110" />
           <span className="relative flex-1">{label}</span>
           {count != null && (
-            <span className="tnum relative rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white">
+            <span className="tnum relative rounded-full bg-white/15 px-2 py-0.5 text-xs font-bold text-white transition-transform duration-200 ease-out group-hover:scale-105">
               {count}
             </span>
           )}
@@ -101,7 +111,7 @@ function NavContent({ todayCount }) {
       </nav>
 
       <div className="border-t border-white/15 p-3">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-control [&>button]:px-3.5 [&>button]:py-2.5 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white/75 [&>button:hover]:bg-white/10 [&>button:hover]:text-white [&_svg]:h-5 [&_svg]:w-5">
+        <div className="[&>button]:btn-press [&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-control [&>button]:px-3.5 [&>button]:py-2.5 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white/75 [&>button]:transition-colors [&>button]:duration-200 [&>button:hover]:bg-white/10 [&>button:hover]:text-white [&_svg]:h-5 [&_svg]:w-5 [&_svg]:transition-transform [&_svg]:duration-200 [&>button:hover_svg]:scale-110">
           <LogoutMenu redirectTo="/admin/login" />
         </div>
       </div>
