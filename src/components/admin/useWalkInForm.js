@@ -13,6 +13,7 @@ export default function useWalkInForm({ reasonRecords, medicineRecords, onSubmit
   const [quantity, setQuantity] = useState("");
   const [medTags, setMedTags] = useState([]);
   const [walkInError, setWalkInError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function resetWalkInForm() {
     setRegId("");
@@ -41,6 +42,10 @@ export default function useWalkInForm({ reasonRecords, medicineRecords, onSubmit
   }
 
   async function handleAddWalkIn() {
+    // Guard against double-submits: without this, a slow request plus an
+    // impatient double-click (or a fast double-tap on mobile) fires two
+    // POSTs before the first one resolves, creating duplicate logbook rows.
+    if (isSubmitting) return;
     if ((!regId.trim() && !walkInName.trim()) || !walkInReasonId) return;
 
     const now = new Date();
@@ -56,6 +61,7 @@ export default function useWalkInForm({ reasonRecords, medicineRecords, onSubmit
       .map((t) => ({ medicine_id: t.medicine_id, quantity: t.quantity }));
 
     try {
+      setIsSubmitting(true);
       setWalkInError(null);
       await onSubmit({
         student_id: regId.trim() || undefined,
@@ -69,6 +75,8 @@ export default function useWalkInForm({ reasonRecords, medicineRecords, onSubmit
     } catch (err) {
       setWalkInError(err.message || "Couldn't save the walk-in visit.");
       return;
+    } finally {
+      setIsSubmitting(false);
     }
 
     resetWalkInForm();
@@ -90,6 +98,7 @@ export default function useWalkInForm({ reasonRecords, medicineRecords, onSubmit
     quantity, setQuantity,
     medTags,
     walkInError, setWalkInError,
+    isSubmitting,
     handleAddMedicine,
     handleAddWalkIn,
     handleClose,

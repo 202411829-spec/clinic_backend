@@ -473,6 +473,7 @@ export default function LogbookFullPanel() {
           quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
           medTags={walkIn.medTags}
           walkInError={walkIn.walkInError}
+          isSubmitting={walkIn.isSubmitting}
           handleAddMedicine={walkIn.handleAddMedicine}
           handleAddWalkIn={walkIn.handleAddWalkIn}
           handleClose={walkIn.handleClose}

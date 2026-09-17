@@ -495,8 +495,8 @@ export default function AdminsPanel() {
                 <p className="mt-1 text-sm text-ink-500">New sign-ups and re-activation requests will show up here.</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-card ring-1 ring-ink-100">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-card ring-1 ring-ink-100">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead className="border-b border-ink-100 text-left text-xs font-medium text-ink-500">
                     <tr>
                       <th className="px-4 py-2.5 font-medium">Name</th>
@@ -519,13 +519,13 @@ export default function AdminsPanel() {
                               {name}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-ink-600">{a.email}</td>
+                          <td className="max-w-[220px] truncate px-4 py-3 text-ink-600" title={a.email}>{a.email}</td>
                           <td className="px-4 py-3"><RolePill role={a.role} /></td>
                           <td className="px-4 py-3 text-ink-600">{a.license_no || '—'}</td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => handleAccept(a)} className="btn-press rounded-control bg-brand-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">Accept</button>
-                              <button onClick={() => { setConfirmTarget(a); setConfirmEmail(''); setConfirmError('') }} className="btn-press rounded-control px-3 py-1.5 text-xs font-medium text-signal-rose hover:bg-signal-rose-bg">Reject</button>
+                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                              <button onClick={() => handleAccept(a)} className="btn-press shrink-0 rounded-control bg-brand-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">Accept</button>
+                              <button onClick={() => { setConfirmTarget(a); setConfirmEmail(''); setConfirmError('') }} className="btn-press shrink-0 rounded-control px-3 py-1.5 text-xs font-medium text-signal-rose hover:bg-signal-rose-bg">Reject</button>
                             </div>
                           </td>
                         </tr>

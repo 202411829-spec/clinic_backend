@@ -171,12 +171,24 @@
      one currently under your pointer" so the revealed action buttons read as
      belonging to that row. No `cursor: pointer` here — the row itself isn't
      a link, only its buttons are; add `.row-hover--link` on rows where the
-     whole row does navigate/open something. */
+     whole row does navigate/open something.
+
+     The rail's ::before used to live directly on the <tr>. Browsers table-
+     fixup a pseudo-element generated on a <tr> as if it were an extra
+     anonymous cell — even though it's `position: absolute` — which silently
+     consumed a real column slot and pushed every actual <td> in the row one
+     column to the right of its header (Logbook/Masterlist column
+     misalignment). Targeting the row's first cell instead keeps the exact
+     same rail animation without touching the table's column layout. */
   .row-hover {
-    position: relative;
     transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .row-hover::before {
+  .row-hover > td:first-child,
+  .row-hover > th:first-child {
+    position: relative;
+  }
+  .row-hover > td:first-child::before,
+  .row-hover > th:first-child::before {
     content: '';
     position: absolute;
     left: 0;
@@ -187,7 +199,8 @@
     transform: scaleY(0);
     transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .row-hover:hover::before {
+  .row-hover:hover > td:first-child::before,
+  .row-hover:hover > th:first-child::before {
     transform: scaleY(1);
   }
   .row-hover--link {
@@ -301,7 +314,8 @@
     transform: none !important;
   }
 
-  .row-hover::before {
+  .row-hover > td:first-child::before,
+  .row-hover > th:first-child::before {
     display: none !important;
   }
 

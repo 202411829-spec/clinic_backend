@@ -491,22 +491,29 @@ export default function LogbookPanel({
         </div>
       )}
 
-      {/* walk-in visit form */}
+      {/* walk-in visit form — wrapped with the same px-5 side padding every
+          other block in this widget uses; the shared WalkInVisitForm
+          component has no horizontal padding of its own (LogbookFullPanel
+          gives it padding via its own p-4/p-5 section wrapper), so without
+          this it rendered flush against this panel's edges. */}
       {walkIn.showWalkInForm && (
-        <WalkInVisitForm
-          regId={walkIn.regId} setRegId={walkIn.setRegId}
-          walkInName={walkIn.walkInName} setWalkInName={walkIn.setWalkInName}
-          walkInReasonId={walkIn.walkInReasonId} setWalkInReasonId={walkIn.setWalkInReasonId}
-          complaint={walkIn.complaint} setComplaint={walkIn.setComplaint}
-          medicineInput={walkIn.medicineInput} setMedicineInput={walkIn.setMedicineInput}
-          quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
-          medTags={walkIn.medTags}
-          walkInError={walkIn.walkInError}
-          handleAddMedicine={walkIn.handleAddMedicine}
-          handleAddWalkIn={walkIn.handleAddWalkIn}
-          handleClose={walkIn.handleClose}
-          reasonRecords={reasonRecords}
-        />
+        <div className="px-5 pb-5 print:hidden">
+          <WalkInVisitForm
+            regId={walkIn.regId} setRegId={walkIn.setRegId}
+            walkInName={walkIn.walkInName} setWalkInName={walkIn.setWalkInName}
+            walkInReasonId={walkIn.walkInReasonId} setWalkInReasonId={walkIn.setWalkInReasonId}
+            complaint={walkIn.complaint} setComplaint={walkIn.setComplaint}
+            medicineInput={walkIn.medicineInput} setMedicineInput={walkIn.setMedicineInput}
+            quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
+            medTags={walkIn.medTags}
+            walkInError={walkIn.walkInError}
+            isSubmitting={walkIn.isSubmitting}
+            handleAddMedicine={walkIn.handleAddMedicine}
+            handleAddWalkIn={walkIn.handleAddWalkIn}
+            handleClose={walkIn.handleClose}
+            reasonRecords={reasonRecords}
+          />
+        </div>
       )}
     </section>
   );
