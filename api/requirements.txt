@@ -1,0 +1,12 @@
+# Vercel installs the Python dependencies for the serverless function from THIS
+# file (api/index.py), not from the repo-root requirements.txt. Keep the pins in
+# sync with the root file, which stays the source of truth for local dev.
+# gunicorn is intentionally omitted: Vercel runs the WSGI callable directly, so
+# gunicorn is only needed by the root file (Dockerfile / `python main.py`).
+flask==3.1.3
+flask-cors==6.0.5
+python-dotenv==1.0.1
+resend==2.5.1
+supabase==2.7.4
+groq>=0.11.0
+redis>=5.0.0

@@ -1,0 +1,21 @@
+# Secrets and local artifacts must never be uploaded to Vercel.
+node_modules
+dist
+dev-dist
+deepseek-harness
+__pycache__
+*.pyc
+.env
+.env.local
+.env.frontend
+*.log
+backend*.log
+server_restart*.log
+*token*.txt
+admin_token*.txt
+student_token*.txt
+qa_*.py
+test_*.py
+tests
+docs/demo
+.git
