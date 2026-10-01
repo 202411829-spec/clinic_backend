@@ -2,6 +2,36 @@ import { supabase } from './supabaseClient.js'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
+// ---- Backend URL normalizer (two modes, one place) ----
+// Local dev  (VITE_API_URL unset => http://127.0.0.1:5000): Flask is served
+//   directly at the root, so paths are used verbatim — `/appointments` stays
+//   `/appointments` and `/health` stays `/health`. Byte-identical to before.
+// Production (VITE_API_URL = https://<project>.vercel.app): Vercel only exposes
+//   serverless functions under `/api/*`, and the whole Flask app is mounted there
+//   via DispatcherMiddleware, so every path gains an `/api` prefix. Paths that
+//   already carry it (`/api/reports/`, `/api/masterlist/students`, `/api/auth/*`)
+//   are left alone, so nothing double-prefixes. Note `/health` is therefore
+//   served at `/api/health` in production and bare `/health` locally.
+// Working on the parsed URL (not string surgery) keeps query strings and hashes
+// intact: `/api/masterlist/students?page=1` is never mangled.
+function isLocalBackend(baseUrl) {
+  try {
+    const { hostname } = new URL(baseUrl)
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
+  } catch {
+    return false
+  }
+}
+
+export function toApiUrl(path) {
+  const url = new URL(path, API_BASE_URL)
+  const alreadyPrefixed = url.pathname === '/api' || url.pathname.startsWith('/api/')
+  if (!alreadyPrefixed && !isLocalBackend(API_BASE_URL)) {
+    url.pathname = `/api${url.pathname}`
+  }
+  return url.toString()
+}
+
 // The Flask backend rejects every API call (except GET / and /health)
 // without "Authorization: Bearer <supabase_access_token>".
 async function getAccessToken() {
@@ -63,7 +93,7 @@ export function clearApiCache() {
 }
 
 async function request(path, { params, headers, cacheTtl: explicitCacheTtl, signal, ...options } = {}, _retried = false) {
-  const url = new URL(path, API_BASE_URL)
+  const url = new URL(toApiUrl(path))
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -257,7 +287,7 @@ export const recordsApi = {
 // the pre-auth sign-up flow. TODO: move behind a backend /auth router once
 // the Python endpoints are finalized.
 async function authRequest(path, body) {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await fetch(toApiUrl(path), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
