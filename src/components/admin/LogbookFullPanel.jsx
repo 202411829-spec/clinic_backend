@@ -21,13 +21,18 @@ const EXPORT_HEADERS = ["Date & Time", "Student ID", "Name", "Age", "Dept / Cour
 const PDF_MARGIN_MM = 10;
 const PDF_CONTENT_W_MM = 210 - PDF_MARGIN_MM * 2; // 190mm
 const PDF_CONTENT_H_MM = 297 - PDF_MARGIN_MM * 2; // 277mm
+// Blank space captured under each page so the last row's bottom border can never be clipped.
+const PDF_EXTRA_BOTTOM_PX = 16;
 
 // One self-contained PDF page: letterhead + title + summary + column header +
 // this page's rows. Every page gets its own full header, exactly like the
 // printed version (where the header lives in <thead> and repeats).
 function ExportPage({ rows, summary }) {
+  // The 2px padding on the wrapper matters: with border-collapse the outer half
+  // of the last row's bottom border (and the left/right edges) sits outside the
+  // table box, so the snapshot clipped it and the table looked open at the bottom.
   return (
-    <div data-pdf-page className="bg-white w-[190mm]">
+    <div data-pdf-page className="bg-white w-[190mm] p-[2px]">
       <Letterhead className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-300" />
       <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
         CLINIC LOGBOOK
@@ -286,7 +291,7 @@ export default function LogbookFullPanel() {
         : [];
 
       // 2) Pack rows into pages (CSS px @96dpi; small safety margin).
-      const capacity = (PDF_CONTENT_H_MM / 25.4) * 96 - 6;
+      const capacity = (PDF_CONTENT_H_MM / 25.4) * 96 - 6 - PDF_EXTRA_BOTTOM_PX - 4;
       const chunks = [];
       let current = [];
       let used = headerH;
@@ -308,7 +313,7 @@ export default function LogbookFullPanel() {
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       for (let i = 0; i < pageNodes.length; i += 1) {
-        const { dataUrl, width, height } = await nodeToPng(pageNodes[i], { pixelRatio: 2 });
+        const { dataUrl, width, height } = await nodeToPng(pageNodes[i], { pixelRatio: 2, extraBottom: PDF_EXTRA_BOTTOM_PX });
         const imgH = (height / width) * PDF_CONTENT_W_MM;
         if (i > 0) doc.addPage();
         doc.addImage(dataUrl, "PNG", PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_CONTENT_W_MM, imgH);

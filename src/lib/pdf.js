@@ -84,13 +84,16 @@ export async function pdfLetterhead(doc, startY = 18) {
  * layout and drew text a few px lower than boxes, which is what misaligned the
  * checkboxes in the downloaded PDF.
  * @param {HTMLElement} node
- * @param {{ pixelRatio?: number }} [opts]
+ * @param {{ pixelRatio?: number, extraBottom?: number }} [opts] extraBottom: blank px added under the node so any
+ *   sub-pixel growth of the re-laid-out clone (embedded web font, rounding) can't clip the last row's bottom border.
  * @returns {Promise<{ dataUrl: string, width: number, height: number }>}
  */
-export async function nodeToPng(node, { pixelRatio = 3 } = {}) {
+export async function nodeToPng(node, { pixelRatio = 3, extraBottom = 0 } = {}) {
   const { toPng } = await import("html-to-image");
+  const rect = node.getBoundingClientRect();
   const options = {
     pixelRatio,
+    ...(extraBottom ? { height: Math.ceil(rect.height) + extraBottom } : {}),
     backgroundColor: "#ffffff",
     cacheBust: true,
     // The export nodes sit off-screen (fixed, left: -9999px); the clone that
@@ -114,6 +117,5 @@ export async function nodeToPng(node, { pixelRatio = 3 } = {}) {
     dataUrl = await toPng(node, { ...options, skipFonts: true });
   }
 
-  const rect = node.getBoundingClientRect();
-  return { dataUrl, width: rect.width, height: rect.height };
+  return { dataUrl, width: rect.width, height: extraBottom ? Math.ceil(rect.height) + extraBottom : rect.height };
 }
