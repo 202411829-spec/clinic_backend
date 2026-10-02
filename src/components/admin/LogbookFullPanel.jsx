@@ -1,5 +1,6 @@
 // src/components/admin/LogbookFullPanel.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import NavIcon from "./NavIcon.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import Letterhead from "./Letterhead.jsx";
@@ -10,6 +11,83 @@ import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
 import { formatMDY, isoToMDY } from "../../lib/calendar.js";
 
 const PAGE_SIZE = 20;
+
+// ---- PDF export layout -----------------------------------------------------
+// Column widths (% of the 190mm printable width) — shared by the on-screen
+// print table and the PDF replica so they always match. "Student ID" needs
+// ~11% so its 9 digits stay inside the cell (digits never wrap).
+const EXPORT_COL_WIDTHS = [12, 11, 14, 5, 15, 7, 13, 10, 13];
+const EXPORT_HEADERS = ["Date & Time", "Student ID", "Name", "Age", "Dept / Course", "Sex", "Reason", "Complaint", "Medicine"];
+const PDF_MARGIN_MM = 10;
+const PDF_CONTENT_W_MM = 210 - PDF_MARGIN_MM * 2; // 190mm
+const PDF_CONTENT_H_MM = 297 - PDF_MARGIN_MM * 2; // 277mm
+
+// One self-contained PDF page: letterhead + title + summary + column header +
+// this page's rows. Every page gets its own full header, exactly like the
+// printed version (where the header lives in <thead> and repeats).
+function ExportPage({ rows, summary }) {
+  return (
+    <div data-pdf-page className="bg-white w-[190mm]">
+      <Letterhead className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-300" />
+      <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+        CLINIC LOGBOOK
+      </h2>
+      <p className="text-xs text-gray-600 mb-4">{summary}</p>
+
+      <table className="w-full table-fixed border-collapse text-[9.5px] leading-snug [overflow-wrap:break-word]">
+        <colgroup>
+          {EXPORT_COL_WIDTHS.map((w, i) => (
+            <col key={i} style={{ width: `${w}%` }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr className="text-left bg-gray-50">
+            {EXPORT_HEADERS.map((h) => (
+              <th key={h} className="px-1.5 py-2 font-semibold border border-gray-300 whitespace-normal">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={9} className="py-8 text-center text-gray-400 border border-gray-300">
+                No logbook entries found
+              </td>
+            </tr>
+          ) : (
+            rows.map((entry) => (
+              <tr key={entry.id}>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.dateTime}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300 font-medium">{entry.studentId}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.name}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.age}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">
+                  <div className="font-medium">{entry.dept}</div>
+                  <div className="text-[9px] text-gray-500">{entry.course}</div>
+                </td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.sex}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.reason}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.complaint}</td>
+                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.medicine}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Wait for webfonts + seal images so the snapshot never captures a half-loaded frame.
+async function waitForAssets(container) {
+  if (document.fonts?.ready) await document.fonts.ready;
+  await Promise.all(
+    Array.from(container.querySelectorAll("img")).map((img) =>
+      img.decode ? img.decode().catch(() => {}) : Promise.resolve()
+    )
+  );
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+}
 
 // Map a backend /logbook row onto the shape this panel renders.
 function mapEntry(r) {
@@ -177,82 +255,63 @@ export default function LogbookFullPanel() {
     window.print();
   }
 
-  // Off-screen node holding an exact replica of the print layout (see
-  // printRef below) — snapshotted with html2canvas so the download is
-  // pixel-for-pixel what "Print" produces, instead of a hand-drawn jsPDF
-  // table. The old approach drew every row at a fixed 7mm height and let
-  // jsPDF's own text-wrapping kick in independently of that height, so any
-  // cell whose text wrapped to 2+ lines (long complaint/medicine text,
-  // narrow columns) overlapped the row below it — that's the "siksikan"
-  // (cramped/overlapping) look. Snapshotting real, wrapped DOM/CSS avoids
-  // that entirely: each row is exactly as tall as its content needs.
-  const printRef = useRef(null);
+  // The PDF is built page by page from an off-screen replica of the print
+  // layout. Rows are measured first and packed into A4 pages so a row is never
+  // sliced in half, and every page is rendered with its own full header
+  // (letterhead + title + column header) — same as the printed version.
+  // `exportPages` is null normally (nothing rendered); during a download it
+  // holds the rows for each page.
+  const [exportPages, setExportPages] = useState(null);
+  const exportRef = useRef(null);
 
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
+      const [{ jsPDF }, { nodeToPng }] = await Promise.all([
         import("jspdf"),
+        import("../../lib/pdf.js"),
       ]);
 
-      const node = printRef.current;
-      if (!node) return;
+      // 1) Measure: render every row on a single tall page.
+      flushSync(() => setExportPages([entries]));
+      const container = exportRef.current;
+      if (!container) return;
+      await waitForAssets(container);
 
-      // Wait for the Inter webfont + seal images to finish loading/decoding
-      // before snapshotting — otherwise html2canvas can capture a frame
-      // that's still on a fallback font or a blank image, which is the
-      // other common cause of the download not matching the real print.
-      if (document.fonts?.ready) {
-        await document.fonts.ready;
-      }
-      await Promise.all(
-        Array.from(node.querySelectorAll("img")).map((img) =>
-          img.decode ? img.decode().catch(() => {}) : Promise.resolve()
-        )
-      );
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const measurePage = container.querySelector("[data-pdf-page]");
+      const tbody = measurePage.querySelector("tbody");
+      const headerH = tbody.getBoundingClientRect().top - measurePage.getBoundingClientRect().top;
+      const rowHeights = entries.length
+        ? Array.from(tbody.querySelectorAll("tr")).map((tr) => tr.getBoundingClientRect().height)
+        : [];
 
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
+      // 2) Pack rows into pages (CSS px @96dpi; small safety margin).
+      const capacity = (PDF_CONTENT_H_MM / 25.4) * 96 - 6;
+      const chunks = [];
+      let current = [];
+      let used = headerH;
+      rowHeights.forEach((h, i) => {
+        if (current.length && used + h > capacity) {
+          chunks.push(current);
+          current = [];
+          used = headerH;
+        }
+        current.push(entries[i]);
+        used += h;
       });
+      if (current.length || chunks.length === 0) chunks.push(current);
+
+      // 3) Render the real pages, one canvas per page.
+      flushSync(() => setExportPages(chunks));
+      await waitForAssets(container);
+      const pageNodes = Array.from(container.querySelectorAll("[data-pdf-page]"));
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const margin = 10; // matches the .print-a4-portrait / @page margin
-      const imgWidth = 210 - margin * 2; // 190mm
-      const pageHeightMm = 297 - margin * 2; // 277mm
-      const pxPerMm = canvas.width / imgWidth;
-      const pageHeightPx = Math.floor(pageHeightMm * pxPerMm);
-
-      // The table can run longer than one A4 page (up to 20 rows per
-      // logbook page) — slice the tall canvas into page-height chunks and
-      // add one image per PDF page, instead of squashing everything onto a
-      // single sheet.
-      let renderedPx = 0;
-      let pageNum = 0;
-      while (renderedPx < canvas.height) {
-        const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx);
-        const sliceCanvas = document.createElement("canvas");
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = sliceHeightPx;
-        sliceCanvas
-          .getContext("2d")
-          .drawImage(canvas, 0, renderedPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
-
-        if (pageNum > 0) doc.addPage();
-        doc.addImage(
-          sliceCanvas.toDataURL("image/png"),
-          "PNG",
-          margin,
-          margin,
-          imgWidth,
-          sliceHeightPx / pxPerMm
-        );
-
-        renderedPx += sliceHeightPx;
-        pageNum += 1;
+      for (let i = 0; i < pageNodes.length; i += 1) {
+        const { dataUrl, width, height } = await nodeToPng(pageNodes[i], { pixelRatio: 2 });
+        const imgH = (height / width) * PDF_CONTENT_W_MM;
+        if (i > 0) doc.addPage();
+        doc.addImage(dataUrl, "PNG", PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_CONTENT_W_MM, imgH);
       }
 
       doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
@@ -260,6 +319,7 @@ export default function LogbookFullPanel() {
       console.error("Failed to generate PDF:", err);
       setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
+      setExportPages(null);
       setDownloadingPdf(false);
     }
   }
@@ -289,15 +349,6 @@ export default function LogbookFullPanel() {
           <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
         </div>
       )}
-      {/* print-only formal letterhead — shared component */}
-      <Letterhead />
-      <h2 className="hidden print:block text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
-        CLINIC LOGBOOK
-      </h2>
-      <p className="hidden print:block print:text-xs text-gray-600 mb-4">
-        {printSummary}
-      </p>
-
       {/* header + Print/PDF toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4 print:hidden">
         {/* header — matches the dashboard Logbook widget's card header */}
@@ -384,7 +435,7 @@ export default function LogbookFullPanel() {
           walk-in form are all print:hidden, and the layout's sidebar/topbar
           already carry print:hidden. */}
       <div className="overflow-x-auto -mx-4 md:mx-0 print:overflow-visible print:mx-0">
-        <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:table-fixed print:text-[9.5px] print:leading-snug">
+        <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:table-fixed print:text-[9.5px] print:leading-snug print:[overflow-wrap:break-word]">
           {/* Print-only column widths — forces the table to stay within the
               190mm printable width (see .print-a4-portrait in index.css)
               instead of letting long content push columns off the page.
@@ -393,27 +444,39 @@ export default function LogbookFullPanel() {
               whitespace-normal-without-break-words note below). Ignored on
               screen since table-layout stays "auto" there. */}
           <colgroup>
+            <col className="print:w-[12%]" />
+            <col className="print:w-[11%]" />
             <col className="print:w-[13%]" />
-            <col className="print:w-[9%]" />
-            <col className="print:w-[14%]" />
-            <col className="print:w-[6%]" />
+            <col className="print:w-[5%]" />
             <col className="print:w-[15%]" />
-            <col className="print:w-[6%]" />
+            <col className="print:w-[7%]" />
             <col className="print:w-[14%]" />
             <col className="print:w-[10%]" />
             <col className="print:w-[13%]" />
           </colgroup>
           <thead>
+            {/* Print-only page header. It lives inside <thead> so the browser
+                repeats it (letterhead + title + summary + column header) at
+                the top of every printed page. Hidden on screen. */}
+            <tr className="hidden print:table-row">
+              <td colSpan={9} className="p-0 border-0 bg-white font-normal text-left align-top">
+                <Letterhead />
+                <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
+                  CLINIC LOGBOOK
+                </h2>
+                <p className="text-xs text-gray-600 mb-4">{printSummary}</p>
+              </td>
+            </tr>
             <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2 px-4 md:px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
-              <th className="py-2 px-2 print:px-2 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
+              <th className="py-2 px-4 md:px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody className="tbl-animate">
@@ -426,18 +489,18 @@ export default function LogbookFullPanel() {
             ) : (
               entries.map((entry) => (
                 <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
-                  <td className="py-2.5 px-4 md:px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300">
+                  <td className="py-2.5 px-4 md:px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300">
                     <div className="font-medium whitespace-nowrap print:whitespace-normal">{entry.dept}</div>
                     <div className="text-xs print:text-[9px] text-gray-500 whitespace-nowrap print:whitespace-normal">{entry.course}</div>
                   </td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.reason}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 max-w-xs truncate print:max-w-none print:overflow-visible print:text-clip print:whitespace-normal">{entry.complaint}</td>
-                  <td className="py-2.5 px-2 print:px-2 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.medicine}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.reason}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 max-w-xs truncate print:max-w-none print:overflow-visible print:text-clip print:whitespace-normal">{entry.complaint}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.medicine}</td>
                 </tr>
               ))
             )}
@@ -487,75 +550,15 @@ export default function LogbookFullPanel() {
         />
       )}
 
-      {/* ---------- PDF-export-only: exact replica of the print layout ----------
-          Kept off-screen (not display:none) so html2canvas can still capture
-          it for the "Download PDF" button — display:none elements have no
-          layout box to snapshot. Uses the *same* plain (non print:-prefixed)
-          classes the real print output resolves to, so what gets downloaded
-          is identical to what "Print" produces, row heights included. */}
-      <div
-        ref={printRef}
-        className="flex flex-col bg-white fixed top-0 -left-[9999px] w-[190mm] p-0"
-      >
-        <Letterhead className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-300" />
-        <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
-          CLINIC LOGBOOK
-        </h2>
-        <p className="text-xs text-gray-600 mb-4">{printSummary}</p>
-
-        <table className="w-full table-fixed border-collapse text-[9.5px] leading-snug">
-          <colgroup>
-            <col style={{ width: "13%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "15%" }} />
-            <col style={{ width: "6%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "10%" }} />
-            <col style={{ width: "13%" }} />
-          </colgroup>
-          <thead>
-            <tr className="text-left bg-gray-50">
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Date & Time</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Student ID</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Name</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Age</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Dept / Course</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Sex</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Reason</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Complaint</th>
-              <th className="px-2 py-2 font-semibold border border-gray-300 whitespace-normal">Medicine</th>
-            </tr>
-          </thead>
-          <tbody className="tbl-animate">
-            {entries.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="py-8 text-center text-gray-400 border border-gray-300">
-                  No logbook entries found
-                </td>
-              </tr>
-            ) : (
-              entries.map((entry) => (
-                <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.dateTime}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 font-medium whitespace-normal">{entry.studentId}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.name}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.age}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300">
-                    <div className="font-medium whitespace-normal">{entry.dept}</div>
-                    <div className="text-[9px] text-gray-500 whitespace-normal">{entry.course}</div>
-                  </td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.sex}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.reason}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.complaint}</td>
-                  <td className="px-2 py-2 text-gray-700 border border-gray-300 whitespace-normal">{entry.medicine}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* PDF-export-only replica (rendered only while "Download PDF" runs).
+          Off-screen but not display:none so it can be snapshotted. */}
+      {exportPages && (
+        <div ref={exportRef} className="fixed top-0 -left-[9999px] w-[190mm] flex flex-col">
+          {exportPages.map((rows, i) => (
+            <ExportPage key={i} rows={rows} summary={printSummary} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

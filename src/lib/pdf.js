@@ -76,3 +76,44 @@ export async function pdfLetterhead(doc, startY = 18) {
   doc.setTextColor("#000000");
   return y;
 }
+
+/**
+ * Rasterize a DOM node to a PNG data URL using the browser's own layout
+ * engine (html-to-image / SVG foreignObject), so text, checkboxes and borders
+ * land exactly where they do in the real print preview. html2canvas re-implements
+ * layout and drew text a few px lower than boxes, which is what misaligned the
+ * checkboxes in the downloaded PDF.
+ * @param {HTMLElement} node
+ * @param {{ pixelRatio?: number }} [opts]
+ * @returns {Promise<{ dataUrl: string, width: number, height: number }>}
+ */
+export async function nodeToPng(node, { pixelRatio = 3 } = {}) {
+  const { toPng } = await import("html-to-image");
+  const options = {
+    pixelRatio,
+    backgroundColor: "#ffffff",
+    cacheBust: true,
+    // The export nodes sit off-screen (fixed, left: -9999px); the clone that
+    // gets rasterized must be in normal flow or it renders blank.
+    style: { position: "static", left: "0", top: "0" },
+  };
+
+  // Safari sometimes paints the first foreignObject render before images are
+  // ready — a throwaway low-res pass warms them up.
+  if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+    await toPng(node, { ...options, pixelRatio: 1 }).catch(() => {});
+  }
+
+  let dataUrl;
+  try {
+    dataUrl = await toPng(node, options);
+  } catch (err) {
+    // Web-font embedding can fail (offline / blocked CSS) — retry with the
+    // system fallback font rather than failing the whole download.
+    console.warn("Font embedding failed, retrying without web fonts:", err);
+    dataUrl = await toPng(node, { ...options, skipFonts: true });
+  }
+
+  const rect = node.getBoundingClientRect();
+  return { dataUrl, width: rect.width, height: rect.height };
+}
