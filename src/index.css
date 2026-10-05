@@ -333,6 +333,21 @@
     border-radius: 0 !important;
   }
 
+  /* Long tables: repeat <thead> (letterhead + column header) on every printed
+     page and never split a row across two pages. */
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .print-a4-portrait {
     width: 190mm; /* A4 210mm minus the 10mm @page margin each side */
     margin: 0 auto;

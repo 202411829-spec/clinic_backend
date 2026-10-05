@@ -14,6 +14,7 @@ import { computeAge } from "../../data/studentRecordSample.js";
 import { formatMDY } from "../../lib/calendar.js";
 import { getCertificateDefaults } from "../../lib/certificateSync.js";
 import { formatDisplayName } from "../../lib/format.js";
+import { salutationFor, sexLabel } from "../../lib/inferSex.js";
 
 import gordonCollegeSeal from "../../assets/certificate/gordon-college-seal.png";
 import oswsSeal from "../../assets/certificate/osws-seal.png";
@@ -21,10 +22,6 @@ import healthServicesSeal from "../../assets/certificate/health-services-seal.pn
 
 const PURPOSE_OPTIONS = ["Enrollment", "OJT Internship", "R.L.E"];
 const COPY_LABELS = ["Student's Copy", "Coordinator's Copy", "Registrar's Copy"];
-
-function pronounFor(sex) {
-  return sex?.toLowerCase() === "female" ? "Ms" : "Mr";
-}
 
 // Compact, read-only rendering of one certificate copy — used only in the
 // print output, where three of these stack on a single portrait A4 page.
@@ -76,21 +73,24 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
       </h2>
 
       <p className="text-gray-800 mb-1.5">
-        This is to certify that {pronounFor(student.sex)} {formatDisplayName(student.name)},{" "}
-        {age != null ? age : "__"} years old, {student.sex || "____"} has submitted all required
+        This is to certify that {salutationFor(student.sex, student.name)} {formatDisplayName(student.name)},{" "}
+        {age != null ? age : "__"} years old, {sexLabel(student.sex)} has submitted all required
         medical requirements and upon physical examination.
       </p>
 
-      <div className="flex items-start gap-1 mb-1">
-        <span className="font-semibold text-gray-800 shrink-0">Findings:</span>
-        <span className="flex-1 flex items-center gap-1 text-gray-700">
-          <span
-            className={`inline-block w-2.5 h-2.5 border border-gray-500 shrink-0 ${
-              normalFindings ? "bg-gc-green" : "bg-white"
-            }`}
-          />
-          Essentially normal physical findings at the time of evaluation
-        </span>
+      {/* Checkbox rows use plain inline flow (inline-block box + vertical-align)
+          instead of flex + items-center: html2canvas positions boxes from
+          layout but text from its own baseline math, so flex-centered boxes
+          drifted above their labels in the downloaded PDF. Inline flow keeps
+          box and text on the same baseline in both print and download. */}
+      <div className="mb-1 text-gray-700 leading-[12px]">
+        <span className="font-semibold text-gray-800 mr-1">Findings:</span>
+        <span
+          className={`inline-block w-2.5 h-2.5 border border-gray-500 align-[-2px] mr-1 ${
+            normalFindings ? "bg-gc-green" : "bg-white"
+          }`}
+        />
+        Essentially normal physical findings at the time of evaluation
       </div>
 
       <div className="mb-1">
@@ -108,12 +108,12 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
         <span className="block border-b border-gray-400 min-h-[10px] text-gray-700">{finalRemark}</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-1">
-        <span className="font-semibold text-gray-800 shrink-0">Purpose:</span>
+      <div className="mb-1 text-gray-700 leading-[12px]">
+        <span className="font-semibold text-gray-800 mr-1">Purpose:</span>
         {PURPOSE_OPTIONS.map((label) => (
-          <span key={label} className="flex items-center gap-0.5 text-gray-700">
+          <span key={label} className="whitespace-nowrap mr-2">
             <span
-              className={`inline-block w-2 h-2 border border-gray-500 shrink-0 ${
+              className={`inline-block w-2 h-2 border border-gray-500 align-[-1px] mr-0.5 ${
                 purpose.has(label) ? "bg-gc-green" : "bg-white"
               }`}
             />
@@ -212,22 +212,17 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
+      const [{ jsPDF }, { nodeToPng }] = await Promise.all([
         import("jspdf"),
+        import("../../lib/pdf.js"),
       ]);
 
       const node = printRef.current;
       if (!node) return;
 
-      // html2canvas paints whatever is on screen *right now* — if the Inter
-      // webfont (loaded from Google Fonts, see index.html) hasn't finished
-      // downloading yet, or an <img> seal hasn't decoded yet, it silently
-      // falls back to a system font / blank image for this snapshot only.
-      // The actual "Print" button doesn't have this problem because the
-      // browser's native print pipeline always waits for both. Waiting on
-      // document.fonts.ready + decoding every <img> here closes that gap so
-      // the download reliably matches the print output.
+      // Wait for the Inter webfont + seal images so the snapshot never
+      // captures a fallback font or a blank image (the native Print button
+      // always waits for both).
       if (document.fonts?.ready) {
         await document.fonts.ready;
       }
@@ -236,24 +231,16 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           img.decode ? img.decode().catch(() => {}) : Promise.resolve()
         )
       );
-      // One extra frame so the browser has actually painted the settled
-      // fonts/images before we snapshot.
       await new Promise((resolve) => requestAnimationFrame(resolve));
 
-      const canvas = await html2canvas(node, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/png");
+      const { dataUrl, width, height } = await nodeToPng(node, { pixelRatio: 3 });
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const margin = 10; // matches the certificate-portrait @page margin
       const imgWidth = 210 - margin * 2; // 190mm
-      const imgHeight = (canvas.height / canvas.width) * imgWidth;
+      const imgHeight = (height / width) * imgWidth;
 
-      doc.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      doc.addImage(dataUrl, "PNG", margin, margin, imgWidth, imgHeight);
       doc.save(`medical-certificate-${student.studentNumber || student.name}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
@@ -355,8 +342,8 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           </h2>
 
           <p className="text-base text-gray-800 leading-relaxed mb-6">
-            This is to certify that {pronounFor(student.sex)} {formatDisplayName(student.name)},{" "}
-            {age != null ? age : "__"} years old, {student.sex || "____"} has submitted all required medical
+            This is to certify that {salutationFor(student.sex, student.name)} {formatDisplayName(student.name)},{" "}
+            {age != null ? age : "__"} years old, {sexLabel(student.sex)} has submitted all required medical
             requirements and upon physical examination.
           </p>
 
@@ -432,8 +419,8 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           const nodes = [];
           if (i > 0) {
             nodes.push(
-              <div key={`${label}-cut`} className="print-cut-line" aria-hidden="true">
-                <span className="print-cut-line-scissor">✂</span>
+              <div key={`${label}-cut`} className="print-cut-line relative block h-0 border-t border-dashed border-gray-400" aria-hidden="true">
+                <span className="print-cut-line-scissor absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rotate-90 bg-white px-[2mm] text-[8px] leading-none text-gray-400">✂</span>
               </div>
             );
           }
