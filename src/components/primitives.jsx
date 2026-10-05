@@ -1,18 +1,35 @@
-// src/components/ui/primitives.jsx
+// src/components/primitives.jsx
 //
-// The shared vocabulary every panel should be built from. The point of this
-// file is that hierarchy lives in the primitive, not in each panel's class
-// string — which is why the old build had ~40 copies of
-// `bg-white rounded-2xl shadow-sm border border-gray-200` and no hierarchy.
+// REQUIRED import path for shared visual elements. Cards, buttons, badges,
+// fields, page headers and error messages are built from here — not copied
+// into a page as a class string. This file exists because the old build ended
+// up with ~40 copies of
+// `bg-white rounded-2xl shadow-sm border border-gray-200`
+// and no hierarchy: the fix was written once, never adopted, and the
+// duplication regrew. Importing from here instead of retyping the classes is
+// what stops that happening again.
+//
+// Pass 1 palette: `gc-green` for primary actions, `gray-*` for chrome,
+// borders and text — the tokens the majority of the app already uses, so a
+// primitive dropped into a page renders the same pixels as the markup it
+// replaces. The `brand` / `ink` / `signal` palette is Pass 2; don't add it.
+//
+// Note: `PanelHeader` and `StatRail` are pre-existing exports with no
+// importers yet. They still carry Pass 2 tokens and are kept until the
+// deferred cleanup removes them — do not build new pages on them.
 
 const cx = (...parts) => parts.filter(Boolean).join(' ')
 
 /* ── Panel ─────────────────────────────────────────────────────────────────
-   The base surface. Note there is no `border` — the e2 shadow token carries
-   its own hairline ring, so a panel never has a doubled edge. */
+   The card surface: radius, hairline and shadow live here so no page has to
+   restate them. Padding and spacing stay at the call site — cards size their
+   content differently (p-4, p-5, p-8) and one baked-in padding would fight
+   every other caller. No background either: admin pages sit on a white page
+   (see AdminLayout), so the hairline and shadow are what separate the card
+   from it. */
 export function Panel({ children, className = '', ...rest }) {
   return (
-    <section className={cx('overflow-hidden rounded-panel bg-white shadow-e2', className)} {...rest}>
+    <section className={cx('rounded-2xl border border-gray-100 shadow-sm', className)} {...rest}>
       {children}
     </section>
   )
@@ -31,27 +48,28 @@ export function PanelHeader({ title, subtitle, actions, className = '' }) {
 }
 
 /* ── Page header ───────────────────────────────────────────────────────────
-   The serif is scoped to page titles and the printed letterhead only. It is
-   what gives an institutional document its weight; used everywhere it would
-   just be decoration. */
-export function PageHeader({ title, meta, actions }) {
+   The one admin page header: icon, uppercase title, one-line description.
+   The title text is written in upper case by the caller — it is the page's
+   name, not a sentence. `className` carries page-level spacing (pt-2 and
+   friends) so the header itself stays identical on every admin page. */
+export function PageHeader({ icon: Icon, title, description, className = '' }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="font-serif text-3xl font-semibold text-ink-900">{title}</h1>
-        {meta && <p className="mt-1 text-base text-ink-500">{meta}</p>}
+    <div className={className}>
+      <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-gc-accent" />
+        <h1 className="text-lg font-extrabold tracking-wide text-gray-900">{title}</h1>
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {description && <p className="mt-0.5 text-sm text-gray-500">{description}</p>}
     </div>
   )
 }
 
 /* ── Button ───────────────────────────────────────────────────────────────── */
 const VARIANTS = {
-  primary: 'bg-brand-900 text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950',
-  secondary: 'border border-ink-200 bg-white text-ink-700 shadow-e1 hover:bg-ink-50',
-  ghost: 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
-  danger: 'bg-signal-rose text-white shadow-e1 hover:brightness-95',
+  primary: 'bg-gc-green text-white hover:opacity-90',
+  secondary: 'border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50',
+  danger: 'bg-red-600 text-white hover:bg-red-700',
+  ghost: 'text-gray-600 hover:bg-gray-100',
 }
 const SIZES = {
   sm: 'px-3 py-1.5 text-xs',
@@ -83,16 +101,16 @@ export function Button({ variant = 'secondary', size = 'md', className = '', chi
    (bg-green-100/text-green-700) read as consumer-app candy on a medical
    record; the dot also means status survives being printed in grayscale. */
 const TONES = {
-  positive: 'bg-brand-50 text-brand-800 ring-brand-200',
-  warning: 'bg-signal-amber-bg text-signal-amber ring-signal-amber-ring',
-  critical: 'bg-signal-rose-bg text-signal-rose ring-signal-rose-ring',
-  neutral: 'bg-signal-slate-bg text-signal-slate ring-signal-slate-ring',
+  positive: 'bg-gc-green-50 text-gc-green-800 ring-gc-green-100',
+  warning: 'bg-amber-50 text-amber-700 ring-amber-200',
+  critical: 'bg-red-50 text-red-700 ring-red-200',
+  neutral: 'bg-gray-100 text-gray-700 ring-gray-200',
 }
 const DOTS = {
-  positive: 'bg-brand-600',
-  warning: 'bg-signal-amber',
-  critical: 'bg-signal-rose',
-  neutral: 'bg-signal-slate',
+  positive: 'bg-gc-green-600',
+  warning: 'bg-amber-600',
+  critical: 'bg-red-600',
+  neutral: 'bg-gray-500',
 }
 
 // Maps the statuses already used across Appointments / Logbook / Masterlist.
@@ -151,25 +169,25 @@ export function StatRail({ items = [] }) {
 export function Field({ label, hint, error, id, className = '', ...rest }) {
   return (
     <div className={className}>
-      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-ink-600">{label}</label>}
+      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-gray-500">{label}</label>}
       <input
         id={id}
         aria-invalid={error ? true : undefined}
         className={cx(
-          'w-full rounded-control border bg-white px-3 py-2 text-sm text-ink-900',
-          'placeholder:text-ink-400 focus:outline-none focus:ring-2',
-          'disabled:bg-ink-50 disabled:text-ink-400',
+          'w-full rounded-control border bg-white px-3 py-2 text-sm text-gray-900',
+          'placeholder:text-gray-400 focus:outline-none focus:ring-2',
+          'disabled:bg-gray-50 disabled:text-gray-400',
           error
-            ? 'border-signal-rose focus:border-signal-rose focus:ring-signal-rose/15'
-            : 'border-ink-200 focus:border-brand-600 focus:ring-brand-600/15'
+            ? 'border-red-600 focus:border-red-600 focus:ring-red-600/20'
+            : 'border-gray-200 focus:border-gc-green-700 focus:ring-gc-green-700/20'
         )}
         {...rest}
       />
       {/* Errors state what happened and what to do — they don't apologise. */}
       {error ? (
-        <p className="mt-1.5 text-xs text-signal-rose">{error}</p>
+        <p className="mt-1.5 text-xs text-red-600">{error}</p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-ink-400">{hint}</p>
+        <p className="mt-1.5 text-xs text-gray-400">{hint}</p>
       ) : null}
     </div>
   )
@@ -181,9 +199,18 @@ export function Field({ label, hint, error, id, className = '', ...rest }) {
 export function EmptyState({ title, body, action }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      <p className="text-base font-medium text-ink-900">{title}</p>
-      {body && <p className="mt-1 max-w-[42ch] text-sm text-ink-500">{body}</p>}
+      <p className="text-base font-medium text-gray-900">{title}</p>
+      {body && <p className="mt-1 max-w-[42ch] text-sm text-gray-500">{body}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   )
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────
+   The inline failure message that sits under the thing that failed. Renders
+   nothing when there is no error, so a page can hand its error state straight
+   in without guarding around it. */
+export function ErrorBanner({ message, className = '' }) {
+  if (!message) return null
+  return <p className={cx('mt-4 text-sm font-medium text-red-600', className)}>{message}</p>
 }
