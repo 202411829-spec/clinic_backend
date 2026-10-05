@@ -10,6 +10,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '../../components/icons.jsx'
+import { PageHeader, Panel, ErrorBanner } from '../../components/primitives.jsx'
 import NavIcon from '../../components/admin/NavIcon.jsx'
 import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
 import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
@@ -148,13 +149,14 @@ export default function Masterlist() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 pt-2">
-        <MasterlistIcon className="h-5 w-5 text-gc-accent" />
-        <h1 className="text-lg font-extrabold tracking-wide text-gray-900">MASTERLIST</h1>
-      </div>
-      <p className="mt-0.5 text-sm text-gray-500">View and manage the master list of students.</p>
+      <PageHeader
+        className="pt-2"
+        icon={MasterlistIcon}
+        title="MASTERLIST"
+        description="View and manage the master list of students."
+      />
 
-      <div className="mt-6 rounded-2xl border border-gray-100 p-5 shadow-sm">
+      <Panel className="mt-6 p-5">
         {/* Search + filters */}
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
@@ -190,7 +192,7 @@ export default function Masterlist() {
           />
         </div>
 
-        {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
+        <ErrorBanner message={error} />
 
         {/* Table: only scrolls horizontally on small screens (below md),
             where the min-width kicks in. On desktop the min-width is
@@ -299,7 +301,7 @@ export default function Masterlist() {
             </PageButton>
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   )
 }
