@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import LogbookPanel from "../../components/admin/LogbookPanel";
 import AppointmentsPanel from "../../components/admin/AppointmentsPanel";
+import { PageHeader } from "../../components/primitives.jsx";
+import { DashboardIcon } from "../../components/icons.jsx";
 import { referenceApi } from "../../lib/api.js";
 
 export default function Dashboard() {
@@ -34,10 +36,11 @@ export default function Dashboard() {
     // need a bit more air between them or they read as stacked rather than
     // separate sections.
     <div className="space-y-5">
-      <div>
-        <h1 className="font-serif text-3xl font-semibold text-ink-900">Dashboard</h1>
-        <p className="mt-1 text-base text-ink-500">Overview of today's clinic activity.</p>
-      </div>
+      <PageHeader
+        icon={DashboardIcon}
+        title="DASHBOARD"
+        description="Overview of today's clinic activity."
+      />
 
       <LogbookPanel
         reasonRecords={reasonRecords}
