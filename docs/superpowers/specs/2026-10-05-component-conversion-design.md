@@ -216,8 +216,11 @@ Each step must satisfy all of:
 
 1. `npm run build` succeeds with no new warnings.
 2. Backend reachable; the 24 SPA routes return 200.
-3. **Visual diff on the two migrated pages is empty** — this is the Pass 1 acceptance
-   criterion, checked by screenshot before/after.
+3. **Visual diff is empty on Masterlist** — this is the Pass 1 acceptance
+   criterion, checked by screenshot before/after. **Dashboard is the one
+   documented exception:** its diff must be empty *except* for the §4.2 header
+   block, because converting that serif header is a change this spec mandates
+   rather than a regression. Every other pixel on both pages stays identical.
 4. Authenticated smoke test still passes: admin login → `/api/admins/me` 200; student login →
    own record 200 and `/api/admins/me` 403.
 5. No new occurrences of the anti-pattern: a repo-wide grep for
