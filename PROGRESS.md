@@ -1,38 +1,39 @@
 # Project Progress
-Updated: 2026-09-17 09:55
+Updated: 2026-10-06
 
 ## Current Goal
-1-week scalable refactor — SHIPPED. Pushed to origin/main as 3d08404 (squashed).
+Land the component-conversion proof slice (3 of 7 components adopted) on `refactor/component-conversion` and keep the demo ready for the 2026-10-08 pitch.
 
 ## Steps
 | # | Step | Owner | Status | Notes |
 |---|------|-------|--------|-------|
-| 0 | git pull + resolve merge conflicts | team-lead | DONE | 81268e5 → e89b8cc (rewritten) |
-| 1 | PR #1: DB indexes + Years distinct | backend-developer | DONE | 94e6fa1; SQL run by user in Supabase (Success) |
-| 2 | PR #2: Reports fast-path + mv_daily_reports + pg_cron job 1 | backend-developer | DONE | 0f6471e; SQL run by user (Schedule:1) |
-| 3 | PR #3: Redis + HTTP cache + gunicorn/Docker | backend-developer | DONE | f8a4d32; in-memory fallback active (no redis pkg) |
-| 4 | PR #4: client TTL cache + abort + skeletons + dedupe | general | DONE | 52a2088, 4ba5cd4; build PASS |
-| 5 | Fix clinic-settings Cache-Control prefix | team-lead | DONE | 3566eae; verified live |
-| 6 | Auth 401 regression after restart → clean restart fixed | team-lead | DONE | PID 10664; smoke PASS (login + 3 endpoints 200) |
-| 7 | QA AFTER verification | general | DONE | 7/7 PASS; zero error bodies |
-| 8 | Rebase/merge with teammate redesign (73792b8, ac4f54e) | software-engineer | DONE | merge 7e3e683; perf logic verified 5/5 |
-| 9 | GitHub push-protection block (Groq key in tracked .env) | team-lead | DONE | rewrote branch: .env reverted to origin version, squash 3d08404, local .env restored |
-| 10 | Push to origin/main | team-lead | DONE | ac4f54e..3d08404 |
+| 1 | Audit Vercel readiness | explore | DONE | main.py import-safe; mixed /api + root routes found |
+| 2 | Choose topology | user | DONE | Monorepo confirmed by user |
+| 3 | Frontend /api normalizer | general | DONE | b2e1e6e - toApiUrl(), local dev unchanged |
+| 4 | Backend scaffolding | general | DONE | 3f32caa - api/index.py, api/requirements.txt, vercel.json, .vercelignore |
+| 5 | Fix /api double-prefix 404 | team-lead | DONE | 3b2e7bd - all /api/* routes verified 200 with real admin token |
+| 6 | Push commits to origin | team-lead | PENDING | Those 3 deploy commits are on origin/main (checked 2026-10-06); component-conversion branch (6 commits) not pushed |
+| 7 | Set Vercel env vars | user | PENDING | Dashboard step, see below |
+| 8 | First Vercel deploy | user | PENDING | After push + env vars |
+| 9 | Fix backend proxy env-var issue | user | IN PROGRESS | Under investigation; fix not yet applied, see below |
+| 10 | Proof-slice code review | team-lead | DONE | 45d6bed..364875c; Panel(3) / PageHeader(2) / ErrorBanner(1) adopted; 4 components deferred |
+| 11 | Record deferral in spec | software-engineer | DONE | spec §4.1.1 (status + why) and §6.1 (verification record) |
 
-## Final QA numbers (AFTER vs BASELINE)
-| Endpoint | Baseline | After (warm) | Cache 2nd call |
-|---|---|---|---|
-| masterlist/students p1/15 | 1300 ms | 301-305 ms | n/a (intentional) |
-| masterlist/years | 818 ms | 314-320 ms | n/a |
-| reports today | 485 ms | 355 ms | 239 ms |
-| reports historical | — | 308-433 ms | 151-186 ms |
-- Cache-Control on reports/years/clinic-settings: public, max-age=60, stale-while-revalidate=300 ✓
-- report_breakdown RPC validated against live data (31 appointments grouped correctly)
-- Per-request auth floor ~150-250ms (require_auth → supabase get_user) — future optimization: local JWT verify
-
-## Blockers / Decisions / Open items
-- OPEN: GitHub push protection enabled on repo — ANY commit touching tracked .env with a known secret will be blocked. Options: (a) untrack .env + .gitignore (needs user consent — earlier user said keep .gitignore intentional), (b) rotate the Groq key (it was pasted in chat + pushed earlier in e89b8cc-original... it never reached origin), (c) only commit .env WITHOUT secrets.
-- OPEN: recommend rotating GROQ_API_KEY (exposed in chat transcript) and SUPABASE_SERVICE_ROLE_KEY (in repo-history .env, user's intentional tracking).
-- Redis: activate via pip install redis + REDIS_URL in .env for shared cross-worker cache.
-- Backend currently running: PID 10664 (clean env restart at 09:31; auth verified).
-- Parallel session pushes frequently → prefer git merge over rebase when integrating origin/main.
+## Blockers / Decisions
+- Decision: `Button`/`Badge`/`Field`/`EmptyState` adoption deferred to Pass 2 — spec §2 (zero
+  visual change) and §4.1 (adopt all 7) conflict for these four given the existing markup's
+  inconsistency; documented in spec §4.1.1.
+- Open: backend proxy env-var issue under investigation by the user (backend tested manually
+  with HTTP_PROXY/HTTPS_PROXY/ALL_PROXY set to http://127.0.0.1:9); fix not yet applied.
+- Open: `TEST001` student_id rename pending current-count query.
+- Deferred: security/hardening (incl. SUPABASE_SERVICE_ROLE_KEY rotation — in git history),
+  Vercel deployment (needs user's Vercel auth + manual signoff), color migration to
+  `brand`/`ink`/`signal`.
+- Vercel project not created/linked yet; needs user account access. Required env vars
+  (dashboard): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+  FRONTEND_ORIGINS=https://<project>.vercel.app, and build-time
+  VITE_API_URL=https://<project>.vercel.app, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY.
+- vercel.json sets "framework": null so Vercel does not auto-select Flask and
+  bypass api/index.py.
+- Stale test: tests/test_admin_auth.py expects 404, endpoint returns 200 by design.
+- Out of scope per user: AI agent (groq missing, relative-date bug).
