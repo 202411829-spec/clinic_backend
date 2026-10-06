@@ -10,6 +10,7 @@ import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi } from "../../lib/api.js";
 import { isoToMDY } from "../../lib/calendar.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
+import { Panel } from "../../components/primitives.jsx";
 
 // Backend dateTime is formatted as "MM/DD/YYYY h:mm AM" (or "MM/DD/YYYY HH:MM"
 // for the created_at fallback) — normalize to "YYYY-MM-DD" so the date
@@ -317,7 +318,7 @@ export default function LogbookPanel({
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
+    <Panel className="bg-white border-gray-200 p-4 md:p-4 print:shadow-none print:rounded-none print:border-0 print:p-0">
       {error && (
         <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
           <span>{error}</span>
@@ -527,6 +528,6 @@ export default function LogbookPanel({
           />
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

@@ -17,19 +17,31 @@
 // Note: `PanelHeader` and `StatRail` are pre-existing exports with no
 // importers yet. They still carry Pass 2 tokens and are kept until the
 // deferred cleanup removes them — do not build new pages on them.
+// `StatusBadge` is dead for the same reason: status pills on the dashboard
+// still come from `components/admin/StatusBadge.jsx`, and swapping that over
+// is a visual change (solid pastel pill -> dot + inset ring), so it waits for
+// Pass 2 along with the rest of them.
 
 const cx = (...parts) => parts.filter(Boolean).join(' ')
 
 /* ── Panel ─────────────────────────────────────────────────────────────────
-   The card surface: radius, hairline and shadow live here so no page has to
-   restate them. Padding and spacing stay at the call site — cards size their
-   content differently (p-4, p-5, p-8) and one baked-in padding would fight
-   every other caller. No background either: admin pages sit on a white page
-   (see AdminLayout), so the hairline and shadow are what separate the card
-   from it. */
+   The card surface: radius, hairline width and shadow live here so no page has
+   to restate them. Everything a card shades or spaces differently stays at the
+   call site:
+
+     - padding (p-4, p-5, p-8) — cards size their content differently and one
+       baked-in padding would fight every other caller;
+     - hairline colour (`border-gray-100` on Masterlist, `border-gray-200` on
+       the dashboard widgets) — the existing cards disagree, and baking either
+       shade in would shift the other one a pixel, which Pass 1 forbids. Every
+       call site therefore passes its own `border-gray-*`; Pass 2 unifies them
+       and moves the winner back in here.
+
+   No background either: admin pages sit on a white page (see AdminLayout), so
+   the hairline and shadow are what separate the card from it. */
 export function Panel({ children, className = '', ...rest }) {
   return (
-    <section className={cx('rounded-2xl border border-gray-100 shadow-sm', className)} {...rest}>
+    <section className={cx('rounded-2xl border shadow-sm', className)} {...rest}>
       {children}
     </section>
   )
@@ -48,16 +60,29 @@ export function PanelHeader({ title, subtitle, actions, className = '' }) {
 }
 
 /* ── Page header ───────────────────────────────────────────────────────────
-   The one admin page header: icon, uppercase title, one-line description.
+   The one admin page header: icon, uppercase title, one-line description and
+   an optional right-aligned `actions` slot for page-level buttons (the
+   Requests/New Admin pair on the Admins page is the case that needs it).
+
    The title text is written in upper case by the caller — it is the page's
-   name, not a sentence. `className` carries page-level spacing (pt-2 and
-   friends) so the header itself stays identical on every admin page. */
-export function PageHeader({ icon: Icon, title, description, className = '' }) {
+   name, not a sentence — and `uppercase` on the h1 enforces that in CSS, so a
+   caller cannot drift the single admin title style into sentence case.
+
+   `icon` is optional. With ~13 admin headers coming and no app-wide error
+   boundary, a header that forgot its icon must still render a title rather
+   than throw on a missing component.
+
+   `className` carries page-level spacing (pt-2 and friends) so the header
+   itself stays identical on every admin page. */
+export function PageHeader({ icon: Icon, title, description, actions, className = '' }) {
   return (
     <div className={className}>
-      <div className="flex items-center gap-2">
-        <Icon className="h-5 w-5 text-gc-accent" />
-        <h1 className="text-lg font-extrabold tracking-wide text-gray-900">{title}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          {icon && <Icon className="h-5 w-5 text-gc-accent" />}
+          <h1 className="text-lg font-extrabold tracking-wide uppercase text-gray-900">{title}</h1>
+        </div>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
       {description && <p className="mt-0.5 text-sm text-gray-500">{description}</p>}
     </div>
@@ -209,8 +234,10 @@ export function EmptyState({ title, body, action }) {
 /* ── Error banner ─────────────────────────────────────────────────────────
    The inline failure message that sits under the thing that failed. Renders
    nothing when there is no error, so a page can hand its error state straight
-   in without guarding around it. */
+   in without guarding around it. Vertical spacing is the call site's, same as
+   Panel's padding: a banner under a filter row wants mt-4, one under a table
+   wants something else. */
 export function ErrorBanner({ message, className = '' }) {
   if (!message) return null
-  return <p className={cx('mt-4 text-sm font-medium text-red-600', className)}>{message}</p>
+  return <p className={cx('text-sm font-medium text-red-600', className)}>{message}</p>
 }

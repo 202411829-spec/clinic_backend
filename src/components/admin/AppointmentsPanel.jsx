@@ -6,6 +6,7 @@ import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import { appointmentsApi } from "../../lib/api.js";
+import { Panel } from "../../components/primitives.jsx";
 import { toYMD } from "../../lib/calendar.js";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
@@ -354,7 +355,7 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
+    <Panel className="bg-white border-gray-200 p-4 md:p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
@@ -417,6 +418,6 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
           />
         ))
       )}
-    </section>
+    </Panel>
   );
 }

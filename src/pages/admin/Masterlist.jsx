@@ -156,7 +156,7 @@ export default function Masterlist() {
         description="View and manage the master list of students."
       />
 
-      <Panel className="mt-6 p-5">
+      <Panel className="mt-6 p-5 border-gray-100">
         {/* Search + filters */}
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
@@ -192,7 +192,7 @@ export default function Masterlist() {
           />
         </div>
 
-        <ErrorBanner message={error} />
+        <ErrorBanner message={error} className="mt-4" />
 
         {/* Table: only scrolls horizontally on small screens (below md),
             where the min-width kicks in. On desktop the min-width is
