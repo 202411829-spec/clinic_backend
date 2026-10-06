@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-05
 **Branch:** `refactor/component-conversion`
-**Status:** Approved for Pass 1 (reuse). Pass 2 (color system) deferred.
+**Status:** Pass 1 proof slice complete — 3 of 7 components adopted, 4 deferred to Pass 2
+(§4.1.1). Pass 2 (color system) still deferred.
 **Deadline context:** Presentation 2026-10-08. Main branch stays demo-ready.
 
 ---
@@ -148,6 +149,66 @@ Components to deliver:
 | `PageHeader` | Admin page header, **single style** | 3 competing designs across ~15 sites |
 | `ErrorBanner` | Inline error message | 25 renderings, 3 shapes |
 
+#### 4.1.1 Adoption results and the four deferred components (recorded 2026-10-06)
+
+Status after the first proof slice — six commits on this branch (`45d6bed` spec, `2f2869d`,
+`d164f42`, `2b95196`, `76e4f6f`, `364875c`):
+
+| Component | Call sites | Status |
+|---|---|---|
+| `Panel` | 3 — `AppointmentsPanel`, `LogbookPanel`, `Masterlist` (`76e4f6f`, `2b95196`) | ADOPTED |
+| `PageHeader` | 2 — `Dashboard`, `Masterlist` (`d164f42`, `2b95196`) | ADOPTED |
+| `ErrorBanner` | 1 — `Masterlist` (`2b95196`) | ADOPTED |
+| `Button` | 0 | DEFERRED |
+| `Badge` | 0 | DEFERRED |
+| `Field` | 0 | DEFERRED |
+| `EmptyState` | 0 | DEFERRED |
+
+**Why these four are deferred: §2 and §4.1 cannot both hold for them.**
+
+§2 requires Pass 1 to change zero pixels. §4.1 requires delivering all seven components
+against the markup that already exists. For `Button`, `Badge`, `Field` and `EmptyState`
+those two requirements are mutually exclusive, because the markup they would replace is
+**not consistent to begin with** — §1 counts 67 distinct button class strings, each slightly
+different. A shared component necessarily renders ONE canonical look; absorbing 67
+variations would need a prop per call site. That is a pass-through with extra steps, not an
+abstraction. So the choice is: change pixels (break §2) or reproduce every variation via
+props (no reuse). Neither is Pass 1 work.
+
+Evidence from the code review of this slice:
+
+- **`Button`** — the base alone contributes `btn-press … justify-center … rounded-control
+  font-medium transition-colors duration-150 disabled:*` (`primitives.jsx:112-114`). No
+  button in the migrated files carries that set (none uses `rounded-control` at all), so the
+  class union can only grow — adoption necessarily changes pixels.
+  - Logbook "Print" (`LogbookPanel.jsx:397`): `border-gray-300` / `font-semibold` / `py-2`
+    vs `secondary`+`sm`'s `border-gray-200` / `font-medium` / `py-1.5`.
+  - Logbook "+ Add Walk-in Visit" (`LogbookPanel.jsx:500`): `text-sm … rounded-lg`; nearest
+    fit is `size="lg"`, which injects `text-base` over its `text-sm`.
+- **`Badge`** — the "X / Y Booked" pill (`AppointmentsPanel.jsx:110`) is
+  `px-2.5 py-1 text-xs font-semibold`, solid pastel, no ring, no dot. `Badge` adds
+  `ring-1 ring-inset`, a `text-2xs` size and a child dot (`primitives.jsx:151-155`).
+- **`EmptyState`** — the three empty states live inside `<td>` cells (`Masterlist.jsx:234`,
+  `LogbookPanel.jsx:477`, `LogbookFullPanel.jsx:490`) or a `py-12` div
+  (`AppointmentsPanel.jsx:405`). `EmptyState` renders a `py-14` flex block with a
+  `text-base font-medium text-gray-900` title (`primitives.jsx:226-227`) → pixel change.
+- **`Field`** — the Masterlist search input (`Masterlist.jsx:168`) is `rounded-xl` +
+  `pl-10` icon slot; `Field` is `rounded-control` / `px-3 py-2` with no icon slot
+  (`primitives.jsx:202`).
+
+**The principle.** An abstraction only pays when the things being unified are actually the
+same. Unifying things that merely look similar yields either a canonical look that moves
+every call site, or a prop per call site — a pass-through, not reuse.
+
+**Disposition — Pass 2 (visual normalization).** These four are deferred to a deliberate
+second pass that *accepts* a pixel change: screenshot review before/after, and explicit user
+approval. Not a silent change, and not something to squeeze into Pass 1 under the
+zero-visual-change rule.
+
+**Also in this slice:** the reported defect — Dashboard's serif header vs Masterlist's —
+*is* resolved. Both render the §4.2 reference header via `PageHeader` (`d164f42`,
+`2b95196`).
+
 ### 4.2 Single admin header style
 
 Decision: **one** admin header style — the Masterlist pattern the product owner selected as
@@ -226,6 +287,27 @@ Each step must satisfy all of:
 5. No new occurrences of the anti-pattern: a repo-wide grep for
    `bg-white rounded-2xl` must not increase.
 
+### 6.1 Proof-slice verification record (2026-10-06)
+
+Re-run against the working tree while writing this record:
+
+| Check | Result |
+|---|---|
+| 1. `npm run build` | **exit 0** (7.2s; PWA precache 50 entries) |
+| 2. `/admin/dashboard`, `/admin/masterlist` | **HTTP 200** (Vite dev server, `:5173`) |
+| Backend reachable | `/api/masterlist/students` **200** on `:5000` |
+| 4 (admin side). admin login → `/api/masterlist/students` | **200**, `total=6`, 6 rows |
+| 5. `bg-white rounded-2xl` — Dashboard / Masterlist / LogbookPanel / AppointmentsPanel | **0 / 0 / 0 / 0** |
+| 5 (repo-wide) | `main` 47 → `HEAD` 45 — did not increase |
+
+Not captured for this slice — recorded as not-done rather than assumed:
+
+- Criterion 3 (before/after screenshot diff): no screenshots are checked in for this slice.
+  If it was reviewed manually, the repo does not evidence it.
+- Criterion 4 student half (student login → own record 200, `/api/admins/me` 403): not run
+  for this record.
+- Only the 2 SPA routes this slice touches were re-checked, not all 24.
+
 ---
 
 ## 7. Risk register
@@ -243,6 +325,9 @@ Each step must satisfy all of:
 
 Tracked, not started:
 
+- Pass 2 adoption of `Button`, `Badge`, `Field`, `EmptyState` — 0 call sites after the proof
+  slice; §2 and §4.1 conflict for these four, see §4.1.1. Needs screenshot review + user
+  approval, not a silent change.
 - Pass 2 color migration (`brand`/`ink`/`signal` canonical, offset-safe aliasing, AdminsPanel
   unification)
 - Page-clone deduplication (~900 lines)
