@@ -1,6 +1,8 @@
 // src/components/admin/AppointmentsFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon";
+import { PageHeader } from "../primitives.jsx";
+import { AppointmentsIcon } from "../icons.jsx";
 import StatusBadge from "./StatusBadge";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
@@ -342,19 +344,16 @@ export default function AppointmentsFullPanel({ selectedDate }) {
 
   return (
     <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center">
-            <NavIcon name="calendar" className="w-4 h-4" />
+      <PageHeader
+        icon={AppointmentsIcon}
+        title="APPOINTMENTS"
+        actions={
+          <span className="text-xs font-semibold text-gray-500">
+            {formatLongDate(selectedDate)}
           </span>
-          <h2 className="font-bold text-gc-green text-sm md:text-base">
-            Appointments
-          </h2>
-        </div>
-        <span className="text-xs font-semibold text-gray-500">
-          {formatLongDate(selectedDate)}
-        </span>
-      </div>
+        }
+        className="mb-4"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
         <div className="md:col-span-2 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">

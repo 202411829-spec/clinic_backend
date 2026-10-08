@@ -1,6 +1,8 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon.jsx";
+import { PageHeader } from "../primitives.jsx";
+import { ClinicScheduleIcon } from "../icons.jsx";
 import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
@@ -348,14 +350,7 @@ export default function ClinicScheduleFullPanel() {
   return (
     <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       {/* header */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-          <NavIcon name="calendar" className="w-4 h-4" />
-        </span>
-        <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
-          Clinic Schedule
-        </h1>
-      </div>
+      <PageHeader icon={ClinicScheduleIcon} title="CLINIC SCHEDULE" className="mb-3" />
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">
         {/* left: calendar */}

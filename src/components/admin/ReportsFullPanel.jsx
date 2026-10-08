@@ -1,6 +1,8 @@
 // src/components/admin/ReportsFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "./NavIcon.jsx";
+import { PageHeader } from "../primitives.jsx";
+import { ReportsIcon } from "../icons.jsx";
 import PeriodDropdown from "./PeriodDropdown.jsx";
 import SelectDateCalendar from "./SelectDateCalendar.jsx";
 import Letterhead from "./Letterhead.jsx";
@@ -473,19 +475,12 @@ export default function ReportsFullPanel() {
           ═══════════════════════════════════════════════════════════════ */}
       <div className="print:hidden">
         {/* ─── Page header ─────────────────────────────────────────── */}
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-              <NavIcon name="chart" className="w-5 h-5" />
-            </span>
-            <div>
-              <h1 className="font-bold text-gc-green text-lg md:text-xl leading-tight">
-                Reports
-              </h1>
-              <p className="text-xs text-gray-400 leading-tight">Clinic analytics &amp; statistics</p>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          icon={ReportsIcon}
+          title="REPORTS"
+          description="Clinic analytics & statistics"
+          className="mb-5"
+        />
 
         {/* ─── Filter toolbar ───────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">

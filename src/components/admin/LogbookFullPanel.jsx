@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
 import NavIcon from "./NavIcon.jsx";
+import { PageHeader } from "../primitives.jsx";
+import { LogbookIcon } from "../icons.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import Letterhead from "./Letterhead.jsx";
 import Pagination from "../Pagination.jsx";
@@ -354,23 +356,13 @@ export default function LogbookFullPanel() {
           <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
         </div>
       )}
-      {/* header + Print/PDF toolbar */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4 print:hidden">
-        {/* header — matches the dashboard Logbook widget's card header */}
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-            <NavIcon name="book" className="w-4 h-4" />
-          </span>
-          <div>
-            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
-              Logbook
-            </h1>
-            <p className="text-xs text-gray-400 leading-tight">
-              View history of completed clinic visits.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* header */}
+      <PageHeader
+        icon={LogbookIcon}
+        title="LOGBOOK"
+        description="View history of completed clinic visits."
+        className="mb-4 print:hidden"
+      />
 
       {/* search + filters + export — matches the dashboard Logbook widget toolbar */}
       <div className="flex flex-col gap-2 mb-3 print:hidden">
