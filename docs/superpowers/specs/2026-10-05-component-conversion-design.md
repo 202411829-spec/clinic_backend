@@ -277,11 +277,25 @@ Each step must satisfy all of:
 
 1. `npm run build` succeeds with no new warnings.
 2. Backend reachable; the 24 SPA routes return 200.
-3. **Visual diff is empty on Masterlist** — this is the Pass 1 acceptance
-   criterion, checked by screenshot before/after. **Dashboard is the one
-   documented exception:** its diff must be empty *except* for the §4.2 header
-   block, because converting that serif header is a change this spec mandates
-   rather than a regression. Every other pixel on both pages stays identical.
+3. **Visual diff — judged by intent, not by consequence.** Checked with a
+   DOM/bounding-box diff plus a pixel diff before/after:
+   - **Masterlist:** the visual diff must be empty. (Verified — see §6.2.)
+   - **Dashboard:** the ONLY permitted differences are (a) the §4.2 header block
+     itself, and (b) the normal-flow reflow that the header's height change
+     mechanically causes. Content below the header shifting by a single uniform
+     `dy` with `dx = dw = dh = 0` is **reflow, not drift** — a physical
+     consequence of the conversion §4.2 mandates, not a defect. There is no
+     implementation of §4.2 that avoids it.
+   - **Fails — a real regression:** any element with `dx ≠ 0`, `dw ≠ 0`,
+     `dh ≠ 0`, or a *non-uniform* `dy` (some elements moved while others did
+     not, or they moved by different amounts).
+
+   **The principle — why this criterion is phrased this way.** A verification
+   criterion must be satisfiable by the correct implementation. If the only
+   correct implementation cannot pass the check, the check is broken — it will
+   train the team to wave it through rather than fix the code. This criterion
+   was written wrong twice (the original wording, then the `364875c` rewrite),
+   both times demanding a result the correct implementation cannot produce.
 4. Authenticated smoke test still passes: admin login → `/api/admins/me` 200; student login →
    own record 200 and `/api/admins/me` 403.
 5. No new occurrences of the anti-pattern: a repo-wide grep for
@@ -300,13 +314,41 @@ Re-run against the working tree while writing this record:
 | 5. `bg-white rounded-2xl` — Dashboard / Masterlist / LogbookPanel / AppointmentsPanel | **0 / 0 / 0 / 0** |
 | 5 (repo-wide) | `main` 47 → `HEAD` 45 — did not increase |
 
+**Criterion 3 (visual diff) — NOW captured and complete.** Both migrated pages were
+diffed at `30613ec` (DOM/bounding-box + pixel) and the results are recorded in §6.2.
+This supersedes the "not captured" note that previously stood in its place below.
+
 Not captured for this slice — recorded as not-done rather than assumed:
 
-- Criterion 3 (before/after screenshot diff): no screenshots are checked in for this slice.
-  If it was reviewed manually, the repo does not evidence it.
+- Criterion 3 (before/after screenshot diff): superseded — now captured and complete,
+  see §6.2.
 - Criterion 4 student half (student login → own record 200, `/api/admins/me` 403): not run
   for this record.
 - Only the 2 SPA routes this slice touches were re-checked, not all 24.
+
+### 6.2 Visual-diff record at `30613ec` (2026-10-06)
+
+DOM/bounding-box diff of both migrated pages, with head-vs-head captures to establish the
+noise floor:
+
+| Page | Result | Evidence |
+|---|---|---|
+| Masterlist | **PASS** | 277 → 279 elements; the +2 is exactly the two wrapper `<div>`s `PageHeader` introduces. Every element bounding box Δ=0 except the transparent header root (h32 → h54); the description `<p>` is at x=296 y=106 w=1104 h=20 before and after. Pixel diff vs the post-refactor capture = **6px**, below the head-vs-head control of 10px — i.e. noise. |
+| Dashboard | **PASS under §6 criterion 3** | 305 → 312 elements (+7, all inside the header block, exactly as §4.2 intends). The header shrank 66px → 46px (old `h1 40 + mt-1 4 + p 22`; new `row 24 + mt-0.5 2 + p 20`), so the 188 in-flow elements below it all moved `dy = −20` with `dx = dw = dh = 0` (first card y=158 → 138; stats toolbar y=175 → 155; logbook table y=322 → 302; appointments section y=818 → 798). Sizes and shapes unchanged. Pixel diff = 201,782px against a head-vs-head control of 0px — the pixels really did move, uniformly, because the header got shorter. Reflow, not drift. |
+
+**Defect found and fixed during this verification — the most useful result of the slice.**
+
+- `30613ec` fixed a `ReferenceError: icon is not defined` in `PageHeader`
+  (`src/components/primitives.jsx:82` referenced the pre-rename name after line 77
+  destructured `icon: Icon`). The guard threw at render time and sent `/admin/dashboard`
+  and `/admin/masterlist` to the error boundary.
+- It was introduced by `76e4f6f`, whose message claimed the guard existed so that a
+  forgotten icon "must not white-screen" the admin pages.
+- **Why it shipped:** four checks passed and all four were blind to it. `npm run build`
+  succeeded; both routes returned HTTP 200 (Vite serves `index.html` for any SPA route,
+  so 200 ≠ rendered); the auth smoke test passed; a class-string diff passed (an
+  out-of-scope identifier changes no `className`). Only actually rendering the page
+  caught it — which is precisely what criterion 3 exists for.
 
 ---
 
