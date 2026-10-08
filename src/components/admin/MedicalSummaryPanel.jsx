@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "./NavIcon.jsx";
 import { ChevronLeftIcon } from "../icons.jsx";
+import { PageHeader } from "../primitives.jsx";
 import Letterhead from "./Letterhead.jsx";
 import {
   academicYears,
@@ -14,6 +15,10 @@ import {
 } from "../../data/studentRecordSample.js";
 import { adaptMedicalSummaryYear } from "../../lib/studentAdapter.js";
 import { formatDisplayName, computeBmi } from "../../lib/format.js";
+
+// PageHeader renders its icon as <Icon className="…">; NavIcon takes a `name`
+// instead, so wrap the existing "file" glyph rather than drawing a new one.
+const FileIcon = (props) => <NavIcon name="file" {...props} />;
 
 const RESULT_STYLES = {
   Normal: "bg-green-100 text-green-700",
@@ -363,45 +368,36 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           Back
         </button>
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-            <NavIcon name="file" className="w-5 h-5" />
-          </span>
-          <div>
-            <h1 className="font-bold text-gray-800 text-base md:text-lg leading-tight">
-              Medical Summary
-            </h1>
-            <p className="text-xs text-gray-400 leading-tight mt-0.5">
-              Summary of the student's health information and laboratory results.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 md:flex md:items-center gap-2">
-          <button
-            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
-            className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            Medical Certificate
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-          >
-            <NavIcon name="printer" className="w-4 h-4" />
-            Print
-          </button>
-          <button
-            onClick={handleDownloadPdf}
-            disabled={downloading}
-            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
-          >
-            <NavIcon name="download" className="w-4 h-4" />
-            {downloading ? "Preparing…" : "Download PDF"}
-          </button>
-        </div>
-        </div>
+        <PageHeader
+          icon={FileIcon}
+          title="MEDICAL SUMMARY"
+          description="Summary of the student's health information and laboratory results."
+          actions={
+            <div className="grid grid-cols-3 md:flex md:items-center gap-2">
+              <button
+                onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate`)}
+                className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+              >
+                Medical Certificate
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
+              >
+                <NavIcon name="printer" className="w-4 h-4" />
+                Print
+              </button>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
+              >
+                <NavIcon name="download" className="w-4 h-4" />
+                {downloading ? "Preparing…" : "Download PDF"}
+              </button>
+            </div>
+          }
+        />
       </div>
 
       {/* ---------- student information ---------- */}

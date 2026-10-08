@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
 import { SearchIcon, ShieldIcon, ChevronLeftIcon, ChevronRightIcon } from '../icons.jsx'
+import { PageHeader } from '../primitives.jsx'
 
 const ALLOWED_ROLES = ['nurse', 'doctor']
 const EMAIL_DOMAIN = '@gordoncollege.edu.ph'
@@ -285,37 +286,38 @@ export default function AdminsPanel() {
   return (
     <div className="space-y-5">
       {/* ---------- Header ---------- */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          {/* The "ADMIN MANAGEMENT" eyebrow is gone: a tracked-out all-caps
-              label above a heading that already says the same thing is the
-              commonest generic-admin-template tell, and the sidebar already
-              shows you where you are. */}
-          <h1 className="font-serif text-3xl font-semibold text-ink-900">Admins &amp; staff</h1>
-          <p className="mt-1 text-base text-ink-500">Nurse and doctor accounts for the Health Services portal.</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setShowRequests(true)}
-            className="btn-press relative inline-flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 shadow-e1 hover:bg-ink-50"
-          >
-            <BellIcon className="h-4 w-4 text-ink-500" />
-            Requests
-            {pendingTotal > 0 && (
-              <span className="tnum absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-signal-amber px-1 text-2xs font-semibold leading-none text-white ring-2 ring-canvas">
-                {pendingTotal > 99 ? '99+' : pendingTotal}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { setShowAdd(true); setAddError(''); setAddSuccess('') }}
-            className="btn-press inline-flex items-center gap-2 rounded-control bg-brand-900 px-3.5 py-2 text-sm font-medium text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950"
-          >
-            <PlusIcon className="h-4 w-4" />
-            New Admin
-          </button>
-        </div>
-      </div>
+      {/* The "ADMIN MANAGEMENT" eyebrow is gone: a tracked-out all-caps
+          label above a heading that already says the same thing is the
+          commonest generic-admin-template tell, and the sidebar already
+          shows you where you are. */}
+      <PageHeader
+        icon={ShieldIcon}
+        title="ADMINS & STAFF"
+        description="Nurse and doctor accounts for the Health Services portal."
+        actions={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowRequests(true)}
+              className="btn-press relative inline-flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 shadow-e1 hover:bg-ink-50"
+            >
+              <BellIcon className="h-4 w-4 text-ink-500" />
+              Requests
+              {pendingTotal > 0 && (
+                <span className="tnum absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-signal-amber px-1 text-2xs font-semibold leading-none text-white ring-2 ring-canvas">
+                  {pendingTotal > 99 ? '99+' : pendingTotal}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setShowAdd(true); setAddError(''); setAddSuccess('') }}
+              className="btn-press inline-flex items-center gap-2 rounded-control bg-brand-900 px-3.5 py-2 text-sm font-medium text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950"
+            >
+              <PlusIcon className="h-4 w-4" />
+              New Admin
+            </button>
+          </div>
+        }
+      />
 
       {/* ---------- Stat strip ---------- */}
       <StatRail

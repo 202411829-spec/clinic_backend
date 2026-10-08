@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
+import { PageHeader } from '../../components/primitives.jsx'
+import { MasterlistIcon } from '../../components/icons.jsx'
 
 function RoleBadge({ role }) {
   return (
@@ -95,7 +97,9 @@ export default function AdminProfile() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+      {/* The sidebar gives Profile the "user" glyph (adminNav.js); the only
+          person artwork in icons.jsx is the one Masterlist also uses. */}
+      <PageHeader icon={MasterlistIcon} title="PROFILE" />
 
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
 
