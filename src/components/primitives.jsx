@@ -79,7 +79,7 @@ export function PageHeader({ icon: Icon, title, description, actions, className 
     <div className={className}>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          {icon && <Icon className="h-5 w-5 text-gc-accent" />}
+          {Icon && <Icon className="h-5 w-5 text-gc-accent" />}
           <h1 className="text-lg font-extrabold tracking-wide uppercase text-gray-900">{title}</h1>
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
