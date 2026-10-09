@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from database import supabase
 from routers.auth_guard import require_auth, require_admin, sanitize_search, ensure_student_access
-from routers.helpers import execute_with_retry
+from routers.helpers import execute_with_retry, normalize_student_id
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,12 @@ def get_students():
 @require_auth
 def get_student(student_id):
 
-    denied = ensure_student_access(student_id)
+    # The stored id is canonical (uppercase); the path carries the
+    # lowercase email local part. Normalize before the case-sensitive
+    # PostgREST .eq() or "test001" misses the TEST001 row (S-1).
+    sid = normalize_student_id(student_id)
+
+    denied = ensure_student_access(sid)
     if denied:
         return denied
 
@@ -117,7 +122,7 @@ def get_student(student_id):
             supabase
             .table("student_masterlist")
             .select("*")
-            .eq("student_id", student_id)
+            .eq("student_id", sid)
             .maybe_single()
         )
 

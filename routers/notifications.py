@@ -13,7 +13,7 @@ import logging
 from flask import Blueprint, jsonify
 
 from database import supabase
-from routers.helpers import execute_with_retry
+from routers.helpers import execute_with_retry, normalize_student_id
 from routers.auth_guard import require_auth, ensure_student_access
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,12 @@ def _format_changed_at(changed_at):
 @require_auth
 def get_notifications(student_id):
 
-    denied = ensure_student_access(student_id)
+    # The stored id is canonical (uppercase); the path carries the
+    # lowercase email local part. Normalize before the case-sensitive
+    # PostgREST .eq() or "test001" misses the TEST001 appointments (S-1).
+    sid = normalize_student_id(student_id)
+
+    denied = ensure_student_access(sid)
     if denied:
         return denied
 
@@ -71,7 +76,7 @@ def get_notifications(student_id):
             supabase
             .table("appointments")
             .select("appointment_id, appointment_date, appointment_time")
-            .eq("student_id", student_id)
+            .eq("student_id", sid)
         )
 
         appointments = appt_response.data or []

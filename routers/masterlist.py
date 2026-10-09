@@ -15,7 +15,7 @@ from typing import Optional, Literal
 
 from supabase_client import supabase
 from routers.auth_guard import require_auth, require_admin, sanitize_search, ensure_student_access
-from routers.helpers import error_response, execute_with_retry
+from routers.helpers import error_response, execute_with_retry, normalize_student_id
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,12 @@ def get_student_summary(student_id: str):
     Lightweight lookup used when a row is clicked (before navigating into
     the full Student Record page, which is a separate module).
     """
-    denied = ensure_student_access(student_id)
+    # The stored id is canonical (uppercase); the path carries the
+    # lowercase email local part. Normalize before the case-sensitive
+    # PostgREST .eq() or "test001" misses the TEST001 row (S-1).
+    sid = normalize_student_id(student_id)
+
+    denied = ensure_student_access(sid)
     if denied:
         return denied
 
@@ -112,7 +117,7 @@ def get_student_summary(student_id: str):
         response = execute_with_retry(
             supabase.table("student_masterlist")
             .select("*")
-            .eq("student_id", student_id)
+            .eq("student_id", sid)
             .maybe_single()
         )
     except Exception as e:

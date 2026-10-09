@@ -21,7 +21,7 @@ from routers.helpers import (
     get_latest_status_for_appointments,
     handle_errors,
 )
-from routers.auth_guard import require_auth, require_admin, resolve_student_id
+from routers.auth_guard import require_auth, require_admin, resolve_student_id, ensure_student_access
 
 logger = logging.getLogger(__name__)
 
@@ -464,6 +464,14 @@ def _write_status(appointment_id, previous_status, new_status, remarks, changed_
 @handle_errors("Appointment error")
 def get_appointments():
 
+    # IDOR defense: students may only list THEIR OWN appointments
+    # (admin passes; a student without a student_id filter, or with
+    # someone else's, gets 403). ensure_student_access also allows an
+    # admin passing a student_id filter to scope to that student.
+    denied = ensure_student_access(request.args.get("student_id"))
+    if denied:
+        return denied
+
     requested_date = request.args.get("date")
     student_id = request.args.get("student_id")
     date_from = request.args.get("date_from")
@@ -591,6 +599,12 @@ def get_appointment(appointment_id):
             "success": False,
             "error": "Appointment not found"
         }), 404
+
+    # IDOR defense: students may only read their OWN appointment
+    # (admin passes; otherwise 403 — same shared guard as the list).
+    denied = ensure_student_access(appointments[0].get("student_id"))
+    if denied:
+        return denied
 
     return jsonify({
         "success": True,

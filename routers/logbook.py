@@ -472,6 +472,16 @@ def _count_scoped_logs(select_str, embedded_filters, appointment_ids):
 @handle_errors("Logbook error")
 def get_logbook():
 
+    # IDOR defense: the roster is staff/admin data. A student may only
+    # read THEIR OWN visit logs — pass ?student_id=<own id> (admin may
+    # pass any student's id to scope, or none to see everything).
+    # ensure_student_access enforces: admin -> allow; student with own
+    # id -> allow; student with a foreign/missing filter -> 403.
+    requested_student_id = request.args.get("student_id")
+    denied = ensure_student_access(requested_student_id)
+    if denied:
+        return denied
+
     # --- Parse query params (same contract as before) ---
     search = request.args.get("search", "").strip()
     date_from = request.args.get("date_from")
@@ -489,7 +499,24 @@ def get_logbook():
     if search:
         appointment_ids = _search_appointment_ids(search)
 
-    # Nothing matched the free-text search — short-circuit.
+    # --- Student scope narrows to that student's appointments ---
+    # Reached only when ensure_student_access allowed the request:
+    # a student reading their own rows, or an admin filtering by
+    # student. Uses the same bounded appointment-id leg as the
+    # free-text search — never a full-table read.
+    if requested_student_id is not None:
+        scoped_ids = _collected_ids(
+            supabase.table("appointments")
+            .select("appointment_id")
+            .eq("student_id", normalize_student_id(requested_student_id))
+        )
+        if appointment_ids is not None:
+            wanted = set(appointment_ids)
+            scoped_ids = [aid for aid in scoped_ids if aid in wanted]
+        appointment_ids = scoped_ids
+
+    # Nothing matched the free-text search or the student scope —
+    # short-circuit.
     if appointment_ids == []:
         return jsonify({
             "success": True,
@@ -715,6 +742,27 @@ def get_logbook_entry(log_id):
         }), 404
 
     log_row = logs[0]
+
+    # IDOR defense: the log's student is its appointment's student.
+    # Walk-in logs with no student_id resolve to None, so only admins
+    # can read them (ensure_student_access: admin -> allow; student
+    # -> allow only for their own id; otherwise 403).
+    owner_student_id = None
+    if log_row.get("appointment_id"):
+        owner_response = execute_with_retry(
+            supabase
+            .table("appointments")
+            .select("student_id")
+            .eq("appointment_id", log_row["appointment_id"])
+            .maybe_single()
+        )
+        owner = owner_response.data or {}
+        owner_student_id = owner.get("student_id")
+
+    denied = ensure_student_access(owner_student_id)
+    if denied:
+        return denied
+
     (
         appointments_by_id,
         students_by_id,
