@@ -23,6 +23,7 @@ Land the component-conversion proof slice (3 of 7 components adopted) on `refact
 | 14 | Fix student IDOR on GET endpoints | software-engineer | DONE | de2bf5a - shared guard `ensure_student_access()` (routers/auth_guard.py:213): admin OR self → allow, else 403; applied to 11 routes across feedback.py, logbook.py, masterlist.py, notifications.py, student.py, student_record.py; roster endpoints admin-only. Tests: tests/test_idor_authorization.py (11 tests, fail pre-fix). Full suite 35 passed / 1 pre-existing failure (see stale-test note). External review APPROVED |
 | 15 | Unify admin headers on shared PageHeader | software-engineer | DONE | 84ee22e + 70161f7 - all 9 admin pages converted (Dashboard, Masterlist, Admins & Staff, Profile, Medical Summary, Logbook, Reports, Clinic Schedule, Appointments); every page verifiably renders: no ErrorBoundary, no ReferenceErrors, §6.3 box-level PASS |
 | 16 | S-1 case-normalization + residual appointment/logbook IDOR | software-engineer | DONE | 5e5a39e - (a) lookups normalized at handler top with the same helper `ensure_student_access` uses: `test001` (lowercase) now reads own profile; the upstream guard was already normalized, downstream `.eq("student_id", ...)` sites were the break. (b) admin-or-self enforcement added via `ensure_student_access()` to `/appointments?student_id=`, `/appointments/<id>`, `/logbook` (roster), `/logbook/<log_id>`; public/anonymous endpoints (slot preview) untouched. Tests: tests/test_student_id_case_normalization.py (7) + tests/test_appointment_logbook_idor.py (21), both fail pre-fix. Suite: 63 passed / 1 pre-existing failure (stale-test note below). Live curl-verified: S-1 → 200 returning TEST001; A→B logbook/appointments → 403; own data → 200; admin cross → 200 |
+| 17 | Email code delivery fixed (Gmail SMTP) | software-engineer | DONE | eb8aece - root cause: all 3 code-send endpoints (student signup `/api/auth/send-code`, admin signup `/api/auth/admin/send-code`, forgot password `/api/auth/forgot/send-code`) returned fake 200 "sent" while only logging the 6-digit code — `.env` had no SMTP creds and no RESEND_API_KEY — so a new student was hard-stuck at signup step 2 (code mandatory, never delivered) and admin signup stuck the same way. Fix: `_send_email_via_smtp` in `routers/auth.py` now Gmail-ready (env read at call time: SMTP_HOST default smtp.gmail.com, SMTP_PORT default 587, SMTP_USE_TLS default true → STARTTLS, SMTP_USER, SMTP_PASSWORD, SMTP_FROM default = SMTP_USER); the 3 endpoints now return an honest 500 error envelope when both SMTP and Resend fail (no more fake 200); code storage/validation unchanged. Frontend already renders `body.error` — no src changes needed. Gmail creds now in local `.env` (SMTP_USER=202311330@gordoncollege.edu.ph + App Password) — UNCOMMITTED, `.env` must not be committed. Proof: live POST `/api/auth/forgot/send-code` → 200 + log `SMTP email sent to 202311330@gordoncollege.edu.ph`, receipt confirmed in inbox. Tests: tests/test_auth_email_delivery.py (8, fail-before-pass, incl. Gmail pin: host/587/starttls/login/from/body-has-code). Suite: 71 passed / 1 pre-existing failure (stale-test note below) |
 
 ## Blockers / Decisions
 - Decision: `Button`/`Badge`/`Field`/`EmptyState` adoption deferred to Pass 2 — spec §2 (zero
@@ -51,6 +52,13 @@ Land the component-conversion proof slice (3 of 7 components adopted) on `refact
   self-heals; not reproduced in later runs.
 - Known open S-3: `/admin/about` — dead desktop button (Sidebar.jsx:121), mobile 404;
   `/admin/pending` has no nav link.
+- Known open (invite deadlock, owner: unassigned — deferred; flagged during the email
+  investigation): "New Admin" invite → invited email hits 409 on `/admin/signup`
+  ("signup request already exists") while activate 409s back ("must complete signup");
+  no path sets a password for invited rows; invite sends no email by design.
+- Known open (cosmetic, candidate for later fix): admin + student signup step 2 is
+  length-only fake verification client-side (user bounced back after entering the
+  password).
 - Known open N-2: `202500901` has no `app_accounts` row (6 rows: 1 admin + 5 students)
   — currently works via email-local-part fallback in `resolve_student_id`
   (auth_guard.py:200-205), which is slated for removal; reconcile before removal.
@@ -60,19 +68,23 @@ Land the component-conversion proof slice (3 of 7 components adopted) on `refact
   spec §4.2 lists for conversion — left unconverted this slice.
 - Open: `TEST001` student_id rename pending — decision on current appointment-count
   query first; the row stays `TEST001` for now (case fix means lowercase lookups work).
-- Deferred: security/hardening (incl. `.env` tracked and SUPABASE_SERVICE_ROLE_KEY
-  rotation — in git history), Vercel deployment (needs user's Vercel auth + manual
+- Deferred: security/hardening (incl. `.env` tracked — now carries SMTP creds too, plus
+  SUPABASE_SERVICE_ROLE_KEY rotation — both in git history; slightly more urgent since
+  the Gmail App Password is new), Vercel deployment (needs user's Vercel auth + manual
   signoff), color migration to `brand`/`ink`/`signal` (`Button`/`Badge`/`Field`/
-  `EmptyState` deferred per spec §4.1.1), merge to main.
+  `EmptyState` deferred per spec §4.1.1), merge to main, walkthrough of the 9 unified
+  admin pages still owed.
 - Vercel project not created/linked yet; needs user account access. Required env vars
   (dashboard): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
   FRONTEND_ORIGINS=https://<project>.vercel.app, and build-time
   VITE_API_URL=https://<project>.vercel.app, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY.
 - vercel.json sets "framework": null so Vercel does not auto-select Flask and
   bypass api/index.py.
-- Stale test: tests/test_admin_auth.py:18 expects 404, endpoint returns 200 by design —
-  1 pre-existing failure at baseline, unrelated to the fixes (full suite:
-  63 passed / 1 failed).
+- Stale test (expected/pre-existing): `tests/test_admin_auth.py::test_admin_check_email_not_invited`
+  asserts the removed email allowlist (expects 404 "Not invited"; endpoint now returns
+  200 available by design — `routers/auth.py:774` "no allowlist — any
+  @gordoncollege.edu.ph can request"). Deliberately left failing; unrelated to the
+  fixes. Full suite: 71 passed / 1 failed (this one).
 - Tooling note: run pytest as `python -m pytest` directly — the `rtk` shell wrapper
   breaks test collection ("No tests collected").
 - Status note: backend running PID 15444 on :5000 (verified 2026-10-06).
