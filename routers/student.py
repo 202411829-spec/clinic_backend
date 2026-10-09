@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from database import supabase
-from routers.auth_guard import require_auth, sanitize_search
+from routers.auth_guard import require_auth, require_admin, sanitize_search, ensure_student_access
 from routers.helpers import execute_with_retry
 
 logger = logging.getLogger(__name__)
@@ -25,13 +25,17 @@ student_bp = Blueprint(
 # students + departments + courses source the masterlist module uses —
 # instead of the raw `students` table,
 # so every consumer sees consistent joined fields.
+#
+# Admin-only: full roster with PII. No frontend caller exists (the UI's
+# roster goes through /api/masterlist/students, itself admin-only); the
+# only callers are admin-header test scripts.
 # ============================================================
 
 @student_bp.route(
     "/students",
     methods=["GET"]
 )
-@require_auth
+@require_admin
 def get_students():
 
     try:
@@ -103,6 +107,10 @@ def get_students():
 )
 @require_auth
 def get_student(student_id):
+
+    denied = ensure_student_access(student_id)
+    if denied:
+        return denied
 
     try:
         response = execute_with_retry(

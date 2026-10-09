@@ -23,7 +23,7 @@ from routers.helpers import (
     handle_errors,
     _SEARCH_SCAN_CAP,
 )
-from routers.auth_guard import require_auth, require_admin
+from routers.auth_guard import require_auth, require_admin, ensure_student_access
 
 logger = logging.getLogger(__name__)
 
@@ -615,6 +615,10 @@ def get_logbook_by_student(student_id):
             "count": 0,
             "logbook": []
         })
+
+    denied = ensure_student_access(sid)
+    if denied:
+        return denied
 
     appointment_response = execute_with_retry(
         supabase

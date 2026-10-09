@@ -14,7 +14,7 @@ from flask import Blueprint, jsonify
 
 from database import supabase
 from routers.helpers import execute_with_retry
-from routers.auth_guard import require_auth
+from routers.auth_guard import require_auth, ensure_student_access
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,10 @@ def _format_changed_at(changed_at):
 )
 @require_auth
 def get_notifications(student_id):
+
+    denied = ensure_student_access(student_id)
+    if denied:
+        return denied
 
     try:
 

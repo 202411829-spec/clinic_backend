@@ -15,7 +15,7 @@ from flask import Blueprint, g, jsonify, request
 from datetime import date
 
 from database import supabase
-from routers.auth_guard import require_auth, require_admin, resolve_student_id, is_admin_user
+from routers.auth_guard import require_auth, require_admin, resolve_student_id, is_admin_user, ensure_student_access
 from routers.helpers import execute_with_retry, normalize_student_id
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,10 @@ def get_student_record_header(student_id):
     sid = normalize_student_id(student_id)
     if not sid:
         return _error("Student not found", 404)
+
+    denied = ensure_student_access(sid)
+    if denied:
+        return denied
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         profile_fut = executor.submit(
@@ -210,9 +214,12 @@ FINDING_FIELDS = ["skin", "heent", "heart", "abdomen", "extremities", "other_fin
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/physical-examination", methods=["GET"])
 @require_auth
 def get_physical_examination(annual_exam_id):
-    _, error = _get_annual_exam_or_404(annual_exam_id)
+    exam, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
         return error
+    denied = ensure_student_access(exam["student_id"])
+    if denied:
+        return denied
     response = execute_with_retry(
         supabase.table("physical_examinations")
         .select("*")
@@ -303,6 +310,15 @@ def save_physical_examination(annual_exam_id):
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/lab-results", methods=["GET"])
 @require_auth
 def get_lab_results(annual_exam_id):
+    # Ownership is derived from the annual exam row (exam -> student).
+    # When the exam doesn't exist there is no data to leak, so fall
+    # through to the existing 409 handling below.
+    exam, exam_error = _get_annual_exam_or_404(annual_exam_id)
+    if exam_error is None:
+        denied = ensure_student_access(exam["student_id"])
+        if denied:
+            return denied
+
     physical_exam, error = _get_physical_exam_or_409(annual_exam_id)
     if error:
         return error
@@ -396,6 +412,14 @@ def save_lab_results(annual_exam_id):
 @student_record_bp.route("/annual-exams/<int:annual_exam_id>/diagnosis", methods=["GET"])
 @require_auth
 def get_diagnosis(annual_exam_id):
+    # Ownership comes from the annual exam row; a nonexistent exam has
+    # no certificate to leak, so keep the existing null response.
+    exam, exam_error = _get_annual_exam_or_404(annual_exam_id)
+    if exam_error is None:
+        denied = ensure_student_access(exam["student_id"])
+        if denied:
+            return denied
+
     response = execute_with_retry(
         supabase.table("medical_certificates")
         .select("*")
@@ -463,6 +487,9 @@ def get_medical_certificate(annual_exam_id):
     exam, error = _get_annual_exam_or_404(annual_exam_id)
     if error:
         return error
+    denied = ensure_student_access(exam["student_id"])
+    if denied:
+        return denied
 
     profile = execute_with_retry(
         supabase.table("student_masterlist")
@@ -492,6 +519,10 @@ def get_medical_summary(student_id):
     sid = normalize_student_id(student_id)
     if not sid:
         return _error("Student not found", 404)
+
+    denied = ensure_student_access(sid)
+    if denied:
+        return denied
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         profile_fut = executor.submit(

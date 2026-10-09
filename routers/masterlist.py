@@ -14,7 +14,7 @@ from flask import Blueprint, jsonify, request
 from typing import Optional, Literal
 
 from supabase_client import supabase
-from routers.auth_guard import require_auth, sanitize_search
+from routers.auth_guard import require_auth, require_admin, sanitize_search, ensure_student_access
 from routers.helpers import error_response, execute_with_retry
 
 logger = logging.getLogger(__name__)
@@ -34,8 +34,12 @@ SORTABLE_COLUMNS = {
 
 
 @blueprint.route("/students", methods=["GET"])
-@require_auth
+@require_admin
 def list_students():
+    # Full-roster read (names, contact numbers, birth dates). The only
+    # consumer is the admin Masterlist page (src/pages/admin/Masterlist.jsx
+    # -> masterlistApi.listStudents); no student-side caller exists, so
+    # this is admin-only.
     search: Optional[str] = sanitize_search(request.args.get("search"))
     department_id: Optional[int] = request.args.get("department_id", type=int)
     course_id: Optional[int] = request.args.get("course_id", type=int)
@@ -100,6 +104,10 @@ def get_student_summary(student_id: str):
     Lightweight lookup used when a row is clicked (before navigating into
     the full Student Record page, which is a separate module).
     """
+    denied = ensure_student_access(student_id)
+    if denied:
+        return denied
+
     try:
         response = execute_with_retry(
             supabase.table("student_masterlist")

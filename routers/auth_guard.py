@@ -21,11 +21,12 @@ admin identity (Blockers B/C).
 
 import logging
 from functools import wraps
+from types import SimpleNamespace
 
 from flask import g, jsonify, request
 
 from database import supabase
-from routers.helpers import execute_with_retry
+from routers.helpers import execute_with_retry, normalize_student_id
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,44 @@ def resolve_student_id(user):
         return email.split("@")[0]
 
     return None
+
+
+def ensure_student_access(target_student_id):
+    """
+    Authorization guard for endpoints that return data scoped to a
+    student_id (IDOR defense).
+
+    `require_auth` proves *who* the caller is; this proves *whether*
+    they may read this particular student's data. Returns None when
+    access is allowed, otherwise a (body, 403) response the handler
+    returns straight through:
+
+        denied = ensure_student_access(sid)
+        if denied:
+            return denied
+
+    Mirrors the ownership check on PATCH /api/records/<sid>/profile
+    (routers/student_record.py): admin first — so the email-local-part
+    fallback can't misclassify admin@gordoncollege.edu.ph as a foreign
+    student — then the caller's own student_id. 403 (not 401) because
+    the caller IS authenticated; not 404 because that would leak
+    whether the target record exists.
+    """
+    auth_user = SimpleNamespace(
+        id=g.user.get("id"),
+        email=g.user.get("email"),
+    )
+
+    if is_admin_user(auth_user):
+        return None
+
+    caller_student_id = resolve_student_id(auth_user)
+    if caller_student_id is not None and normalize_student_id(
+        caller_student_id
+    ) == normalize_student_id(target_student_id):
+        return None
+
+    return _forbidden("You can only view your own record")
 
 
 # ============================================================

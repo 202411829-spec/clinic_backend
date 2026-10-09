@@ -29,7 +29,7 @@ from flask import Blueprint, g, jsonify, request
 
 from database import supabase
 from routers.helpers import execute_with_retry
-from routers.auth_guard import require_auth, resolve_student_id
+from routers.auth_guard import require_auth, resolve_student_id, ensure_student_access
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,10 @@ def _format_created_at(created_at):
 )
 @require_auth
 def get_feedback(student_id):
+
+    denied = ensure_student_access(student_id)
+    if denied:
+        return denied
 
     try:
 
