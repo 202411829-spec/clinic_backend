@@ -147,39 +147,55 @@ def _find_auth_user_by_email(email: str):
 
 
 def _send_email_via_smtp(to_email: str, code: str) -> bool:
-    """Send verification code email via Gmail SMTP. Returns True on success."""
+    """Send verification code email via SMTP (Gmail by default).
+
+    Config (read from env at call time): SMTP_HOST, SMTP_PORT, SMTP_USER,
+    SMTP_PASSWORD, SMTP_FROM (defaults to SMTP_USER), SMTP_USE_TLS
+    (default true -> STARTTLS on 587; "false" -> implicit TLS on 465).
+
+    Returns True only when the server accepted the message.
+    Never raises — callers fall back to Resend on False.
+    """
     smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_port_raw = os.environ.get("SMTP_PORT", "587")
     smtp_user = os.environ.get("SMTP_USER", "")
     smtp_password = os.environ.get("SMTP_PASSWORD", "")
+    smtp_from = os.environ.get("SMTP_FROM", "").strip() or smtp_user
+    use_tls = os.environ.get("SMTP_USE_TLS", "true").strip().lower() != "false"
 
     if not smtp_user or not smtp_password:
         logger.warning("SMTP credentials not configured — skipping SMTP send")
         return False
 
-    msg = MIMEMultipart("alternative")
-    msg["From"] = smtp_user
-    msg["To"] = to_email
-    msg["Subject"] = "Your Gordon College Clinic verification code"
-
-    html_body = (
-        f"<p>Your verification code is: <strong>{code}</strong></p>"
-        f"<p>This code expires in 5 minutes.</p>"
-    )
-    msg.attach(MIMEText(html_body, "html"))
-
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, to_email, msg.as_string())
+        smtp_port = int(smtp_port_raw)
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = smtp_from
+        msg["To"] = to_email
+        msg["Subject"] = "Your Gordon College Clinic verification code"
+        # Same wording as the Resend branch so the user experience
+        # is identical regardless of which provider delivers.
+        msg.attach(MIMEText(
+            f"Your verification code is: {code}\n\n"
+            "This code expires in 5 minutes.",
+            "plain",
+        ))
+
+        if use_tls:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP_SSL(smtp_host, 465) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, to_email, msg.as_string())
+
         logger.info("SMTP email sent to %s", to_email)
         return True
-    except smtplib.SMTPAuthenticationError as exc:
-        logger.error("SMTP authentication failed: %r", exc)
-        return False
     except Exception as exc:
-        logger.warning("SMTP send failed for %s: %r", to_email, exc)
+        logger.warning("SMTP send failed: %s", exc)
         return False
 
 
@@ -296,9 +312,9 @@ def send_code():
     logger.debug("DEBUG verification code for %s: %s", email, code)
 
     # --- send email: try SMTP first, then fallback to Resend ---
-    smtp_ok = _send_email_via_smtp(email, code)
+    delivered = _send_email_via_smtp(email, code)
 
-    if not smtp_ok:
+    if not delivered:
         # Fallback: try Resend if configured
         api_key = os.environ.get("RESEND_API_KEY", "").strip()
         if api_key and resend is not None:
@@ -314,15 +330,21 @@ def send_code():
                     ),
                 })
                 logger.info("Resend email sent to %s", email)
+                delivered = True
             except Exception as exc:
                 logger.warning("Resend email failed for %s: %r", email, exc)
-        else:
-            logger.warning(
-                "No email provider available — code for %s logged only: %s",
-                email, code,
-            )
-    else:
-        logger.info("Verification code sent to %s via SMTP", email)
+
+    if not delivered:
+        # Keep the code visible in logs for debugging, but be honest
+        # with the client — no provider actually accepted the email.
+        logger.warning(
+            "No email provider available — code for %s logged only: %s",
+            email, code,
+        )
+        return error_response(
+            "Could not send the verification email. Please try again or contact the clinic.",
+            500,
+        )
 
     return jsonify({"success": True, "message": "Verification code sent"}), 200
 
@@ -631,9 +653,9 @@ def forgot_send_code():
     logger.debug("DEBUG forgot code for %s: %s", email, code)
 
     # --- send email: try SMTP first, then fallback to Resend ---
-    smtp_ok = _send_email_via_smtp(email, code)
+    delivered = _send_email_via_smtp(email, code)
 
-    if not smtp_ok:
+    if not delivered:
         api_key = os.environ.get("RESEND_API_KEY", "").strip()
         if api_key and resend is not None:
             try:
@@ -648,15 +670,19 @@ def forgot_send_code():
                     ),
                 })
                 logger.info("Resend email sent to %s", email)
+                delivered = True
             except Exception as exc:
                 logger.warning("Resend email failed for %s: %r", email, exc)
-        else:
-            logger.warning(
-                "No email provider available — forgot code for %s logged only: %s",
-                email, code,
-            )
-    else:
-        logger.info("Forgot password code sent to %s via SMTP", email)
+
+    if not delivered:
+        logger.warning(
+            "No email provider available — forgot code for %s logged only: %s",
+            email, code,
+        )
+        return error_response(
+            "Could not send the verification email. Please try again or contact the clinic.",
+            500,
+        )
 
     return jsonify({"success": True, "message": "Verification code sent"}), 200
 
@@ -819,8 +845,8 @@ def admin_send_code():
     _record_admin_send(email, code)
     logger.debug("DEBUG admin signup code for %s: %s", email, code)
 
-    smtp_ok = _send_email_via_smtp(email, code)
-    if not smtp_ok:
+    delivered = _send_email_via_smtp(email, code)
+    if not delivered:
         api_key = os.environ.get("RESEND_API_KEY", "").strip()
         if api_key and resend is not None:
             try:
@@ -832,10 +858,16 @@ def admin_send_code():
                     "html": f"<p>Your admin verification code is: <strong>{code}</strong></p><p>This code expires in 5 minutes.</p>",
                 })
                 logger.info("Resend admin code sent to %s", email)
+                delivered = True
             except Exception as exc:
                 logger.warning("Resend admin code failed for %s: %r", email, exc)
-        else:
-            logger.warning("No email provider -- admin code for %s logged only: %s", email, code)
+
+    if not delivered:
+        logger.warning("No email provider -- admin code for %s logged only: %s", email, code)
+        return error_response(
+            "Could not send the verification email. Please try again or contact the clinic.",
+            500,
+        )
 
     return jsonify({"success": True, "message": "Code sent"}), 200
 
