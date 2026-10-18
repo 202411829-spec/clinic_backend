@@ -4,8 +4,8 @@
 // button on the Student Record page.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "./NavIcon.jsx";
-import { ChevronLeftIcon } from "../icons.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
+import { ChevronLeftIcon } from "../ui/icons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import {
   academicYears,

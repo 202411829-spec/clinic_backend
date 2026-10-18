@@ -1,7 +1,7 @@
 // src/components/student/StudentSidebarContent.jsx
 import { NavLink } from "react-router-dom";
-import NavIcon from "../admin/NavIcon";
-import LogoutMenu from "../LogoutMenu";
+import NavIcon from "../ui/NavIcon";
+import LogoutMenu from "../auth/LogoutMenu";
 import { studentMainNav } from "../../data/studentNav";
 
 /**
@@ -27,12 +27,12 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
           <img
             src="/gordon-college-badge.png"
             alt="Gordon College seal"
-            className="h-16 w-16 shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 rounded-2xl object-contain"
           />
           <img
             src="/health-service-badge.png"
             alt="Health Service Unit seal"
-            className="h-16 w-16 shrink-0 object-contain"
+            className="h-16 w-16 shrink-0 rounded-2xl object-contain"
           />
         </div>
         <div className="text-center leading-tight">
@@ -46,10 +46,10 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
         </div>
       </div>
 
-      <div className="mx-4 border-t border-white/30" />
+      <div className="mx-4 h-px bg-white/15" />
 
       <nav className="flex-1 overflow-y-auto px-2 pt-5">
-        <p className="px-4 text-[11px] font-bold tracking-wider text-white/80 uppercase mb-2">
+        <p className="px-4 text-[11px] font-bold tracking-wider text-white/60 uppercase mb-2">
           Main
         </p>
         {/* Sidebar mounts once per session (outside the routed <Outlet />),
@@ -65,10 +65,10 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
                 style={{ animationDelay: `${i * 35}ms` }}
                 className={({ isActive }) =>
                   [
-                    "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-smooth animate-fade-in-up motion-reduce:animate-none",
+                    "nav-rail flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-smooth animate-fade-in-up motion-reduce:animate-none",
                     isActive
-                      ? "bg-gc-green text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
-                      : "text-white/95 hover:bg-black/10 hover:translate-x-0.5",
+                      ? "bg-white/15 text-white"
+                      : "text-white/75 hover:bg-white/10 hover:text-white hover:translate-x-0.5",
                   ].join(" ")
                 }
               >
@@ -81,12 +81,12 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
       </nav>
 
       <div className="px-2 pb-2">
-        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white/95 [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-black/10 [&_svg]:h-[18px] [&_svg]:w-[18px]">
+        <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-semibold [&>button]:text-white/75 [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-white/10 [&>button:hover]:text-white [&_svg]:h-[18px] [&_svg]:w-[18px]">
           <LogoutMenu redirectTo="/student/login" />
         </div>
       </div>
 
-      <div className="border-t border-white/20">
+      <div className="border-t border-white/10">
         {profileComplete && (
           <NavLink
             to="/student/feedback"
@@ -95,8 +95,8 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
               [
                 "flex items-center gap-3 px-6 py-3.5 text-sm font-semibold transition-all duration-200",
                 isActive
-                  ? "bg-gc-green text-white"
-                  : "text-white/95 bg-gc-green-800 hover:bg-gc-green-900",
+                  ? "bg-white/10 text-white"
+                  : "text-white/75 hover:bg-white/10 hover:text-white",
               ].join(" ")
             }
           >
@@ -107,7 +107,7 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
         <NavLink
           to="/student/about"
           onClick={onNavigate}
-          className="btn-press flex items-center gap-3 bg-gc-green-800 px-6 py-4 text-sm font-semibold text-white transition-all duration-200 hover:bg-gc-green-900 border-t border-white/10"
+          className="btn-press flex items-center gap-3 px-6 py-4 text-sm font-semibold text-white/75 transition-all duration-200 hover:bg-white/10 hover:text-white border-t border-white/10"
         >
           <NavIcon name="info" className="w-[18px] h-[18px]" />
           <span>About</span>

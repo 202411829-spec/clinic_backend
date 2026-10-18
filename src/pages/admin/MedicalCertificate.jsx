@@ -1,7 +1,7 @@
 // src/pages/admin/MedicalCertificate.jsx
 import { useEffect, useState } from "react";
 import { useParams, Link, useLocation, useSearchParams } from "react-router-dom";
-import MedicalCertificatePanel from "../../components/admin/MedicalCertificatePanel";
+import MedicalCertificatePanel from "../../components/admin/MedicalCertificatePanel.jsx";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
 import { adaptStudentProfile, latestAnnualExamId } from "../../lib/studentAdapter.js";
 

@@ -1,6 +1,6 @@
 // src/pages/student/Feedback.jsx
 import { useEffect, useState } from "react";
-import NavIcon from "../../components/admin/NavIcon";
+import NavIcon from "../../components/ui/NavIcon";
 import StarRating from "../../components/student/StarRating";
 import { feedbackApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";

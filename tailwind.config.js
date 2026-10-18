@@ -25,6 +25,11 @@ export default {
         shell: '#0A1A0F',   // sidebar / dark chrome
         canvas: '#F6F8F6',  // app background behind panels
 
+        // Single warm accent, borrowed from the college crest. Used ONLY for
+        // the active-nav rail, focus glints and small highlights — it is what
+        // stops the green shell from reading as one flat colour.
+        gold: { 300: '#F2D27A', 400: '#E8B93D', 500: '#D4A017' },
+
         brand: {
           50: '#EEF7F0',
           100: '#D8EEDC',
@@ -101,6 +106,7 @@ export default {
         control: '8px',
         card: '12px',
         panel: '20px',
+        shell: '28px',      // the floating main surface in the app shell
       },
 
       // Shadows tinted with the brand hue + a baked-in hairline ring, so panels
@@ -110,6 +116,8 @@ export default {
         e2: '0 2px 4px -2px rgba(10,26,15,.10), 0 6px 16px -8px rgba(10,26,15,.12), 0 0 0 1px rgba(10,26,15,.05)',
         e3: '0 12px 32px -12px rgba(10,26,15,.22), 0 0 0 1px rgba(10,26,15,.06)',
         e4: '0 24px 56px -20px rgba(10,26,15,.30), 0 0 0 1px rgba(10,26,15,.07)',
+        float: '0 30px 80px -20px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04)',
+        glow: '0 10px 30px -8px rgba(53,163,72,.55)',
       },
 
       keyframes: {
@@ -145,6 +153,30 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        // Larger entrance for hero blocks and staggered sections.
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(.92)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        growX: { '0%': { transform: 'scaleX(0)' }, '100%': { transform: 'scaleX(1)' } },
+        growY: { '0%': { transform: 'scaleY(0)' }, '100%': { transform: 'scaleY(1)' } },
+        toastIn: {
+          '0%': { opacity: '0', transform: 'translateX(16px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        // Slow ambient drift for the glow orbs behind the login + shell.
+        floatSlow: {
+          '0%, 100%': { transform: 'translate3d(0,0,0) scale(1)' },
+          '50%': { transform: 'translate3d(24px,-18px,0) scale(1.08)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn .16s ease-out both',
@@ -153,6 +185,13 @@ export default {
         'row-in': 'rowIn .22s cubic-bezier(.16,1,.3,1) both',
         'rail-in': 'railIn .18s cubic-bezier(.16,1,.3,1) both',
         'fade-in-up': 'fadeInUp .22s cubic-bezier(.16,1,.3,1) both',
+        'fade-up': 'fadeUp .5s cubic-bezier(.16,1,.3,1) both',
+        'scale-in': 'scaleIn .5s cubic-bezier(.16,1,.3,1) both',
+        'grow-x': 'growX .8s cubic-bezier(.2,.8,.2,1) both',
+        'grow-y': 'growY .7s cubic-bezier(.2,.8,.2,1) both',
+        'toast-in': 'toastIn .3s cubic-bezier(.2,.8,.2,1) both',
+        'float-slow': 'floatSlow 14s ease-in-out infinite',
+        shimmer: 'shimmer 1.6s linear infinite',
       },
       transitionTimingFunction: {
         smooth: 'cubic-bezier(.4,0,.2,1)',

@@ -1,10 +1,9 @@
+"""Flask entry point for the Gordon College clinic backend."""
 import logging
 import os
 
 from flask import Flask, request
 from flask_cors import CORS
-
-logger = logging.getLogger(__name__)
 
 from routers.auth import auth_bp
 from routers.student import student_bp
@@ -19,6 +18,8 @@ from routers.student_record import student_record_bp
 from routers.reports import blueprint as reports_bp
 from routers.admin_mgmt import admin_mgmt_bp
 from routers.agent import agent_bp
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 

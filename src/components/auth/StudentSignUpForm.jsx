@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EyeIcon, EyeOffIcon } from '../icons.jsx'
+import { EyeIcon, EyeOffIcon } from '../ui/icons.jsx'
 import { authApi } from '../../lib/api.js'
 
 const EMAIL_DOMAIN = '@gordoncollege.edu.ph'

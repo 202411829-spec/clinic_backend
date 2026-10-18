@@ -1,6 +1,6 @@
 // src/components/admin/Topbar.jsx
-import NavIcon from "./NavIcon";
-import LogoutMenu from "../LogoutMenu";
+import NavIcon from "../ui/NavIcon";
+import LogoutMenu from "../auth/LogoutMenu";
 
 function initials(name = "") {
   return name
@@ -20,7 +20,7 @@ export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/a
   const handleBack = onBack ?? (() => window.history.back());
 
   return (
-    <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 bg-white print:hidden">
+    <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 print:hidden">
       <div className="flex items-center gap-3">
         <button
           onClick={handleBack}

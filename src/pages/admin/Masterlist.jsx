@@ -9,8 +9,8 @@ import {
   SortIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-} from '../../components/icons.jsx'
-import NavIcon from '../../components/admin/NavIcon.jsx'
+} from '../../components/ui/icons.jsx'
+import NavIcon from '../../components/ui/NavIcon.jsx'
 import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
 import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
 

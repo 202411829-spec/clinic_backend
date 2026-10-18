@@ -1,8 +1,8 @@
 // src/components/admin/SidebarNav.jsx
 import { NavLink } from "react-router-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 import { mainNav, managementNav } from "../../data/adminNav";
-import LogoutMenu from "../LogoutMenu";
+import LogoutMenu from "../auth/LogoutMenu";
 
 function NavGroup({ title, items, onNavigate }) {
   return (
@@ -20,7 +20,7 @@ function NavGroup({ title, items, onNavigate }) {
                 [
                   "relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 ease-smooth overflow-hidden active:scale-[0.98]",
                   isActive
-                    ? "bg-[#1E6C1A] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+                    ? "bg-white/15 text-white"
                     : "text-white/85 hover:bg-white/10 hover:translate-x-0.5",
                 ].join(" ")
               }
@@ -28,7 +28,7 @@ function NavGroup({ title, items, onNavigate }) {
               {({ isActive }) =>
                 isActive ? (
                   <>
-                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-[#4FAD32] animate-pop-in" />
+                    <span className="absolute inset-y-1.5 left-1 w-1.5 rounded-full bg-white animate-pop-in" />
                     <NavIcon name={item.icon} className="w-[18px] h-[18px] shrink-0" />
                     <span>{item.label}</span>
                   </>

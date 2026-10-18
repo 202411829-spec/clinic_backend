@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeftIcon } from '../icons.jsx'
+import { ChevronLeftIcon } from '../ui/icons.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
 // Medical Certificate / Medical Summary are printable official documents

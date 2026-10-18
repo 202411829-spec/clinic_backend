@@ -2,7 +2,7 @@
 // Small "Day / Week / Month / Semester / Academic Year / Year / All Time"
 // picker used on the Reports page to control the reporting range.
 import { useEffect, useRef, useState } from "react";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 
 export const REPORT_PERIODS = [
   "Day",

@@ -5,9 +5,9 @@
 // with a single "Edit" action instead of print/PDF export).
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "../admin/NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
-import EditStudentInfoModal from "./EditStudentInfoModal";
+import EditStudentInfoModal from "./EditStudentInfoModal.jsx";
 import { recordsApi, masterlistApi } from "../../lib/api.js";
 import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
 import { isStudentProfileComplete } from "../../lib/profileCompleteness.js";

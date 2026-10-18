@@ -1,13 +1,14 @@
 // src/components/student/StudentLayout.jsx
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import StudentSidebar from "./StudentSidebar.jsx";
-import StudentMobileSidebarOverlay from "./StudentMobileSidebarOverlay.jsx";
-import Topbar from "../admin/Topbar.jsx";
-import StudentMobileMenuHandle from "./StudentMobileMenuHandle.jsx";
-import { useAuth } from "../../context/AuthContext.jsx";
-import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
-import { masterlistApi } from "../../lib/api.js";
+import StudentSidebar from "../components/navigation/StudentSidebar.jsx";
+import StudentMobileSidebarOverlay from "../components/navigation/StudentMobileSidebarOverlay.jsx";
+import Topbar from "../components/navigation/HeaderBar.jsx";
+import StudentMobileMenuHandle from "../components/navigation/StudentMobileMenuHandle.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useProfileCompleteness } from "../context/ProfileCompletenessContext.jsx";
+import { masterlistApi } from "../lib/api.js";
+import { ContentLoader } from "../components/ui/PageLoader.jsx";
 
 // The one student page that is always reachable — the rest (Dashboard / Book
 // / Feedback) stay locked behind the complete-your-record gate below.
@@ -99,7 +100,7 @@ export default function StudentLayout() {
   }
 
   return (
-    <div className="min-h-screen md:h-screen bg-gc-student md:flex md:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="app-shell app-shell--flat min-h-screen md:h-screen md:flex md:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
       <StudentSidebar profileComplete={profileComplete} />
 
       <StudentMobileSidebarOverlay
@@ -110,7 +111,7 @@ export default function StudentLayout() {
 
       <StudentMobileMenuHandle onClick={() => setMobileNavOpen(true)} />
 
-      <div className="flex-1 bg-gray-50 md:rounded-tl-[48px] md:rounded-bl-[48px] min-h-screen md:h-screen md:overflow-y-auto overflow-hidden pb-10 md:pb-0 print:h-auto print:overflow-visible print:rounded-none print:bg-white print:pb-0">
+      <div className="app-main flex-1 min-h-screen md:min-h-0 md:h-[calc(100vh-1.5rem)] md:my-3 md:mr-3 md:rounded-shell md:overflow-y-auto overflow-hidden pb-10 md:pb-0 print:m-0 print:h-auto print:overflow-visible print:rounded-none print:bg-white print:pb-0">
         <Topbar
           user={currentUser}
           onMenuClick={() => setMobileNavOpen(true)}
@@ -125,8 +126,10 @@ export default function StudentLayout() {
             // Dashboard/Book/Record/Feedback each replay the same subtle
             // "settle in" transition automatically — transform/opacity only,
             // so it stays smooth and never slows navigation down.
-            <div key={location.pathname} className="animate-fade-in-up print:animate-none">
-              <Outlet />
+            <div key={location.pathname} className="animate-fade-up print:animate-none">
+              <Suspense fallback={<ContentLoader />}>
+                <Outlet />
+              </Suspense>
             </div>
           )}
         </main>

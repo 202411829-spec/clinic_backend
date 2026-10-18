@@ -6,7 +6,7 @@
 // can update its local state. Swap the fake submit for a real Supabase
 // write once that's wired up.
 import { useRef, useState } from "react";
-import NavIcon from "../admin/NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample.js";
 import { masterlistApi } from "../../lib/api.js";

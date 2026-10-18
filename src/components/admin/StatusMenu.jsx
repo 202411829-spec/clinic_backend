@@ -1,7 +1,7 @@
 // src/components/admin/StatusMenu.jsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 import { statusOptions } from "../../data/dashboardSample";
 
 const MENU_WIDTH = 160; // matches w-40

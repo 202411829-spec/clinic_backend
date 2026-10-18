@@ -1,5 +1,5 @@
 // src/components/student/SelectTimeSlots.jsx
-import NavIcon from "../admin/NavIcon";
+import NavIcon from "../ui/NavIcon";
 import { remainingSlots, isSlotFull } from "../../lib/timeSlots";
 
 function SlotBar({ slot }) {

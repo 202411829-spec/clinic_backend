@@ -1,6 +1,6 @@
 // src/components/admin/ScheduleCalendar.jsx
 import { useState } from "react";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 import {
   getMonthMatrix,
   isSameDate,

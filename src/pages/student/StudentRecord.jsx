@@ -1,8 +1,8 @@
 // src/pages/student/StudentRecord.jsx
 import { useEffect, useState } from "react";
-import StudentRecordPanel from "../../components/student/StudentRecordPanel";
+import StudentRecordPanel from "../../components/student/StudentRecordPanel.jsx";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 function formatDate(value) {
   if (!value) return "-";

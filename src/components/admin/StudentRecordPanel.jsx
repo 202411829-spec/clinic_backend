@@ -1,7 +1,7 @@
 // src/components/admin/StudentRecordPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 import AddAnnualExamModal from "./AddAnnualExamModal";
 import {
   academicYears,

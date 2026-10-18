@@ -2,7 +2,7 @@
 // Universal dropdown extracted from PeriodDropdown — used everywhere so all
 // dropdowns share the same trigger + panel chrome.
 import { useEffect, useRef, useState } from "react";
-import NavIcon from "../admin/NavIcon";
+import NavIcon from "./NavIcon";
 
 function normalizeOptions(options) {
   if (!options) return [];

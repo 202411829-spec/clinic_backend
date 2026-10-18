@@ -1,6 +1,6 @@
 // src/components/student/NotificationsPanel.jsx
 import { useEffect, useState } from "react";
-import NavIcon from "../admin/NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import { useAppointment } from "../../context/AppointmentContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { notificationsApi } from "../../lib/api.js";

@@ -1,6 +1,6 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import NavIcon from "./NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";

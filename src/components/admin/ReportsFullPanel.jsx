@@ -1,6 +1,6 @@
 // src/components/admin/ReportsFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import NavIcon from "./NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import PeriodDropdown from "./PeriodDropdown.jsx";
 import SelectDateCalendar from "./SelectDateCalendar.jsx";
 import Letterhead from "./Letterhead.jsx";

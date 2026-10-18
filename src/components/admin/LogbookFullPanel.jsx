@@ -1,10 +1,10 @@
 // src/components/admin/LogbookFullPanel.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
-import NavIcon from "./NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import Letterhead from "./Letterhead.jsx";
-import Pagination from "../Pagination.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import WalkInVisitForm from "./WalkInVisitForm.jsx";
 import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";

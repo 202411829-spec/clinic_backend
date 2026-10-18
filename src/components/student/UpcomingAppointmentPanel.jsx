@@ -1,7 +1,7 @@
 // src/components/student/UpcomingAppointmentPanel.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "../admin/NavIcon";
+import NavIcon from "../ui/NavIcon";
 import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import ForgotPasswordForm from '../../components/student/ForgotPasswordForm.jsx'
+import ForgotPasswordForm from '../../components/auth/ForgotPasswordForm.jsx'
 
 const BRAND = {
   logo: '/gordon-college-seal.png',

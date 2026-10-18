@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { adminAuthApi } from '../../lib/api.js'
-import { EyeIcon, EyeOffIcon } from '../../components/icons.jsx'
+import { EyeIcon, EyeOffIcon } from '../../components/ui/icons.jsx'
 
 const EMAIL_RE = /^[^\s@]+@gordoncollege\.edu\.ph$/i
 const STEPS = [

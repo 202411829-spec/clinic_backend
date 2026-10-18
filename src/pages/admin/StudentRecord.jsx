@@ -1,7 +1,7 @@
 // src/pages/admin/StudentRecord.jsx
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import StudentRecordPanel from "../../components/admin/StudentRecordPanel";
+import StudentRecordPanel from "../../components/admin/StudentRecordPanel.jsx";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
 import { adaptStudentProfile } from "../../lib/studentAdapter.js";
 

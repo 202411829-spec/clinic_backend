@@ -1,8 +1,21 @@
 // src/pages/admin/Dashboard.jsx
 import { useEffect, useState } from "react";
-import LogbookPanel from "../../components/admin/LogbookPanel";
-import AppointmentsPanel from "../../components/admin/AppointmentsPanel";
+import LogbookPanel from "../../components/admin/LogbookPanel.jsx";
+import AppointmentsPanel from "../../components/admin/AppointmentsPanel.jsx";
 import { referenceApi } from "../../lib/api.js";
+import Reveal from "../../components/ui/Reveal.jsx";
+
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+};
+
+const todayLabel = new Date().toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 export default function Dashboard() {
   const [reasonRecords, setReasonRecords] = useState([]);
@@ -29,21 +42,28 @@ export default function Dashboard() {
   }, []);
 
   return (
-    // space-y-5 (up from space-y-3): the panels are now visually heavier
-    // (rounded-panel + shadow-e2 instead of a thin bordered box), so they
-    // need a bit more air between them or they read as stacked rather than
-    // separate sections.
     <div className="space-y-5">
-      <div>
-        <h1 className="font-serif text-3xl font-semibold text-ink-900">Dashboard</h1>
-        <p className="mt-1 text-base text-ink-500">Overview of today's clinic activity.</p>
-      </div>
+      <header className="flex flex-wrap items-end justify-between gap-3 animate-fade-up">
+        <div>
+          <p className="text-2xs font-semibold uppercase tracking-[0.22em] text-brand-600">
+            {todayLabel}
+          </p>
+          <h1 className="mt-1 font-serif text-3xl font-semibold text-ink-900">
+            {greeting()}
+          </h1>
+          <p className="mt-1 text-base text-ink-500">Overview of today's clinic activity.</p>
+        </div>
+      </header>
 
-      <LogbookPanel
-        reasonRecords={reasonRecords}
-        medicineRecords={medicineRecords}
-      />
-      <AppointmentsPanel reasonRecords={reasonRecords} />
+      <Reveal delay={0}>
+        <LogbookPanel
+          reasonRecords={reasonRecords}
+          medicineRecords={medicineRecords}
+        />
+      </Reveal>
+      <Reveal delay={90}>
+        <AppointmentsPanel reasonRecords={reasonRecords} />
+      </Reveal>
     </div>
   );
 }

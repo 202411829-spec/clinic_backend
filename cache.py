@@ -26,11 +26,20 @@ _redis_available = False
 
 try:
     import redis
+except ImportError:  # redis-py not installed -> in-memory cache only
+    redis = None  # pylint: disable=invalid-name
 
-    redis_url = os.getenv("REDIS_URL")
-    if redis_url:
+# Exceptions raised by redis-py (connection errors, timeouts, etc.).
+# Empty tuple when redis-py is missing, so `except _REDIS_ERRORS` catches nothing.
+_REDIS_ERRORS: tuple[type[BaseException], ...] = (
+    (redis.RedisError, OSError) if redis is not None else ()
+)
+
+_redis_url = os.getenv("REDIS_URL")
+if redis is not None and _redis_url:
+    try:
         _redis_client = redis.Redis.from_url(
-            redis_url,
+            _redis_url,
             socket_timeout=1,
             socket_connect_timeout=1,
             decode_responses=True,
@@ -38,11 +47,11 @@ try:
         # Test connection at import time — if it fails, we degrade gracefully.
         _redis_client.ping()
         _redis_available = True
-        logger.info("Redis cache connected (%s)", redis_url.split("@")[-1])
-except Exception as exc:
-    _redis_client = None
-    _redis_available = False
-    logger.info("Redis unavailable, using in-memory cache: %s", exc)
+        logger.info("Redis cache connected (%s)", _redis_url.split("@")[-1])
+    except (*_REDIS_ERRORS, ValueError) as exc:  # ValueError: malformed URL
+        _redis_client = None
+        _redis_available = False
+        logger.info("Redis unavailable, using in-memory cache: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +71,7 @@ def get_cache(key: str) -> object | None:
             raw = _redis_client.get(key)
             if raw is not None:
                 return json.loads(raw)
-        except Exception as exc:
+        except (*_REDIS_ERRORS, ValueError) as exc:  # ValueError: bad JSON
             logger.warning("Redis get failed for %s: %s", key, exc)
             # Fall through to in-memory — don't crash the app.
 
@@ -86,7 +95,7 @@ def set_cache(key: str, value: object, ttl_seconds: int = 60) -> None:
     if _redis_available and _redis_client is not None:
         try:
             _redis_client.setex(key, ttl_seconds, json.dumps(value))
-        except Exception as exc:
+        except (*_REDIS_ERRORS, TypeError, ValueError) as exc:  # non-JSON value
             logger.warning("Redis set failed for %s: %s", key, exc)
             # Fall through to in-memory — don't crash the app.
 
@@ -108,8 +117,8 @@ def invalidate_cache(key: str) -> None:
     if _redis_available and _redis_client is not None:
         try:
             _redis_client.delete(key)
-        except Exception:
-            pass
+        except _REDIS_ERRORS as exc:
+            logger.debug("Redis delete failed for %s: %s", key, exc)
 
     with _mem_lock:
         _mem_cache.pop(key, None)

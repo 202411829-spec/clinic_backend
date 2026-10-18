@@ -24,13 +24,13 @@ export default function StudentMobileSidebarOverlay({ open, onClose, profileComp
       <button
         aria-label="Close menu"
         onClick={onClose}
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+        className={`absolute inset-0 bg-shell/60 backdrop-blur-sm transition-opacity duration-300 ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       />
 
       <div
-        className={`absolute inset-x-3 bottom-3 top-3 bg-gc-student rounded-[28px] shadow-xl overflow-hidden flex flex-col transition-transform duration-300 ease-out ${
+        className={`absolute inset-x-3 bottom-3 top-3 app-shell app-shell--flat rounded-[28px] shadow-float overflow-hidden flex flex-col transition-transform duration-300 ease-out ${
           visible ? "translate-y-0" : "translate-y-full"
         }`}
       >

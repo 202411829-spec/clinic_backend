@@ -1,7 +1,7 @@
 // src/components/admin/TimeBlockEditPopover.jsx
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import NavIcon from "./NavIcon";
+import NavIcon from "../ui/NavIcon";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 
 const UNITS = ["Minute", "Hour"];

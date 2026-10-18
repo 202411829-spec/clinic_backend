@@ -8,8 +8,8 @@ import {
   ReportsIcon,
   ShieldIcon,
   InfoIcon,
-} from '../icons.jsx'
-import LogoutMenu from '../LogoutMenu.jsx'
+} from '../ui/icons.jsx'
+import LogoutMenu from '../auth/LogoutMenu.jsx'
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -59,7 +59,7 @@ function NavItem({ to, label, Icon }) {
                   appearing, so switching pages reads as the rail travelling
                   to the new item. */}
               <span className="absolute left-0 top-1/2 h-6 w-[3px] origin-center -translate-y-1/2 rounded-r-full bg-white animate-rail-in" />
-              <span className="absolute inset-0 rounded-control bg-white/[0.14] animate-fade-in" />
+              <span className="absolute inset-0 rounded-control bg-white/15 animate-fade-in" />
             </>
           )}
           <Icon className="relative h-5 w-5 shrink-0 transition-transform duration-200 ease-out group-hover:scale-110" />
@@ -75,7 +75,7 @@ function NavContent() {
     <>
       <div className="flex flex-col items-center px-4 pb-5 pt-6 text-center">
         <div className="flex items-center justify-center gap-2">
-          <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 object-contain" />
+          <img src="/gordon-college-logo.png" alt="Gordon College seal" className="h-16 w-16 rounded-2xl object-cover" />
           {/* health-services-logo.png has more padding baked into the source
               file than gordon-college-logo.png, so the seal itself renders
               visibly smaller at the same box size. Scaling it up slightly
@@ -83,27 +83,27 @@ function NavContent() {
           <img
             src="/health-services-logo.png"
             alt="Health Services Unit seal"
-            className="h-16 w-16 object-contain scale-[1.08]"
+            className="h-16 w-16 rounded-2xl object-contain"
           />
         </div>
-        <p className="mt-2 text-sm font-extrabold leading-tight text-white">GORDON COLLEGE</p>
+        <p className="mt-3 text-sm font-extrabold leading-tight tracking-wide text-white">GORDON COLLEGE</p>
         <p className="text-[11px] leading-tight text-white/80">Clinic Appointment System</p>
-        <p className="mt-2 text-xs font-bold tracking-widest text-white">ADMIN PORTAL</p>
-        <div className="mt-4 h-px w-full bg-white/20" />
+        <p className="mt-1 text-xs font-bold tracking-wide text-white">ADMIN PORTAL</p>
+        <div className="mt-4 h-px w-full bg-white/15" />
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">
         <div>
-          <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MAIN</p>
-          <div className="space-y-1">
+          <p className="px-4 pb-2 text-[11px] font-bold tracking-wider text-white/60">MAIN</p>
+          <div className="space-y-1 stagger">
             {MAIN_ITEMS.map((item) => (
               <NavItem key={item.to} {...item} />
             ))}
           </div>
         </div>
         <div>
-          <p className="px-4 pb-2 text-xs font-bold tracking-widest text-white/70">MANAGEMENT</p>
-          <div className="space-y-1">
+          <p className="px-4 pb-2 text-[11px] font-bold tracking-wider text-white/60">MANAGEMENT</p>
+          <div className="space-y-1 stagger">
             {MANAGEMENT_ITEMS.map((item) => (
               <NavItem key={item.to} {...item} />
             ))}
@@ -117,7 +117,7 @@ function NavContent() {
         </div>
       </div>
 
-      <div className="bg-gc-green-800 px-3 py-3">
+      <div className="border-t border-white/10 px-3 py-3">
         <button className="btn-press flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-white/5">
           <InfoIcon className="h-5 w-5" />
           About
@@ -129,7 +129,7 @@ function NavContent() {
 
 export default function Sidebar() {
   return (
-    <aside className="hidden h-screen w-64 shrink-0 flex-col bg-gc-green-700 lg:flex">
+    <aside className="hidden h-screen w-64 shrink-0 flex-col lg:flex print:hidden">
       <NavContent />
     </aside>
   )

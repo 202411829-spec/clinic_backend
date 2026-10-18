@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import StudentSignUpForm from '../../components/student/StudentSignUpForm.jsx'
+import StudentSignUpForm from '../../components/auth/StudentSignUpForm.jsx'
 import { studentSignIn } from '../../lib/supabaseClient.js'
 
 const BRAND = {

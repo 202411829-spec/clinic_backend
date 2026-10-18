@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EyeIcon, EyeOffIcon } from '../icons.jsx'
+import { EyeIcon, EyeOffIcon } from '../ui/icons.jsx'
 
 /**
  * Login form used by the Student Portal login page.
@@ -125,7 +125,7 @@ export default function StudentLoginForm({ align = 'left', onSubmit, loading = f
       <button
         type="submit"
         disabled={loading}
-        className="btn-press mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+        className="btn-press btn-shine mt-7 w-full rounded-xl shadow-glow bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">

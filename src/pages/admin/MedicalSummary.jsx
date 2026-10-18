@@ -1,7 +1,7 @@
 // src/pages/admin/MedicalSummary.jsx
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import MedicalSummaryPanel from "../../components/admin/MedicalSummaryPanel";
+import MedicalSummaryPanel from "../../components/admin/MedicalSummaryPanel.jsx";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
 import { adaptStudentProfile } from "../../lib/studentAdapter.js";
 

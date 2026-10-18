@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient.js";
-import { clearApiCache } from "../lib/api.js";
+import { supabase } from "../../lib/supabaseClient.js";
+import { clearApiCache } from "../../lib/api.js";
 
 function LogoutIcon(props) {
   return (

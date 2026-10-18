@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
-import { SearchIcon, ShieldIcon, ChevronLeftIcon, ChevronRightIcon } from '../icons.jsx'
+import { SearchIcon, ShieldIcon, ChevronLeftIcon, ChevronRightIcon } from '../ui/icons.jsx'
 
 const ALLOWED_ROLES = ['nurse', 'doctor']
 const EMAIL_DOMAIN = '@gordoncollege.edu.ph'

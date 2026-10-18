@@ -3,7 +3,7 @@
 // Pass `readOnly` to render a static rating display instead (used by the
 // admin Feedback inbox to show each submitted rating).
 import { useState } from "react";
-import NavIcon from "../admin/NavIcon";
+import NavIcon from "../ui/NavIcon";
 
 export default function StarRating({
   value = 0,

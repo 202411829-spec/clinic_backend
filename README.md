@@ -66,12 +66,21 @@ docs/                    # SYSTEM_DOCUMENTATION.md (1292 lines; spec claims 1034
 tests/ + pytest.ini      # tests/test_defense_critical.py (5 defense-critical), test_admin_mgmt.py, test_agent.py, test_admin_auth.py — 25 tests total
 vite.config.js           # Vite + vite-plugin-pwa config, server.port 5173
 .env.example             # 12 env entries / 33 lines (VITE_* + SUPABASE_* + RESEND + GROQ)
-src/                     # React PWA
-  App.jsx                # routes incl. MedicalSummary (src/App.jsx:93), /admin/admins, /admin/pending, /student/feedback
-  components/            # layout/, admin/, student/, agent/, shared UI + ErrorBoundary.jsx (0 alert() in codebase)
+src/                     # React PWA (SPA layout)
+  assets/styles/index.css  # Tailwind layers, app shell, motion system, print rules
+  components/
+    ui/                  # primitives, icons, Pagination, Reveal, CountUp, PageLoader, ErrorBoundary
+    auth/                # login / sign-up / forgot forms, AuthShell
+    navigation/          # Sidebar, TopBar, HeaderBar, mobile menu handle + overlay
+    admin/ student/ agent/  # feature panels
+  layouts/               # AdminLayout.jsx, StudentLayout.jsx
   pages/                 # auth/, admin/, student/ screens
-  context/AuthContext.jsx
+  router/                # index.jsx (route table), lazyPages.js, ProtectedRoute.jsx, RouteShell.jsx
+  context/               # Auth, Appointment, ProfileCompleteness providers
   lib/                   # supabaseClient.js, api.js (unwrapData), adapters
+  data/                  # static nav config + sample data
+  App.jsx                # providers + <RouterProvider>
+  main.jsx               # mounts React to index.html
 public/                  # static assets + PWA icons
 ```
 

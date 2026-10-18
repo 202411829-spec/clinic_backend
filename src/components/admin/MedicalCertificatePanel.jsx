@@ -8,8 +8,8 @@
 // department, one for the clinic's own file).
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import NavIcon from "./NavIcon.jsx";
-import { ChevronLeftIcon } from "../icons.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
+import { ChevronLeftIcon } from "../ui/icons.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { formatMDY } from "../../lib/calendar.js";
 import { getCertificateDefaults } from "../../lib/certificateSync.js";

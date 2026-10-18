@@ -1,6 +1,6 @@
 // src/components/admin/AppointmentsPanel.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
-import NavIcon from "./NavIcon.jsx";
+import NavIcon from "../ui/NavIcon.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";

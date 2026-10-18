@@ -268,6 +268,145 @@
   }
 }
 
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   APP SHELL + MOTION SYSTEM
+   Dark, green-cast chrome with soft ambient glows; a floating rounded content
+   surface; staggered entrances. Everything here animates transform/opacity
+   only, and everything is disabled by the reduced-motion block below.
+   ───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .app-shell {
+    background-color: theme('colors.shell');
+    background-image:
+      radial-gradient(60rem 40rem at -10% -10%, rgba(53, 163, 72, 0.28), transparent),
+      radial-gradient(40rem 30rem at 0% 110%, rgba(232, 185, 61, 0.1), transparent);
+  }
+  .app-shell--student {
+    background-image:
+      radial-gradient(60rem 40rem at -10% -10%, rgba(53, 163, 72, 0.38), transparent),
+      radial-gradient(40rem 30rem at 0% 110%, rgba(232, 185, 61, 0.14), transparent);
+  }
+  /* Minimal sidebar chrome: solid brand green, no radial glows. Used by the
+     admin/student layouts and their mobile sheets (not the login screens). */
+  .app-shell--flat,
+  .app-shell.app-shell--flat {
+    background-color: theme('colors.gc.green.DEFAULT');
+    background-image: none;
+  }
+  .app-shell--flat .nav-rail[aria-current='page']::before {
+    background: #fff;
+    box-shadow: none;
+  }
+  .app-main {
+    @apply bg-canvas shadow-float;
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.300') transparent;
+  }
+
+  /* Frosted surface for floating UI over dark chrome. */
+  .glass {
+    @apply bg-white/[0.08] ring-1 ring-white/10 backdrop-blur-md;
+  }
+
+  /* Faint engineering-grid overlay for hero/auth panels. */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+            mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  }
+
+  /* Gold marker on the active NavLink (react-router sets aria-current). */
+  .nav-rail { position: relative; }
+  .nav-rail[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 1.5rem;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: theme('colors.gold.400');
+    box-shadow: 0 0 12px rgba(232, 185, 61, 0.6);
+    transform: translateY(-50%);
+    animation: railIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Opt-in: clickable cards that rise toward the pointer. */
+  .card-lift {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .card-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: theme('boxShadow.e4');
+  }
+
+  /* Skeleton shimmer for loading placeholders. */
+  .skeleton {
+    @apply rounded-control;
+    background: linear-gradient(90deg, theme('colors.ink.100') 25%, theme('colors.ink.50') 50%, theme('colors.ink.100') 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  /* Primary CTA with a light sweep on hover. */
+  .btn-shine {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .btn-shine::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.28) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-shine:hover::after {
+    transform: translateX(120%);
+  }
+
+  /* Modal / popover entrances. */
+  .modal-backdrop {
+    @apply bg-shell/60 backdrop-blur-sm animate-fade-in;
+  }
+  .modal-pop {
+    animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@layer utilities {
+  /* Staggered entrance: put on a parent, children cascade in (8 steps). */
+  .stagger > * {
+    animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 70ms; }
+  .stagger > *:nth-child(3) { animation-delay: 140ms; }
+  .stagger > *:nth-child(4) { animation-delay: 210ms; }
+  .stagger > *:nth-child(5) { animation-delay: 280ms; }
+  .stagger > *:nth-child(6) { animation-delay: 350ms; }
+  .stagger > *:nth-child(7) { animation-delay: 420ms; }
+  .stagger > *:nth-child(n + 8) { animation-delay: 490ms; }
+
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+
+  /* Scroll-reveal state toggled by <Reveal>. */
+  .reveal { opacity: 0; transform: translateY(14px); }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
 /* Respect the OS reduce-motion setting: instant state change, never lost
    functionality. */
 @media (prefers-reduced-motion: reduce) {
@@ -279,6 +418,7 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+  .reveal { opacity: 1; transform: none; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -326,6 +466,14 @@
   .expand {
     grid-template-rows: 1fr !important;
   }
+
+  .app-shell,
+  .app-main {
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
 
   /* Panels are screen furniture; on paper the document is the object. */
   .panel {

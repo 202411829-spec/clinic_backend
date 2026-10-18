@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import Sidebar from './Sidebar.jsx'
-import TopBar from './TopBar.jsx'
-import MobileSidebarOverlay from '../admin/MobileSidebarOverlay.jsx'
-import MobileMenuHandle from '../admin/MobileMenuHandle.jsx'
-import { useAuth } from '../../context/AuthContext.jsx'
-import { adminsApi } from '../../lib/api.js'
-import Pending from '../../pages/admin/Pending.jsx'
-import AgentBubble from '../agent/AgentBubble.jsx'
-import AgentPanel from '../agent/AgentPanel.jsx'
-import { agentApi } from '../../lib/agentApi.js'
+import Sidebar from '../components/navigation/Sidebar.jsx'
+import TopBar from '../components/navigation/TopBar.jsx'
+import MobileSidebarOverlay from '../components/navigation/MobileSidebarOverlay.jsx'
+import MobileMenuHandle from '../components/navigation/MobileMenuHandle.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import { adminsApi } from '../lib/api.js'
+import Pending from '../pages/admin/Pending.jsx'
+import AgentBubble from '../components/agent/AgentBubble.jsx'
+import AgentPanel from '../components/agent/AgentPanel.jsx'
+import { agentApi } from '../lib/agentApi.js'
+import { ContentLoader } from '../components/ui/PageLoader.jsx'
 
 // Medical Certificate / Medical Summary are printable official documents —
 // TopBar already hides itself there, so the mobile nav handle should too.
@@ -127,7 +128,7 @@ export default function AdminLayout() {
   }, [email, authLoading])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gc-green-700 print:h-auto print:overflow-visible print:bg-white">
+    <div className="app-shell app-shell--flat flex h-screen overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gc-green-700 focus:shadow-lg focus:ring-2 focus:ring-gc-green-700">Skip to content</a>
       <Sidebar />
 
@@ -141,7 +142,7 @@ export default function AdminLayout() {
         </>
       )}
 
-      <div className="flex flex-1 flex-col overflow-y-auto bg-white lg:rounded-tl-[48px] lg:rounded-bl-[48px] print:overflow-visible print:rounded-none">
+      <div className="app-main flex flex-1 flex-col overflow-y-auto lg:my-3 lg:mr-3 lg:rounded-shell print:m-0 print:overflow-visible print:rounded-none">
         <TopBar />
         <main id="main-content" tabIndex={-1} className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
           {checkingPending ? (
@@ -163,8 +164,10 @@ export default function AdminLayout() {
             // the same subtle "settle in" transition automatically, without
             // each page needing its own animation code. Transform/opacity
             // only, so it stays smooth and doesn't slow navigation down.
-            <div key={location.pathname} className="animate-fade-in-up print:animate-none">
-              <Outlet />
+            <div key={location.pathname} className="animate-fade-up print:animate-none">
+              <Suspense fallback={<ContentLoader />}>
+                <Outlet />
+              </Suspense>
             </div>
           )}
         </main>
