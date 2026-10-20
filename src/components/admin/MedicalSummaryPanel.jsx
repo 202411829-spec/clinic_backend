@@ -107,7 +107,7 @@ function Th({ children, wide }) {
       // table-fixed they'd add up to more than a printed page's width.
       // print:w-auto lets the table-fixed layout fall back to splitting the
       // page width evenly across columns instead.
-      className={`py-2.5 px-4 font-semibold border border-gray-300 text-left print:w-auto ${
+      className={`py-2.5 px-4 font-medium border-b border-ink-100 print:border print:border-gray-300 text-ink-500 text-left [overflow-wrap:anywhere] print:w-auto ${
         wide ? "w-[200px]" : "w-[130px]"
       }`}
     >
@@ -118,7 +118,7 @@ function Th({ children, wide }) {
 
 function Td({ children, className = "" }) {
   return (
-    <td className={`py-2.5 px-4 border border-gray-300 text-gray-700 break-words ${className}`}>
+    <td className={`py-2.5 px-4 border-b border-ink-100 print:border print:border-gray-300 text-ink-600 [overflow-wrap:anywhere] ${className}`}>
       {children}
     </td>
   );
@@ -480,10 +480,10 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
               Vital Signs and Measurements | Physical Findings
             </div>
-            <div className="overflow-x-auto rounded-xl">
+            <div className="tbl-scroll rounded-xl ring-1 ring-ink-100 print:ring-0">
               <table className="w-full text-sm min-w-[640px] border-collapse table-fixed">
                 <thead>
-                  <tr className="text-left text-xs text-gray-500 bg-gray-50">
+                  <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
                     <Th wide>Examination</Th>
                     {yearLabels.map((label) => (
                       <Th key={label}>{label}</Th>
@@ -562,7 +562,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           <div className="overflow-x-auto rounded-xl print:overflow-visible">
             <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
               <thead>
-                <tr className="text-left text-xs text-gray-500 bg-gray-50">
+                <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
                   <Th wide>Chest X-Ray</Th>
                   {yearLabels.map((label) => (
                     <Th key={label}>{label}</Th>
@@ -652,7 +652,7 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           <div className="overflow-x-auto rounded-xl print:overflow-visible">
             <table className="w-full text-sm min-w-[640px] print:min-w-0 print:w-full print:text-xs border-collapse table-fixed">
               <thead>
-                <tr className="text-left text-xs text-gray-500 bg-gray-50">
+                <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
                   <Th wide>Item</Th>
                   {yearLabels.map((label) => (
                     <Th key={label}>{label}</Th>

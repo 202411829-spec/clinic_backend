@@ -796,24 +796,24 @@ export default function StudentRecordPanel({ student }) {
             </button>
           </div>
 
-          <div className="overflow-x-auto border border-gray-300 rounded-xl">
-            <table className="w-full text-sm min-w-[600px]">
+          <div className="tbl-scroll rounded-xl ring-1 ring-ink-100">
+            <table className="tbl min-w-[600px]">
               <thead>
-                <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
-                  <th className="py-2.5 px-4 font-semibold whitespace-nowrap">Year</th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Date Examined</th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Examined By</th>
-                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Status</th>
-                  <th className="py-2.5 px-4 font-semibold text-right whitespace-nowrap">Action</th>
+                <tr>
+                  <th className="whitespace-nowrap">Year</th>
+                  <th className="whitespace-nowrap">Date Examined</th>
+                  <th className="whitespace-nowrap">Examined By</th>
+                  <th className="whitespace-nowrap">Status</th>
+                  <th className="whitespace-nowrap text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="tbl-animate">
                 {history.map((row) => (
-                  <tr key={row.key} className="row-hover border-b border-gray-200 last:border-b-0 transition-colors duration-150 hover:bg-gray-50/60">
-                    <td className="py-2.5 px-4 text-gray-800 font-medium whitespace-nowrap">{row.label}</td>
-                    <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.dateExamined}</td>
-                    <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{row.examinedBy}</td>
-                    <td className="py-2.5 px-3">
+                  <tr key={row.key} className="row-hover">
+                    <td className="whitespace-nowrap font-medium text-ink-900">{row.label}</td>
+                    <td className="whitespace-nowrap">{row.dateExamined}</td>
+                    <td className="cell-wrap min-w-[140px]">{row.examinedBy}</td>
+                    <td>
                       <span
                         className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                           STATUS_STYLES[row.status]
@@ -822,7 +822,7 @@ export default function StudentRecordPanel({ student }) {
                         {row.status}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-right">
+                    <td className="text-right">
                       <HistoryActionMenu
                         year={row}
                         disabled={row.status === "No Record"}

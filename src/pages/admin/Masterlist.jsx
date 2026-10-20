@@ -196,17 +196,17 @@ export default function Masterlist() {
             where the min-width kicks in. On desktop the min-width is
             removed and the table fits the panel width with no side
             scroll — columns share the available space instead. */}
-        <div className="mt-5 overflow-x-auto md:overflow-visible">
-          <table className="w-full min-w-[900px] md:min-w-0 border-collapse text-left text-sm">
+        <div className="tbl-scroll mt-5">
+          <table className="tbl min-w-[900px] md:min-w-0">
             <thead>
-              <tr className="bg-[#F6F6F6] text-xs uppercase tracking-wide text-gray-500">
+              <tr>
                 {COLUMNS.map((col) => (
-                  <th key={col.key} className="whitespace-nowrap px-4 py-3 font-semibold">
+                  <th key={col.key} className="whitespace-nowrap">
                     <button
                       disabled={!col.sortable}
                       onClick={() => col.sortable && toggleSort(col.key)}
                       className={`btn-press flex items-center gap-1 transition-colors duration-150 ${
-                        col.sortable ? 'cursor-pointer hover:text-gc-green-700' : 'cursor-default'
+                        col.sortable ? 'cursor-pointer hover:text-brand-700' : 'cursor-default'
                       }`}
                     >
                       {col.label}
@@ -229,34 +229,34 @@ export default function Masterlist() {
                 <SkeletonRows rows={5} cells={COLUMNS.length} />
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={COLUMNS.length} className="py-12 text-center text-ink-400">
                     No students found.
                   </td>
                 </tr>
               ) : (
                 rows.map((student) => (
-                  <tr key={student.student_id} className="row-hover border-t border-gray-100 hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gc-green-700 text-xs font-bold text-white">
+                  <tr key={student.student_id} className="row-hover">
+                    <td className="min-w-[200px]">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-semibold text-white">
                           {initialsOf(student.first_name, student.last_name)}
                         </div>
-                        <span className="font-medium text-gray-900">{student.full_name}</span>
+                        <span className="cell-wrap font-medium text-ink-900">{student.full_name}</span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.student_id}</td>
+                    <td className="tnum whitespace-nowrap">{student.student_id}</td>
                     {/* Longest cell in the row — lets text wrap on desktop
                         (where the table no longer scrolls) so it doesn't
                         force the whole table wider than the panel; mobile
                         keeps it on one line since that view scrolls anyway. */}
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700 md:whitespace-normal md:break-words md:min-w-[200px]">
+                    <td className="cell-wrap min-w-[200px]">
                       {student.department_id ? `${student.department_name} / ${student.course_name}` : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.year_level || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.gender || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatDate(student.birth_date)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{student.contact_number || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap">{student.year_level || '—'}</td>
+                    <td className="whitespace-nowrap">{student.gender || '—'}</td>
+                    <td className="whitespace-nowrap">{formatDate(student.birth_date)}</td>
+                    <td className="whitespace-nowrap">{student.contact_number || '—'}</td>
+                    <td className="whitespace-nowrap">
                       <RowActionsMenu
                         open={openMenuId === student.student_id}
                         onToggle={() =>

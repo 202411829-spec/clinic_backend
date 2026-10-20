@@ -437,43 +437,43 @@ export default function LogbookPanel({
             <col className="print:w-[13%]" />
           </colgroup>
           <thead>
-            <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border border-gray-300 print:whitespace-normal">Date / Time</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. & Course</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Reason</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Complaint</th>
-              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
+            <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
+              <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 print:whitespace-normal">Date / Time</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. & Course</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody className="tbl-animate">
             {pageRows.map((row) => (
               <tr key={row.id}>
-                <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
+                <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.dateTime}
                 </td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.name}</td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">{row.deptCourse}</td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{row.name}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{row.deptCourse}</td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.sex}
                 </td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">
                   {row.reason}
                 </td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">
                   {row.complaint}
                 </td>
-                <td className="py-2.5 px-2 print:px-1 print:py-1 text-gray-700 border border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">
                   {row.medicine}
                 </td>
               </tr>
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
+                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border-b border-ink-100 print:border print:border-gray-300">
                   No visits match your search or filters.
                 </td>
               </tr>

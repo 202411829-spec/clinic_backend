@@ -144,35 +144,31 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
       <div className={`expand ${expanded ? "is-open" : ""}`}>
         <div>
           {slot.bookings.length > 0 ? (
-            <div className="overflow-x-auto border-t border-gray-100">
-              <table className="w-full text-sm min-w-[560px] border-collapse">
+            <div className="tbl-scroll border-t border-ink-100">
+              <table className="tbl min-w-[560px]">
                 <thead>
-                  <tr className="text-left text-xs text-gray-500 bg-gray-50">
-                    <th className="py-2 px-4 font-semibold border border-gray-300">Name</th>
-                    <th className="py-2 px-2 font-semibold border border-gray-300">Age</th>
-                    <th className="py-2 px-2 font-semibold border border-gray-300">Dept</th>
-                    <th className="py-2 px-2 font-semibold border border-gray-300 hidden md:table-cell">
-                      Sex
-                    </th>
-                    <th className="py-2 px-2 font-semibold border border-gray-300">Reason</th>
-                    <th className="py-2 px-2 font-semibold border border-gray-300">Status</th>
-                    <th className="py-2 px-4 font-semibold text-right border border-gray-300">Action</th>
+                  <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Dept</th>
+                    <th className="hidden md:table-cell">Sex</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th className="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="tbl-animate">
                   {slot.bookings.map((b) => (
-                    <tr key={b.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
-                      <td className="py-2.5 px-4 text-gray-800 border border-gray-300">{b.name}</td>
-                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.age}</td>
-                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.dept}</td>
-                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300 hidden md:table-cell">
-                        {b.sex}
-                      </td>
-                      <td className="py-2.5 px-2 text-gray-700 border border-gray-300">{b.reason}</td>
-                      <td className="py-2.5 px-2 border border-gray-300">
+                    <tr key={b.id} className="row-hover">
+                      <td className="cell-wrap min-w-[140px] font-medium text-ink-900">{b.name}</td>
+                      <td className="tnum whitespace-nowrap">{b.age}</td>
+                      <td className="cell-wrap min-w-[80px]">{b.dept}</td>
+                      <td className="hidden whitespace-nowrap md:table-cell">{b.sex}</td>
+                      <td className="cell-wrap min-w-[140px]">{b.reason}</td>
+                      <td className="whitespace-nowrap">
                         <StatusBadge status={b.status} />
                       </td>
-                      <td className="py-2.5 px-4 text-right border border-gray-300">
+                      <td className="text-right">
                         <StatusMenu
                           current={b.status}
                           onChange={(newStatus) =>

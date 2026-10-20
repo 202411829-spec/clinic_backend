@@ -5,25 +5,15 @@ import PeriodDropdown from "./PeriodDropdown.jsx";
 import SelectDateCalendar from "./SelectDateCalendar.jsx";
 import Letterhead from "./Letterhead.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import CountUp from "../ui/CountUp.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { masterlistApi, reportsApi } from "../../lib/api.js";
 import { formatMDY, getPeriodLabel, shiftByPeriod, toYMD } from "../../lib/calendar.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
 
-// ─── Colour tokens (reuse brand palette, no new primaries) ───────────
-const GREEN_LIGHT = "bg-gc-green/10";
-const GREEN_TEXT = "text-gc-green";
-const BAR_TRACK = "bg-gray-100";
-
-// ─── Accent palette for variety across bars ───────────────────────────
-const ACCENTS = [
-  "bg-gc-green",
-  "bg-emerald-500",
-  "bg-teal-500",
-  "bg-green-400",
-  "bg-gc-accent",
-  "bg-emerald-400",
-];
+// ─── Design tokens (shared with the rest of the admin shell) ─────────
+const KICKER = "text-[11px] font-bold uppercase tracking-wider text-brand-900";
+const BAR_FILL = "bg-gradient-to-r from-brand-600 to-brand-900";
 
 // ─── Data shape the panel renders ─────────────────────────────────────
 const EMPTY_DATA = {
@@ -105,19 +95,30 @@ function mapResponse(json) {
 }
 
 // ─── KPI summary card ─────────────────────────────────────────────────
-function KpiCard({ label, value, badge, icon }) {
+function KpiCard({ label, value, text, badge, icon }) {
   return (
-    <div className="card-hover bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-6 flex items-center gap-4 animate-fade-in-up print:hover:transform-none">
+    <div className="flex min-w-0 items-center gap-4 rounded-panel bg-white p-5 shadow-e2 md:p-6">
       {icon && (
-        <span className={`w-11 h-11 rounded-xl ${GREEN_LIGHT} ${GREEN_TEXT} flex items-center justify-center shrink-0`}>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
           {icon}
         </span>
       )}
       <div className="min-w-0">
-        <p className="text-xs font-bold tracking-wider text-gray-400 uppercase mb-1">{label}</p>
-        <p className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-none truncate">{value}</p>
+        <p className={KICKER}>{label}</p>
+        {text !== undefined ? (
+          <p
+            title={text}
+            className="cell-wrap mt-1.5 line-clamp-2 text-xl font-semibold leading-tight text-ink-900"
+          >
+            {text}
+          </p>
+        ) : (
+          <p className="mt-1.5 text-3xl font-semibold leading-none text-ink-900">
+            <CountUp value={value} />
+          </p>
+        )}
         {badge && (
-          <span className="inline-block mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gc-green/10 text-gc-green">
+          <span className="mt-2 inline-block rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-800 ring-1 ring-inset ring-brand-100">
             {badge}
           </span>
         )}
@@ -126,45 +127,164 @@ function KpiCard({ label, value, badge, icon }) {
   );
 }
 
-// ─── Breakdown card with horizontal progress bars ─────────────────────
-function BreakdownCard({ title, rows, accentIndex = 0 }) {
+// ─── Breakdown card with animated progress bars ───────────────────────
+function BreakdownCard({ title, rows }) {
+  const total = rows.reduce((sum, r) => sum + (Number(r.count) || 0), 0);
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in-up print:rounded-lg print:break-inside-avoid">
-      {/* Card header */}
-      <div className="border-b border-gray-100 px-5 py-3">
-        <span className="text-xs font-bold tracking-wider text-gray-400 uppercase">{title}</span>
-      </div>
-
-      {/* Rows */}
-      <div className="divide-y divide-gray-50 px-5 py-2">
-        {rows.length === 0 && (
-          <p className="text-sm text-gray-400 py-4 text-center">No data available</p>
+    <div className="rounded-panel bg-white p-5 shadow-e2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className={KICKER}>{title}</h2>
+        {rows.length > 0 && (
+          <span className="shrink-0 text-[11px] text-ink-500">
+            <b className="tnum text-sm font-semibold text-ink-900">{total.toLocaleString()}</b> total
+          </span>
         )}
-        {rows.map((r, i) => {
-          const widthPct = r.percent || 0;
-          const barColor = ACCENTS[(accentIndex + i) % ACCENTS.length];
-          return (
-            <div key={r.label} className="py-3 group">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium text-gray-700 truncate pr-2">{r.label}</span>
-                <span className="text-xs font-semibold text-gray-500 shrink-0 tabular-nums">
-                  {r.count ?? r.value}
-                  {r.percent != null && (
-                    <span className="text-gray-400 ml-1">({r.percent}%)</span>
-                  )}
-                </span>
-              </div>
-              {/* Progress bar */}
-              <div className={`h-2 rounded-full ${BAR_TRACK} overflow-hidden`}>
-                <div
-                  className={`h-full rounded-full ${barColor} transition-all duration-500 ease-out`}
-                  style={{ width: `${widthPct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
       </div>
+      <div className="mt-4 space-y-4">
+        {rows.length === 0 && (
+          <p className="py-6 text-center text-sm text-ink-400">No data available</p>
+        )}
+        {rows.map((r, i) => (
+          <div key={r.label} className="flex items-center gap-3 text-xs">
+            <span className="cell-wrap w-28 shrink-0 text-ink-600 sm:w-36" title={r.label}>
+              {r.label}
+            </span>
+            <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-ink-100">
+              <div
+                className={`h-full origin-left animate-grow-x rounded-full ${BAR_FILL}`}
+                style={{ width: `${Math.min(100, r.percent || 0)}%`, animationDelay: `${i * 90}ms` }}
+              />
+            </div>
+            <span className="tnum w-20 shrink-0 text-right font-semibold text-ink-700">
+              {r.count ?? r.value}
+              {r.percent != null && <span className="ml-1 font-normal text-ink-400">{r.percent}%</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Vertical bar chart (age groups) ──────────────────────────────────
+function BarChartCard({ title, rows }) {
+  const max = Math.max(1, ...rows.map((r) => Number(r.count) || 0));
+  const peak = rows.reduce((best, r, i) => ((Number(r.count) || 0) > (Number(rows[best]?.count) || 0) ? i : best), 0);
+  return (
+    <div className="rounded-panel bg-white p-5 shadow-e2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className={KICKER}>{title}</h2>
+        {rows.length > 0 && (
+          <span className="text-[11px] text-ink-500">Peak: <b className="font-semibold text-ink-900">{rows[peak]?.label}</b></span>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-10 text-center text-sm text-ink-400">No data available</p>
+      ) : (
+        <div className="mt-5 flex h-48 items-end gap-2 sm:gap-3">
+          {rows.map((r, i) => {
+            const n = Number(r.count) || 0;
+            return (
+              <div key={r.label} className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end" title={`${r.label}: ${n}`}>
+                <span className="tnum mb-1 text-[10px] font-semibold text-ink-700">{n}</span>
+                <div
+                  className={`w-full origin-bottom animate-grow-y rounded-t-lg transition group-hover:brightness-110 ${
+                    i === peak ? "bg-gradient-to-t from-gold-500 to-gold-300" : "bg-gradient-to-t from-brand-900 to-brand-600"
+                  }`}
+                  style={{ height: `${Math.max(4, (n / max) * 100)}%`, animationDelay: `${i * 60}ms` }}
+                />
+                <span className="mt-2 w-full truncate text-center text-[10px] font-semibold text-ink-500">{r.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Ranked table (complaints) ────────────────────────────────────────
+function RankTable({ title, rows, className = "" }) {
+  return (
+    <div className={`overflow-hidden rounded-panel bg-white shadow-e2 ${className}`}>
+      <h2 className={`px-5 pt-5 ${KICKER}`}>{title}</h2>
+      <div className="tbl-scroll mt-3 max-h-[26rem] overflow-y-auto">
+        <table className="tbl min-w-[520px]">
+          <thead>
+            <tr>
+              <th className="sticky top-0 z-[1] w-12 bg-ink-50">#</th>
+              <th className="sticky top-0 z-[1] bg-ink-50">Complaint</th>
+              <th className="sticky top-0 z-[1] bg-ink-50 text-center">Cases</th>
+              <th className="sticky top-0 z-[1] bg-ink-50">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-10 text-center text-ink-400">No data available</td>
+              </tr>
+            )}
+            {rows.map((r, i) => (
+              <tr key={r.label} className="odd:bg-brand-50/40">
+                <td className="tnum text-ink-400">{i + 1}</td>
+                <td className="cell-wrap min-w-[180px] font-medium text-ink-900">{r.label}</td>
+                <td className="tnum text-center">{r.count ?? r.value}</td>
+                <td>
+                  <div className="flex w-40 items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-100">
+                      <div
+                        className={`h-full origin-left animate-grow-x rounded-full ${BAR_FILL}`}
+                        style={{ width: `${Math.min(100, r.percent || 0)}%`, animationDelay: `${Math.min(i, 12) * 60}ms` }}
+                      />
+                    </div>
+                    <span className="tnum w-10 text-right text-ink-700">{r.percent != null ? `${r.percent}%` : "—"}</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Print-only breakdown table (formal, bar in the percent column) ───
+function PrintTable({ title, rows }) {
+  return (
+    <div className="break-inside-avoid">
+      <h2 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-brand-900">{title}</h2>
+      <table className="w-full border-collapse overflow-hidden rounded text-[10px] ring-1 ring-brand-900/30">
+        <thead>
+          <tr className="bg-brand-900 text-white">
+            <th className="px-2 py-1 text-left font-semibold">Label</th>
+            <th className="w-14 px-2 py-1 text-right font-semibold">Count</th>
+            <th className="w-28 px-2 py-1 text-right font-semibold">Percent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={3} className="px-2 py-2 text-center italic text-ink-400">No data available</td>
+            </tr>
+          ) : (
+            rows.map((r) => (
+              <tr key={r.label} className="break-inside-avoid border-t border-ink-100 odd:bg-brand-50/60">
+                <td className="[overflow-wrap:anywhere] px-2 py-0.5">{r.label}</td>
+                <td className="tnum px-2 py-0.5 text-right">{r.count ?? r.value}</td>
+                <td className="px-2 py-0.5">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <div className="h-1 w-12 overflow-hidden rounded-full bg-ink-100">
+                      <div className="h-full rounded-full bg-brand-700" style={{ width: `${Math.min(100, r.percent || 0)}%` }} />
+                    </div>
+                    <span className="tnum w-8 text-right">{r.percent != null ? `${r.percent}%` : "—"}</span>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -285,24 +405,29 @@ export default function ReportsFullPanel() {
       // ── Helper: bordered table row (full cell grid, matching the
       // border-gray-400/300 table used on-screen/print) ────────────────
       const summaryLx = 14;
-      const summaryMidX = 105; // matches the on-screen w-1/2 split
-      const summaryRx = 196;
+            const summaryRx = 196;
       const summaryRowH = 5;
       let summaryTop = y - 3.5;
 
+      let zebra = 0;
       function drawRow(label, value, isHeader = false) {
         const lx = summaryLx;
         const rx = summaryRx;
         const rowH = summaryRowH;
 
         if (isHeader) {
-          doc.setFillColor(240, 240, 240);
+          doc.setFillColor(4, 75, 14); // brand-900
+          doc.rect(lx, y - 3.5, rx - lx, rowH, "F");
+          doc.setTextColor(255);
+        } else if (zebra++ % 2 === 1) {
+          doc.setFillColor(238, 247, 240); // brand-50
           doc.rect(lx, y - 3.5, rx - lx, rowH, "F");
         }
 
         doc.setFont(undefined, isHeader ? "bold" : "normal");
         doc.text(label, lx + 1, y);
         doc.text(String(value), rx - 1, y, { align: "right" });
+        doc.setTextColor("#000000");
         y += rowH;
       }
 
@@ -323,15 +448,12 @@ export default function ReportsFullPanel() {
 
       // Full grid over the summary table: outer box, horizontal row lines,
       // and one vertical divider at the label/value midpoint.
-      doc.setDrawColor(160);
+      doc.setDrawColor(214, 219, 215);
       doc.setLineWidth(0.15);
       const summaryBottom = y - 3.5;
       for (let ly = summaryTop; ly <= summaryBottom + 0.01; ly += summaryRowH) {
         doc.line(summaryLx, ly, summaryRx, ly);
       }
-      doc.line(summaryLx, summaryTop, summaryLx, summaryBottom);
-      doc.line(summaryMidX, summaryTop, summaryMidX, summaryBottom);
-      doc.line(summaryRx, summaryTop, summaryRx, summaryBottom);
       y += 4;
 
       // ── Breakdown tables ─────────────────────────────────────────
@@ -352,39 +474,45 @@ export default function ReportsFullPanel() {
 
         doc.setFontSize(10);
         doc.setFont(undefined, "bold");
-        doc.text(section.title, 14, y);
+        doc.setTextColor("#044B0E");
+        doc.text(section.title.toUpperCase(), 14, y);
+        doc.setTextColor("#000000");
         y += 5;
 
         const lx = 14;
-        const div1 = 134; // Label / Count boundary
-        const div2 = 166; // Count / Percent boundary
+                const div2 = 166; // Count / Percent boundary
         const rx = 196;
         const bkRowH = 5;
         let bkTop = y - 3.5;
 
         // Table header
         doc.setFontSize(9);
-        doc.setFillColor(240, 240, 240);
+        doc.setFillColor(4, 75, 14);
         doc.rect(lx, y - 3.5, rx - lx, bkRowH, "F");
         doc.setFont(undefined, "bold");
+        doc.setTextColor(255);
         doc.text("Label", lx + 1, y);
         doc.text("Count", div2 - 1, y, { align: "right" });
         doc.text("Percent", rx - 1, y, { align: "right" });
+        doc.setTextColor("#000000");
         y += bkRowH;
 
         function drawBkGrid(top, bottom) {
-          doc.setDrawColor(180);
+          doc.setDrawColor(214, 219, 215);
           doc.setLineWidth(0.15);
           for (let ly = top; ly <= bottom + 0.01; ly += bkRowH) {
             doc.line(lx, ly, rx, ly);
           }
-          [lx, div1, div2, rx].forEach((vx) => doc.line(vx, top, vx, bottom));
         }
 
         // Table rows
         doc.setFont(undefined, "normal");
         const rowsToRender = section.rows.length ? section.rows : [null];
-        rowsToRender.forEach((row) => {
+        rowsToRender.forEach((row, ri) => {
+          if (row !== null && ri % 2 === 1) {
+            doc.setFillColor(238, 247, 240);
+            doc.rect(lx, y - 3.5, rx - lx, bkRowH, "F");
+          }
           if (y > 270) {
             // Close out the grid drawn so far before breaking to a new page.
             drawBkGrid(bkTop, y - 3.5);
@@ -446,7 +574,16 @@ export default function ReportsFullPanel() {
         { align: "center" }
       );
       y += 4;
-      doc.text("Page 1 of 1", 105, y, { align: "center" });
+
+      // Real page numbers (the old footer always said "Page 1 of 1").
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setFont(undefined, "normal");
+        doc.setTextColor(120);
+        doc.text(`Page ${i} of ${pageCount}`, 196, 290, { align: "right" });
+      }
 
       doc.save(`clinic-report-${formatMDY(date).replaceAll("/", "-")}.pdf`);
       setError(null);
@@ -458,47 +595,58 @@ export default function ReportsFullPanel() {
     }
   }
 
+  const generatedLong = new Date().toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  const topPct = data.complaint.rows[0]?.percent ?? 0;
+
   return (
-    <section className="bg-gray-50/50 rounded-2xl p-4 md:p-6 print:shadow-none print:border-none print-a4-portrait">
+    <section className="print-a4-portrait space-y-5">
       {error && (
-        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-2 print:hidden">
+        <div role="alert" className="flex animate-fade-in items-center justify-between gap-2 rounded-card border border-signal-rose-ring bg-signal-rose-bg px-4 py-3 text-sm text-signal-rose print:hidden">
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">
             Dismiss
           </button>
         </div>
       )}
-      {/* ═══════════════════════════════════════════════════════════════
-          SCREEN DASHBOARD (hidden on print)
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="print:hidden">
-        {/* ─── Page header ─────────────────────────────────────────── */}
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+
+      {/* ═══════════════ SCREEN DASHBOARD (hidden on print) ═══════════════ */}
+      <div className="stagger space-y-5 print:hidden">
+        {/* Page header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-              <NavIcon name="chart" className="w-5 h-5" />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-brand-900 text-white shadow-e2">
+              <NavIcon name="chart" className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="font-bold text-gc-green text-lg md:text-xl leading-tight">
-                Reports
-              </h1>
-              <p className="text-xs text-gray-400 leading-tight">Clinic analytics &amp; statistics</p>
+              <h1 className="font-serif text-2xl font-semibold leading-tight text-ink-900">Reports</h1>
+              <p className="text-xs text-ink-500">Clinic analytics &amp; statistics</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handlePrint} className="btn-secondary btn-press">
+              <NavIcon name="printer" className="h-4 w-4" />
+              Print
+            </button>
+            <button onClick={handleDownloadPdf} disabled={downloading} className="btn-primary btn-press btn-shine">
+              <NavIcon name="download" className="h-4 w-4" />
+              {downloading ? "Preparing…" : "Download PDF"}
+            </button>
           </div>
         </div>
 
-        {/* ─── Filter toolbar ───────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* Date navigator */}
-            <div className="relative flex items-center gap-1.5 flex-1 min-w-0" ref={pickerRef}>
+        {/* Filter toolbar (no overflow-hidden: the date popover must escape it) */}
+        <div className="rounded-panel bg-white p-3 shadow-e2 md:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex min-w-0 flex-1 items-center gap-1.5" ref={pickerRef}>
               {period !== "All Time" && (
                 <button
                   onClick={() => shiftDay(-1)}
                   aria-label={`Previous ${period.toLowerCase()}`}
-                  className="icon-btn w-8 h-8 shrink-0 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="icon-btn h-9 w-9 shrink-0 rounded-control border border-ink-200 text-ink-500 hover:bg-ink-50"
                 >
-                  <NavIcon name="chevron-left" className="w-4 h-4" />
+                  <NavIcon name="chevron-left" className="h-4 w-4" />
                 </button>
               )}
               <button
@@ -506,41 +654,35 @@ export default function ReportsFullPanel() {
                 onClick={() => period !== "All Time" && setPickerOpen((v) => !v)}
                 aria-haspopup={period !== "All Time" ? "dialog" : undefined}
                 aria-expanded={pickerOpen}
-                className={`flex-1 flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-gray-700 whitespace-nowrap min-w-0 ${
-                  period !== "All Time" ? "hover:bg-gray-50 cursor-pointer" : "cursor-default"
+                className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-control border border-ink-200 px-3 text-sm font-semibold text-ink-700 ${
+                  period !== "All Time" ? "cursor-pointer hover:bg-ink-50" : "cursor-default"
                 }`}
               >
-                <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
+                <NavIcon name="calendar" className="h-4 w-4 shrink-0 text-brand-600" />
                 <span className="truncate">{periodLabel}</span>
               </button>
               {period !== "All Time" && (
                 <button
                   onClick={() => shiftDay(1)}
                   aria-label={`Next ${period.toLowerCase()}`}
-                  className="icon-btn w-8 h-8 shrink-0 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="icon-btn h-9 w-9 shrink-0 rounded-control border border-ink-200 text-ink-500 hover:bg-ink-50"
                 >
-                  <NavIcon name="chevron-right" className="w-4 h-4" />
+                  <NavIcon name="chevron-right" className="h-4 w-4" />
                 </button>
               )}
-
               {pickerOpen && (
-                <div className="absolute left-0 top-full mt-2 z-30 w-[320px]">
+                <div className="absolute left-0 top-full z-30 mt-2 w-[320px] animate-pop-in">
                   <SelectDateCalendar
                     selectedDate={date}
-                    onSelectDate={(d) => {
-                      setDate(d);
-                      setPickerOpen(false);
-                    }}
+                    onSelectDate={(d) => { setDate(d); setPickerOpen(false); }}
                     onNavigate={setDate}
                   />
                 </div>
               )}
             </div>
 
-            {/* Divider */}
-            <div className="hidden sm:block w-px h-8 bg-gray-200 shrink-0" />
+            <div className="hidden h-8 w-px shrink-0 bg-ink-100 sm:block" />
 
-            {/* Period + Department filters */}
             <div className="flex items-center gap-2">
               <PeriodDropdown value={period} onChange={setPeriod} />
               <UniversalDropdown
@@ -550,198 +692,92 @@ export default function ReportsFullPanel() {
                 className="w-full sm:w-48"
               />
             </div>
-
-            {/* Divider */}
-            <div className="hidden sm:block w-px h-8 bg-gray-200 shrink-0" />
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handlePrint}
-                className="btn-press inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <NavIcon name="printer" className="w-4 h-4" />
-                Print
-              </button>
-              <button
-                onClick={handleDownloadPdf}
-                disabled={downloading}
-                className="btn-press inline-flex items-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2 rounded-xl hover:bg-gc-green-600 disabled:opacity-60 disabled:hover:translate-y-0 transition-colors"
-              >
-                <NavIcon name="download" className="w-4 h-4" />
-                {downloading ? "Preparing…" : "Download PDF"}
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* ─── KPI summary row ──────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-          <KpiCard
-            label="Total Consultations"
-            value={totalConsultations.toLocaleString()}
-            icon={<NavIcon name="chart" className="w-5 h-5" />}
-          />
-          <KpiCard
-            label="Total Students"
-            value={totalStudents.toLocaleString()}
-            icon={<NavIcon name="user" className="w-5 h-5" />}
-          />
+        {/* KPI row */}
+        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <KpiCard label="Total Consultations" value={totalConsultations} icon={<NavIcon name="chart" className="h-5 w-5" />} />
+          <KpiCard label="Total Students" value={totalStudents} icon={<NavIcon name="user" className="h-5 w-5" />} />
           <KpiCard
             label="Top Complaint"
-            value={topComplaint}
-            badge={topComplaint !== "—" ? `${data.complaint.rows[0]?.percent ?? 0}% of total` : undefined}
-            icon={<NavIcon name="feedback" className="w-5 h-5" />}
+            text={topComplaint}
+            badge={topComplaint !== "—" ? `${topPct}% of total` : undefined}
+            icon={<NavIcon name="feedback" className="h-5 w-5" />}
           />
         </div>
 
-        {/* ─── Breakdown cards grid ──────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <BreakdownCard title="Reason for Visit" rows={data.reason.rows} accentIndex={0} />
-          <BreakdownCard title="Complaint" rows={data.complaint.rows} accentIndex={1} />
-          <BreakdownCard title="Department" rows={data.department.rows} accentIndex={2} />
-          <BreakdownCard title="Sex" rows={data.sex.rows} accentIndex={3} />
-          <BreakdownCard title="Age Group" rows={data.age.rows} accentIndex={4} />
+        {/* Breakdowns */}
+        <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BreakdownCard title="Reason for Visit" rows={data.reason.rows} />
+          <BreakdownCard title="Department" rows={data.department.rows} />
+          <BreakdownCard title="Sex" rows={data.sex.rows} />
+          <BarChartCard title="Age Group" rows={data.age.rows} />
+          <RankTable title="Most common complaints" rows={data.complaint.rows} className="md:col-span-2" />
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          PRINT / PDF LAYOUT (hidden on screen, shown on print)
-          Formal layout: letterhead → title → summary table →
-          breakdown tables → footer sign-off.
-          ═══════════════════════════════════════════════════════════════ */}
-      <div className="hidden print:block print:space-y-5">
-        {/* Letterhead */}
-        <Letterhead className="hidden print:flex items-center gap-3 mb-3 pb-3 border-b border-gray-300" />
+      {/* ═══════════════ PRINT LAYOUT (A4, hidden on screen) ═══════════════ */}
+      <div className="report-print hidden space-y-4 print:block">
+        <Letterhead className="mb-3 hidden items-center gap-3 border-b-2 border-brand-900 pb-3 print:flex" />
 
-        {/* Report title + metadata */}
-        <div className="text-center mb-1">
-          <h1 className="text-base font-bold text-black tracking-wide uppercase">
-            Clinic Consultation Report
-          </h1>
-          <p className="text-[10px] text-gray-600 mt-1">
-            {periodLabel} &nbsp;|&nbsp; {department} &nbsp;|&nbsp;{" "}
-            Generated:{" "}
-            {new Date().toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}{" "}
-            &nbsp;|&nbsp; Generated by: {adminName}
-          </p>
+        {/* Title block */}
+        <div className="text-center">
+          <h1 className="text-sm font-bold uppercase tracking-[0.18em] text-ink-900">Clinic Consultation Report</h1>
+          <div className="mx-auto mt-1.5 h-0.5 w-16 rounded-full bg-gold-400" />
         </div>
 
-        {/* ── Executive Summary table ─────────────────────────────────── */}
-        <div>
-          <h2 className="text-xs font-bold text-black mb-1 uppercase tracking-wide">
-            Executive Summary
-          </h2>
-          <table className="w-full text-[10px] border border-gray-400">
-            <tbody className="tbl-animate">
-              {[
-                ["Total Consultations", totalConsultations.toLocaleString()],
-                ["Total Students", totalStudents.toLocaleString()],
-                ["Top Complaint", topComplaint],
-                ["Date Range", periodLabel],
-                ["Department", department],
-              ].map(([metric, value], i, arr) => (
-                <tr
-                  key={metric}
-                  className={i < arr.length - 1 ? "border-b border-gray-300" : ""}
-                >
-                  <td className="py-1 px-2 font-semibold border-r border-gray-300 w-1/2">
-                    {metric}
-                  </td>
-                  <td className="py-1 px-2">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Meta strip */}
+        <div className="grid grid-cols-4 divide-x divide-ink-200 rounded border border-ink-200 bg-ink-50 text-[9px]">
+          {[
+            ["Period", periodLabel],
+            ["Department", department],
+            ["Generated", generatedLong],
+            ["Prepared by", adminName],
+          ].map(([k, v]) => (
+            <div key={k} className="min-w-0 px-2 py-1.5">
+              <p className="font-bold uppercase tracking-wider text-ink-500">{k}</p>
+              <p className="mt-0.5 [overflow-wrap:anywhere] font-medium text-ink-900">{v}</p>
+            </div>
+          ))}
         </div>
 
-        {/* ── Breakdown tables ────────────────────────────────────────── */}
-        {[
-          { title: "Reason for Visit", rows: data.reason.rows },
-          { title: "Complaint", rows: data.complaint.rows },
-          { title: "Department", rows: data.department.rows },
-          { title: "Sex", rows: data.sex.rows },
-          { title: "Age Group", rows: data.age.rows },
-        ].map((section) => (
-          <div key={section.title} className="print:break-inside-avoid">
-            <h2 className="text-xs font-bold text-black mb-1 uppercase tracking-wide">
-              {section.title}
-            </h2>
-            <table className="w-full text-[10px] border border-gray-400">
-              <thead>
-                <tr className="border-b border-gray-400 bg-gray-50">
-                  <th className="py-1 px-2 text-left font-semibold border-r border-gray-300">
-                    Label
-                  </th>
-                  <th className="py-1 px-2 text-right font-semibold border-r border-gray-300 w-20">
-                    Count
-                  </th>
-                  <th className="py-1 px-2 text-right font-semibold w-20">Percent</th>
-                </tr>
-              </thead>
-              <tbody className="tbl-animate">
-                {section.rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="py-2 px-2 text-center text-gray-400 italic"
-                    >
-                      No data available
-                    </td>
-                  </tr>
-                ) : (
-                  section.rows.map((r, i) => (
-                    <tr
-                      key={r.label}
-                      className={
-                        i < section.rows.length - 1 ? "border-b border-gray-300" : ""
-                      }
-                    >
-                      <td className="py-0.5 px-2 border-r border-gray-300">
-                        {r.label}
-                      </td>
-                      <td className="py-0.5 px-2 text-right border-r border-gray-300 tabular-nums">
-                        {r.count ?? r.value}
-                      </td>
-                      <td className="py-0.5 px-2 text-right tabular-nums">
-                        {r.percent != null ? `${r.percent}%` : "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ))}
+        {/* KPI strip */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            ["Total Consultations", totalConsultations.toLocaleString()],
+            ["Total Students", totalStudents.toLocaleString()],
+            ["Top Complaint", topComplaint],
+          ].map(([k, v]) => (
+            <div key={k} className="min-w-0 rounded border border-brand-900/25 bg-brand-50 px-3 py-2">
+              <p className="text-[8px] font-bold uppercase tracking-wider text-brand-800">{k}</p>
+              <p className="mt-0.5 [overflow-wrap:anywhere] text-sm font-bold leading-tight text-brand-900">{v}</p>
+            </div>
+          ))}
+        </div>
 
-        {/* ── Footer sign-off ─────────────────────────────────────────── */}
-        <div className="print:break-inside-avoid mt-6 pt-4 border-t border-gray-400">
-          <div className="flex justify-between text-[10px] text-black mb-6">
+        <PrintTable title="Reason for Visit" rows={data.reason.rows} />
+        <PrintTable title="Complaint" rows={data.complaint.rows} />
+        <PrintTable title="Department" rows={data.department.rows} />
+        <div className="grid grid-cols-2 items-start gap-4">
+          <PrintTable title="Sex" rows={data.sex.rows} />
+          <PrintTable title="Age Group" rows={data.age.rows} />
+        </div>
+
+        {/* Sign-off */}
+        <div className="mt-6 break-inside-avoid border-t-2 border-brand-900 pt-4">
+          <div className="mb-4 flex justify-between text-[10px] text-ink-900">
             <div>
               <p className="font-semibold">Prepared by: {adminName}</p>
-              <p className="mt-6 border-t border-gray-400 w-40 pt-1">
-                Signature over Printed Name
-              </p>
+              <p className="mt-8 w-44 border-t border-ink-700 pt-1">Signature over Printed Name</p>
             </div>
             <div className="text-right">
               <p className="font-semibold">Noted by:</p>
-              <p className="mt-6 border-t border-gray-400 w-40 pt-1 ml-auto">
-                Signature over Printed Name
-              </p>
+              <p className="ml-auto mt-8 w-44 border-t border-ink-700 pt-1">Signature over Printed Name</p>
             </div>
           </div>
-          <p className="text-[8px] text-gray-500 text-center mt-2">
-            This report is system-generated. Entries with &quot;No complaint
-            logged&quot; have been excluded from the complaint breakdown.
-          </p>
-          <p className="text-[8px] text-gray-500 text-center mt-0.5">
-            Page 1 of 1
+          <p className="text-center text-[8px] text-ink-500">
+            This report is system-generated. Entries with &quot;No complaint logged&quot; have been excluded from the complaint breakdown.
           </p>
         </div>
       </div>

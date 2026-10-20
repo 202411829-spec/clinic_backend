@@ -472,40 +472,40 @@ export default function LogbookFullPanel() {
                 <p className="text-xs text-gray-600 mb-4">{printSummary}</p>
               </td>
             </tr>
-            <tr className="text-left text-xs text-gray-500 bg-gray-50">
-              <th className="py-2 px-4 md:px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
-              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
+            <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
+              <th className="py-2 px-4 md:px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Date & Time</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Name</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Dept / Course</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Sex</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Reason</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Complaint</th>
+              <th className="py-2 px-2 print:px-1.5 print:py-2 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Medicine</th>
             </tr>
           </thead>
           <tbody className="tbl-animate">
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-sm text-gray-400 border border-gray-300">
+                <td colSpan={9} className="py-8 text-center text-sm text-gray-400 border-b border-ink-100 print:border print:border-gray-300">
                   No logbook entries found
                 </td>
               </tr>
             ) : (
               entries.map((entry) => (
-                <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-gray-50">
-                  <td className="py-2.5 px-4 md:px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.name}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300">
-                    <div className="font-medium whitespace-nowrap print:whitespace-normal">{entry.dept}</div>
-                    <div className="text-xs print:text-[9px] text-gray-500 whitespace-nowrap print:whitespace-normal">{entry.course}</div>
+                <tr key={entry.id} className="row-hover transition-colors duration-150 hover:bg-brand-50/60">
+                  <td className="py-2.5 px-4 md:px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.dateTime}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{entry.studentId}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{entry.name}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.age}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300">
+                    <div className="font-medium whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{entry.dept}</div>
+                    <div className="text-xs print:text-[9px] text-gray-500 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{entry.course}</div>
                   </td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.reason}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 max-w-xs truncate print:max-w-none print:overflow-visible print:text-clip print:whitespace-normal">{entry.complaint}</td>
-                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-gray-700 border border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.medicine}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{entry.sex}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{entry.reason}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:min-w-[180px] md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal print:min-w-0">{entry.complaint}</td>
+                  <td className="py-2.5 px-2 print:px-1.5 print:py-2 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{entry.medicine}</td>
                 </tr>
               ))
             )}

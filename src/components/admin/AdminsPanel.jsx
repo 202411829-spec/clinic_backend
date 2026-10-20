@@ -347,21 +347,21 @@ export default function AdminsPanel() {
             />
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="tbl-scroll">
+          <table className="tbl min-w-[720px]">
             {/* Sentence case, not NAME / EMAIL / ROLE. Tracked-out caps make
                 headers shout louder than the data they label. */}
-            <thead className="border-b border-ink-100 text-left text-xs font-medium text-ink-500">
+            <thead>
               <tr>
-                <th className="px-3 py-2.5 pl-5 font-medium">Name</th>
-                <th className="px-3 py-2.5 font-medium">Email</th>
-                <th className="px-3 py-2.5 font-medium">Role</th>
-                <th className="px-3 py-2.5 font-medium">License no.</th>
-                <th className="px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5 pr-5 text-right font-medium">Actions</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>License no.</th>
+                <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="tbl-animate divide-y divide-ink-100">
+            <tbody className="tbl-animate">
               {loading ? (
                 skeletonRows.map((_, i) => (
                   <tr key={i}>
@@ -398,23 +398,23 @@ export default function AdminsPanel() {
                 const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || '—'
                 const isSelf = (a.email || '').toLowerCase() === selfEmail
                 return (
-                  <tr key={a.admin_id} className="group/row row-hover hover:bg-ink-50/70">
-                    <td className="px-3 py-3 pl-5">
-                      <div className="flex items-center gap-2.5">
+                  <tr key={a.admin_id} className="group/row row-hover">
+                    <td className="min-w-[180px]">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-2xs font-semibold ${roleTone(a.role)}`}>
                           {initials(a)}
                         </span>
-                        <span className="font-medium text-ink-900">
+                        <span className="cell-wrap font-medium text-ink-900">
                           {name}
                           {isSelf && <span className="ml-2 text-xs font-normal text-ink-400">You</span>}
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-ink-600">{a.email}</td>
-                    <td className="px-3 py-3"><RolePill role={a.role} /></td>
-                    <td className="tnum px-3 py-3 text-ink-600">{a.license_no || '—'}</td>
-                    <td className="px-3 py-3"><StatusPill status={a.status} /></td>
-                    <td className="px-3 py-3 pr-5">
+                    <td className="cell-wrap min-w-[180px] max-w-[260px]">{a.email}</td>
+                    <td><RolePill role={a.role} /></td>
+                    <td className="tnum cell-wrap">{a.license_no || '—'}</td>
+                    <td><StatusPill status={a.status} /></td>
+                    <td>
                       {/* Actions rest at 60% and come up to full on row hover
                           or keyboard focus. Eight fully-saturated controls in a
                           four-row table competed with the data itself — but
@@ -495,34 +495,34 @@ export default function AdminsPanel() {
                 <p className="mt-1 text-sm text-ink-500">New sign-ups and re-activation requests will show up here.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-card ring-1 ring-ink-100">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead className="border-b border-ink-100 text-left text-xs font-medium text-ink-500">
+              <div className="tbl-scroll rounded-card ring-1 ring-ink-100">
+                <table className="tbl min-w-[640px]">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-2.5 font-medium">Name</th>
-                      <th className="px-4 py-2.5 font-medium">Email</th>
-                      <th className="px-4 py-2.5 font-medium">Role</th>
-                      <th className="px-4 py-2.5 font-medium">License no.</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>License no.</th>
+                      <th className="text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="tbl-animate divide-y divide-ink-100">
+                  <tbody className="tbl-animate">
                     {pendingAdmins.map((a) => {
                       const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || '—'
                       return (
-                        <tr key={a.admin_id} className="row-hover hover:bg-ink-50/70">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
+                        <tr key={a.admin_id} className="row-hover">
+                          <td className="min-w-[160px]">
+                            <div className="flex min-w-0 items-center gap-2.5">
                               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${roleTone(a.role)}`}>
                                 {initials(a)}
                               </span>
-                              {name}
+                              <span className="cell-wrap font-medium text-ink-900">{name}</span>
                             </div>
                           </td>
-                          <td className="max-w-[220px] truncate px-4 py-3 text-ink-600" title={a.email}>{a.email}</td>
-                          <td className="px-4 py-3"><RolePill role={a.role} /></td>
-                          <td className="px-4 py-3 text-ink-600">{a.license_no || '—'}</td>
-                          <td className="px-4 py-3">
+                          <td className="cell-clip" style={{ '--cell-max': '220px' }} title={a.email}>{a.email}</td>
+                          <td><RolePill role={a.role} /></td>
+                          <td className="cell-wrap">{a.license_no || '—'}</td>
+                          <td>
                             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                               <button onClick={() => handleAccept(a)} className="btn-press shrink-0 rounded-control bg-brand-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">Accept</button>
                               <button onClick={() => { setConfirmTarget(a); setConfirmEmail(''); setConfirmError('') }} className="btn-press shrink-0 rounded-control px-3 py-1.5 text-xs font-medium text-signal-rose hover:bg-signal-rose-bg">Reject</button>

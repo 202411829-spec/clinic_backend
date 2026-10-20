@@ -128,9 +128,58 @@
   .t-key {
     @apply font-medium text-ink-900;
   }
+
+  /* ── Admin data table (mirrors the reference build's look) ─────────────
+     Tinted header bar, hairline row dividers, brand-tinted hover. Apply
+     `.tbl` to <table>; it replaces the per-cell gray grid borders. */
+  .tbl {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .tbl thead {
+    @apply border-y border-ink-100 bg-ink-50/70;
+  }
+  .tbl th {
+    @apply px-3 py-3 text-left text-xs font-medium text-ink-500 first:pl-5 last:pr-5;
+  }
+  .tbl tbody tr {
+    @apply border-b border-ink-100 last:border-b-0;
+  }
+  .tbl tbody tr:hover {
+    background-color: theme('colors.brand.50' / 60%);
+  }
+  .tbl td {
+    @apply px-3 py-3 align-middle text-ink-600 first:pl-5 last:pr-5;
+  }
 }
 
 @layer utilities {
+  /* ── Overflow control for table cells ──────────────────────────────────
+     .cell-wrap  free text (names, emails, reasons, complaints): wraps at
+                 spaces first, and breaks inside a long unbroken string
+                 (emails, IDs, pasted text) instead of spilling past the
+                 cell into its neighbour or out of the panel.
+     .cell-clip  one-line identifiers: ellipsis at --cell-max (default
+                 14rem). Pair with title={fullText} so nothing is lost. */
+  .cell-wrap {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    white-space: normal;
+  }
+  .cell-clip {
+    max-width: var(--cell-max, 14rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Scroll wrapper for wide tables: scrolls sideways inside the panel
+     rather than stretching the page. */
+  .tbl-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
   /* Chrome autofill would otherwise paint fields pale yellow. */
   input:-webkit-autofill,
   input:-webkit-autofill:focus {
@@ -494,6 +543,15 @@
   tr {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* Reports print: zebra rows, header fills and mini bars are background
+     colours, which browsers drop on paper unless told otherwise. Scoped to
+     the report so other printed documents are unaffected. */
+  .report-print,
+  .report-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .print-a4-portrait {
