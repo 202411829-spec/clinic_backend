@@ -11,11 +11,11 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
   // If reasons aren't loaded yet, show a loading state
   if (!reasons || reasons.length === 0) {
     return (
-      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-        <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+      <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
+        <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
           Select Reason
         </h2>
-        <div className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-400">
+        <div className="w-full animate-pulse rounded-control border border-ink-200 px-3 py-2.5 text-sm text-ink-400">
           Loading reasons…
         </div>
       </section>
@@ -23,8 +23,8 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
   }
 
   return (
-    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
+    <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
+      <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
         Select Reason
       </h2>
 

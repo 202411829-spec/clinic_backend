@@ -75,18 +75,17 @@ export default function Feedback() {
   }
 
   return (
-    <div className="pt-2 md:pt-4 pb-6 md:pb-10 space-y-4 md:space-y-6 max-w-3xl mx-auto">
+    <div className="stagger mx-auto max-w-3xl space-y-4 pb-6 pt-2 md:space-y-6 md:pb-10 md:pt-4">
       {/* Header */}
-      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-            <NavIcon name="feedback" className="w-5 h-5" />
+      <section className="relative overflow-hidden rounded-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 p-5 text-white shadow-e2 md:p-7">
+        <span aria-hidden className="pointer-events-none absolute -right-8 -top-12 h-44 w-44 rounded-full border border-white/10" />
+        <div className="relative flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-white/15">
+            <NavIcon name="feedback" className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="font-bold text-gray-800 text-sm md:text-lg tracking-wide">
-              FEEDBACK
-            </h2>
-            <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+            <h1 className="font-serif text-xl font-semibold leading-tight md:text-2xl">Feedback</h1>
+            <p className="mt-0.5 text-sm text-brand-100">
               Tell us about your clinic visit — it helps us serve you better.
             </p>
           </div>
@@ -94,13 +93,13 @@ export default function Feedback() {
       </section>
 
       {/* Submit form */}
-      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+      <section className="card-hover rounded-panel bg-white p-5 shadow-e2 md:p-7">
         {justSubmitted && (
-          <div className="mb-5 flex items-start gap-2.5 rounded-xl bg-gc-green/10 border border-gc-green/20 px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
-            <span className="w-5 h-5 rounded-full bg-gc-green text-white flex items-center justify-center shrink-0 mt-0.5 animate-scale-in">
+          <div className="mb-5 flex animate-fade-in-up items-start gap-2.5 rounded-card border border-brand-200 bg-brand-50 px-4 py-3 motion-reduce:animate-none">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 animate-scale-in items-center justify-center rounded-full bg-brand-700 text-white">
               <NavIcon name="check" className="w-3 h-3" />
             </span>
-            <p className="text-sm font-medium text-gc-green">
+            <p className="text-sm font-medium text-brand-800">
               Salamat! Your feedback has been submitted.
             </p>
           </div>
@@ -108,14 +107,14 @@ export default function Feedback() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="flex flex-col items-center text-center gap-2 py-2">
-            <p className="text-sm font-semibold text-gray-700">
+            <p className="text-sm font-semibold text-ink-700">
               Please Rate Your Experience
             </p>
             <StarRating value={rating} onChange={(v) => { setRating(v); setError(""); }} />
             <p
               className={[
                 "text-xs font-medium",
-                rating ? "text-gc-accent" : "text-gray-400",
+                rating ? "text-brand-700" : "text-ink-400",
               ].join(" ")}
             >
               {ratingLabels[rating]}
@@ -124,10 +123,10 @@ export default function Feedback() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-brand-900">
                 Your message (optional)
               </label>
-              <span className="text-[11px] text-gray-400">
+              <span className="tnum text-[11px] text-ink-400">
                 {message.length}/{maxLength}
               </span>
             </div>
@@ -136,18 +135,18 @@ export default function Feedback() {
               onChange={(e) => setMessage(e.target.value.slice(0, maxLength))}
               rows={4}
               placeholder="Share any details that could help the clinic improve..."
-              className="w-full resize-none border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gc-accent/40 focus:border-gc-accent"
+              className="w-full resize-none rounded-control border border-ink-200 px-3 py-2.5 text-sm text-ink-800 transition placeholder:text-ink-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25"
             />
           </div>
 
           {error && (
-            <p className="text-xs font-medium text-red-600 -mt-2 animate-fade-in-up">{error}</p>
+            <p className="-mt-2 animate-fade-in-up text-xs font-medium text-signal-rose">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={submitting}
-            className="btn-press w-full rounded-xl bg-gc-green py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
+            className="btn-primary btn-press btn-shine w-full py-3 text-[15px]"
           >
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
@@ -162,17 +161,15 @@ export default function Feedback() {
       </section>
 
       {/* History */}
-      <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
-        <h3 className="font-bold text-gray-800 text-sm tracking-wide mb-4">
-          YOUR PREVIOUS FEEDBACK
-        </h3>
+      <section className="card-hover rounded-panel bg-white p-5 shadow-e2 md:p-7">
+        <h2 className="panel-title mb-4 font-serif">Your previous feedback</h2>
 
         {history.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <span className="w-11 h-11 rounded-full bg-gray-50 text-gray-300 flex items-center justify-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
               <NavIcon name="feedback" className="w-5 h-5" />
             </span>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-ink-400">
               You haven't submitted any feedback yet.
             </p>
           </div>
@@ -184,11 +181,11 @@ export default function Feedback() {
               <li
                 key={f.id}
                 style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-                className="row-hover rounded-xl border border-gray-100 bg-gray-50/60 p-4 animate-fade-in-up motion-reduce:animate-none"
+                className="row-hover animate-fade-in-up rounded-card bg-ink-50/70 p-4 ring-1 ring-inset ring-ink-100 motion-reduce:animate-none"
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <StarRating value={f.rating} readOnly size="w-4 h-4" />
-                  <span className="text-[11px] text-gray-400 shrink-0">
+                  <span className="shrink-0 text-[11px] text-ink-400">
                     {new Date(f.date).toLocaleDateString("en-PH", {
                       month: "short",
                       day: "numeric",
@@ -197,7 +194,7 @@ export default function Feedback() {
                   </span>
                 </div>
                 {f.message && (
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                  <p className="cell-wrap text-sm leading-relaxed text-ink-600">
                     {f.message}
                   </p>
                 )}

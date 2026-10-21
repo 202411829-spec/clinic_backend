@@ -6,6 +6,11 @@ import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";
 import { toYMD } from "../../lib/calendar";
+import StatusPill from "./StatusPill.jsx";
+
+// Map the card badge text back onto a pill tone (context bookings say
+// "Today"/"Upcoming", backend rows say Pending/Completed/…).
+const BADGE_TONE = { Completed: "completed", Cancelled: "cancelled", "No Show": "no_show" };
 
 function formatTime(value) {
   if (!value) return "-";
@@ -118,9 +123,9 @@ function handleReschedule() {
   }
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
+    <section className="card-hover h-full rounded-panel bg-white p-5 shadow-e2 md:p-7">
       {error && (
-        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-2">
+        <div role="alert" className="mb-4 flex animate-fade-in items-center justify-between gap-2 rounded-card border border-signal-rose-ring bg-signal-rose-bg px-4 py-3 text-sm text-signal-rose">
           <span>{error}</span>
           <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">
             Dismiss
@@ -129,12 +134,10 @@ function handleReschedule() {
       )}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-            <NavIcon name="calendar" className="w-5 h-5" />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
+            <NavIcon name="calendar" className="h-5 w-5" />
           </span>
-          <h2 className="font-bold text-gray-800 text-sm md:text-lg tracking-wide whitespace-nowrap">
-            UPCOMING APPOINTMENT
-          </h2>
+          <h2 className="panel-title font-serif">Upcoming appointment</h2>
         </div>
 
         {appt && (
@@ -144,7 +147,7 @@ function handleReschedule() {
               aria-label="Appointment actions"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="w-8 h-8 flex items-center justify-center rounded-full text-gc-accent hover:bg-gc-accent/10"
+              className="icon-btn flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100"
             >
               <NavIcon name="dots" className="w-5 h-5" />
             </button>
@@ -152,19 +155,19 @@ function handleReschedule() {
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full mt-1 z-20 w-40 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+                className="absolute right-0 top-full z-20 mt-1 w-40 origin-top-right animate-pop-in overflow-hidden rounded-card bg-white shadow-e3"
               >
                 <button
                   role="menuitem"
                   onClick={handleReschedule}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-50"
                 >
                   Reschedule
                 </button>
                 <button
                   role="menuitem"
                   onClick={handleCancel}
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                  className="w-full px-4 py-2.5 text-left text-sm text-signal-rose hover:bg-signal-rose-bg"
                 >
                   Cancel
                 </button>
@@ -175,50 +178,53 @@ function handleReschedule() {
       </div>
 
       {appt ? (
-        <div className="border border-gray-200 rounded-2xl p-5 md:p-6 flex flex-wrap md:flex-nowrap items-center gap-5 md:gap-6">
-          <div className="w-24 h-24 md:w-28 md:h-28 rounded-xl bg-gc-green-50 flex flex-col items-center justify-center shrink-0">
-            <span className="text-xs md:text-sm font-bold text-gc-green tracking-wide">
+        <div className="flex flex-wrap items-center gap-5 rounded-card bg-ink-50/70 p-4 ring-1 ring-inset ring-ink-100 md:flex-nowrap md:gap-6 md:p-5">
+          <div className="flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-card bg-gradient-to-br from-brand-900 to-brand-600 text-white shadow-e2">
+            <span className="text-[11px] font-semibold tracking-widest text-brand-100">
               {appt.month}
             </span>
-            <span className="text-4xl md:text-5xl font-extrabold text-gc-green leading-none my-1">
+            <span className="my-0.5 text-4xl font-semibold leading-none">
               {appt.day}
             </span>
-            <span className="text-xs md:text-sm font-bold text-gc-green tracking-wide">
-              {appt.weekday}
+            <span className="text-[10px] font-medium tracking-wider text-brand-100">
+              {appt.weekday?.slice(0, 3)}
             </span>
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-2 text-gray-800">
-              <NavIcon name="clock" className="w-5 h-5 shrink-0 text-gray-500 mt-0.5" />
-              <span className="text-base md:text-lg font-semibold break-words">
+            <div className="flex items-start gap-2 text-ink-900">
+              <NavIcon name="clock" className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
+              <span className="cell-wrap text-base font-semibold md:text-lg">
                 {appt.time}
               </span>
             </div>
-            <p className="text-sm md:text-base text-gray-500 mt-1 break-words">{appt.reason}</p>
+            <p className="cell-wrap mt-1 text-sm text-ink-500 md:text-base">{appt.reason}</p>
 
             {/* mobile badge sits in normal flow right under the reason, so it
                 never overlaps text above it no matter how many lines the
                 time/reason wrap onto (was `absolute bottom-3 right-3` before,
                 which pinned it to the card's bottom edge regardless of
                 content height). */}
-            <span className="md:hidden mt-3 inline-flex shrink-0 items-center rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 bg-white">
-              {appt.badge}
+            <span className="mt-3 inline-flex md:hidden">
+              <StatusPill status={BADGE_TONE[appt.badge] || "pending"} label={appt.badge} />
             </span>
           </div>
 
-          <span className="hidden md:inline-flex shrink-0 items-center rounded-full border border-gray-200 px-5 py-2 text-sm font-medium text-gray-600">
-            {appt.badge}
+          <span className="hidden shrink-0 md:inline-flex">
+            <StatusPill status={BADGE_TONE[appt.badge] || "pending"} label={appt.badge} />
           </span>
         </div>
       ) : (
-        <div className="border border-dashed border-gray-200 rounded-2xl p-6 md:p-8 text-center">
-          <p className="text-sm md:text-base text-gray-500">
+        <div className="rounded-card border border-dashed border-ink-200 bg-ink-50/50 p-6 text-center md:p-8">
+          <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+            <NavIcon name="calendar" className="h-5 w-5" />
+          </span>
+          <p className="text-sm text-ink-500 md:text-base">
             You don't have an upcoming appointment yet.
           </p>
           <button
             onClick={() => navigate("/student/book")}
-            className="mt-4 inline-flex items-center rounded-lg bg-gc-green px-5 py-2.5 text-sm font-bold text-white hover:bg-gc-green-600"
+            className="btn-primary btn-press btn-shine mt-4"
           >
             Book an Appointment
           </button>

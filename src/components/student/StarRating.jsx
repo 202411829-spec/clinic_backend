@@ -29,7 +29,7 @@ export default function StarRating({
             className={[
               size,
               "transition-colors",
-              filled ? "text-gc-accent" : "text-gray-200",
+              filled ? "text-gc-accent" : "text-ink-200",
             ].join(" ")}
           />
         );

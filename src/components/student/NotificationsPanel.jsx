@@ -31,41 +31,42 @@ export default function NotificationsPanel() {
   const notifications = [...liveNotifications, ...history];
 
   return (
-    <section className="card-hover bg-white rounded-2xl border border-gray-200 p-5 md:p-7">
-      <div className="flex items-start gap-3 mb-4">
-        <span className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-          <NavIcon name="bell" className="w-5 h-5" />
+    <section className="card-hover h-full rounded-panel bg-white p-5 shadow-e2 md:p-6">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
+          <NavIcon name="bell" className="h-5 w-5" />
+          {notifications.length > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[9px] font-semibold text-white ring-2 ring-white">
+              {notifications.length > 9 ? "9+" : notifications.length}
+            </span>
+          )}
         </span>
-        <div>
-          <h2 className="font-bold text-gray-800 text-base md:text-lg tracking-wide">
-            NOTIFICATIONS
-          </h2>
-          <p className="text-sm md:text-base text-gray-500 mt-1">
-            View changes in clinic schedule and your appointments.
-          </p>
+        <div className="min-w-0">
+          <h2 className="panel-title font-serif">Notifications</h2>
+          <p className="panel-sub mt-0.5">Changes to the clinic schedule and your appointments.</p>
         </div>
       </div>
 
-      <div className="border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="max-h-80 overflow-y-auto rounded-card ring-1 ring-inset ring-ink-100">
         {/* Small, bounded list (session notifications), so a one-time
             staggered entrance per item stays cheap — transform/opacity only. */}
         {notifications.map((n, i) => (
           <div
             key={n.id ?? `n-${i}`}
             style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-            className={`row-hover flex items-start gap-3 px-5 py-4 animate-fade-in-up motion-reduce:animate-none ${
-              i !== notifications.length - 1 ? "border-b border-gray-200" : ""
+            className={`row-hover flex animate-fade-in-up items-start gap-3 px-4 py-3.5 motion-reduce:animate-none ${
+              i !== notifications.length - 1 ? "border-b border-ink-100" : ""
             }`}
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-gc-accent mt-2 shrink-0" />
+            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />
             <div className="min-w-0">
-              <p className="text-sm md:text-base text-gray-800">{n.message}</p>
-              <p className="text-xs md:text-sm text-gray-400 mt-1">{n.time}</p>
+              <p className="cell-wrap text-sm text-ink-800">{n.message}</p>
+              <p className="mt-1 text-xs text-ink-400">{n.time}</p>
             </div>
           </div>
         ))}
         {notifications.length === 0 && (
-          <div className="px-5 py-6 text-center text-sm text-gray-400">
+          <div className="px-5 py-8 text-center text-sm text-ink-400">
             No notifications yet.
           </div>
         )}

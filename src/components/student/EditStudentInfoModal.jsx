@@ -54,7 +54,7 @@ const STEPS = [
 ];
 
 const inputClass =
-  "w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-sm text-gray-700 outline-none focus:border-gc-green focus:ring-2 focus:ring-gc-green/15 placeholder:text-gray-400 disabled:bg-gray-50 disabled:text-gray-400";
+  "w-full border border-ink-300 rounded-lg px-3.5 py-2.5 text-sm text-ink-700 outline-none focus:border-brand-900 focus:ring-2 focus:ring-brand-600/25 placeholder:text-ink-400 disabled:bg-ink-50 disabled:text-ink-400";
 
 /* ---------------------------- helpers: data <-> form ---------------------------- */
 
@@ -303,9 +303,9 @@ function isStep2Valid(form) {
 
 function Label({ children, required }) {
   return (
-    <label className="block text-sm font-bold text-gray-700 mb-1.5">
+    <label className="block text-sm font-bold text-ink-700 mb-1.5">
       {children}
-      {required && <span className="text-red-500"> *</span>}
+      {required && <span className="text-signal-rose"> *</span>}
     </label>
   );
 }
@@ -315,7 +315,7 @@ function Field({ label, required, error, children }) {
     <div>
       {label && <Label required={required}>{label}</Label>}
       {children}
-      {error && <p className="text-xs text-red-500 mt-1">This field is required.</p>}
+      {error && <p className="text-xs text-signal-rose mt-1">This field is required.</p>}
     </div>
   );
 }
@@ -331,29 +331,29 @@ function ToggleGroup({ options, value, onChange, error }) {
             onClick={() => onChange(opt)}
             className={`flex-1 text-sm font-semibold px-4 py-2.5 rounded-lg border transition-colors ${
               value === opt
-                ? "bg-gc-green text-white border-gc-green"
+                ? "bg-brand-900 text-white border-brand-900"
                 : error
-                ? "bg-white text-gray-500 border-red-300 hover:bg-gray-50"
-                : "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+                ? "bg-white text-ink-500 border-signal-rose-ring hover:bg-ink-50"
+                : "bg-white text-ink-500 border-ink-300 hover:bg-ink-50"
             }`}
           >
             {opt}
           </button>
         ))}
       </div>
-      {error && <p className="text-xs text-red-500 mt-1">Please make a selection.</p>}
+      {error && <p className="text-xs text-signal-rose mt-1">Please make a selection.</p>}
     </div>
   );
 }
 
 function SectionBlock({ icon, title, children }) {
   return (
-    <div className="border border-gray-200 rounded-xl p-4 flex flex-col gap-3.5">
+    <div className="border border-ink-200 rounded-xl p-4 flex flex-col gap-3.5">
       <div className="flex items-center gap-2">
-        <span className="w-6 h-6 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+        <span className="w-6 h-6 rounded-md bg-brand-50 text-brand-900 flex items-center justify-center shrink-0">
           <NavIcon name={icon} className="w-3.5 h-3.5" />
         </span>
-        <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">{title}</h3>
+        <h3 className="text-xs font-bold text-ink-700 uppercase tracking-wide">{title}</h3>
       </div>
       {children}
     </div>
@@ -364,24 +364,24 @@ function SectionBlock({ icon, title, children }) {
 
 function StepIndicator({ step }) {
   return (
-    <div className="flex items-start justify-center gap-1.5 sm:gap-3 px-4 md:px-8 py-4 shrink-0 border-b border-gray-100">
+    <div className="flex items-start justify-center gap-1.5 sm:gap-3 px-4 md:px-8 py-4 shrink-0 border-b border-ink-100">
       {STEPS.map((s, i) => (
         <div key={s.n} className="flex items-start">
           <div className="flex flex-col items-center gap-1.5 w-16 sm:w-24">
             <div
               className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors duration-300 ${
                 step > s.n
-                  ? "bg-gc-green text-white"
+                  ? "bg-brand-900 text-white"
                   : step === s.n
-                  ? "bg-gc-green text-white animate-scale-in"
-                  : "bg-gray-100 text-gray-400"
+                  ? "animate-scale-in bg-brand-600 text-white ring-4 ring-brand-600/20"
+                  : "bg-ink-100 text-ink-400"
               }`}
             >
               {step > s.n ? <NavIcon name="check" className="w-4 h-4" /> : s.n}
             </div>
             <span
               className={`text-[10px] sm:text-xs font-semibold text-center leading-tight transition-colors duration-300 ${
-                step === s.n ? "text-gc-green" : "text-gray-400"
+                step === s.n ? "text-brand-900" : "text-ink-400"
               }`}
             >
               {s.label}
@@ -389,8 +389,8 @@ function StepIndicator({ step }) {
           </div>
           {i < STEPS.length - 1 && (
             <div
-              className={`w-4 sm:w-10 h-0.5 mt-4 md:mt-4.5 rounded-full transition-colors duration-300 ${
-                step > s.n ? "bg-gc-green" : "bg-gray-200"
+              className={`mt-4 h-0.5 w-4 rounded-full transition-colors duration-500 sm:w-10 md:mt-[18px] ${
+                step > s.n ? "bg-brand-900" : "bg-ink-200"
               }`}
             />
           )}
@@ -415,18 +415,18 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5 items-start">
         <div className="md:col-span-2 flex flex-col gap-5">
           {/* photo */}
-          <div className="flex flex-col items-center gap-1.5 border border-gray-200 rounded-xl p-4">
+          <div className="flex flex-col items-center gap-1.5 border border-ink-200 rounded-xl p-4">
             <div className="relative w-24 h-24">
               <button
                 type="button"
                 onClick={onPickPhoto}
                 aria-label="Upload student photo"
-                className="w-24 h-24 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden"
+                className="w-24 h-24 rounded-full bg-ink-100 border border-ink-200 flex items-center justify-center overflow-hidden"
               >
                 {photoPreview ? (
                   <img src={photoPreview} alt="Student" className="w-full h-full object-cover" />
                 ) : (
-                  <NavIcon name="user" className="w-9 h-9 text-gray-300" />
+                  <NavIcon name="user" className="w-9 h-9 text-ink-300" />
                 )}
               </button>
               {/* separate element (not inside the overflow-hidden photo circle)
@@ -436,14 +436,14 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                 type="button"
                 onClick={onPickPhoto}
                 aria-label="Change photo"
-                className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full bg-gc-green text-white flex items-center justify-center border-[3px] border-white shadow-md"
+                className="absolute bottom-0.5 right-0.5 w-9 h-9 rounded-full bg-brand-900 text-white flex items-center justify-center border-[3px] border-white shadow-md"
               >
                 <NavIcon name="camera" className="w-5 h-5" />
               </button>
             </div>
             <div className="text-center">
-              <p className="text-sm font-bold text-gray-700">Student 1x1 Photo</p>
-              <p className="text-xs text-gray-400">Tap the circle to upload</p>
+              <p className="text-sm font-bold text-ink-700">Student 1x1 Photo</p>
+              <p className="text-xs text-ink-400">Tap the circle to upload</p>
             </div>
           </div>
 
@@ -457,7 +457,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                 readOnly
                 disabled
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink-400 mt-1">
                 Derived from your school email — not editable.
               </p>
             </Field>
@@ -563,7 +563,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
               <div>
                 <Label>
                   Age{" "}
-                  <span className="text-[10px] font-normal text-gray-400 normal-case">
+                  <span className="text-[10px] font-normal text-ink-400 normal-case">
                     (Auto-Computed)
                   </span>
                 </Label>
@@ -620,7 +620,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
       <button
         type="button"
         onClick={onNext}
-        className="btn-press w-full sm:w-auto sm:self-end sm:px-10 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
+        className="btn-press w-full sm:w-auto sm:self-end sm:px-10 text-sm font-semibold bg-brand-900 text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
       >
         Next: Medical History
       </button>
@@ -644,8 +644,8 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="bg-gc-green/5 border border-gc-green/20 rounded-xl px-4 py-3 text-sm text-gray-600 leading-relaxed">
-        Please check <span className="font-semibold text-gc-green">(✓)</span> if you have or had
+      <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3 text-sm text-ink-600 leading-relaxed">
+        Please check <span className="font-semibold text-brand-900">(✓)</span> if you have or had
         any of the following medical conditions. This assists clinic nurses in keeping your
         medical profile accurate.
       </div>
@@ -658,13 +658,13 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
               key={cond}
               className={`flex items-center gap-2.5 border rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-colors ${
                 checked
-                  ? "border-gc-green bg-gc-green/5 text-gray-800 font-semibold"
-                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  ? "border-brand-900 bg-brand-50 text-ink-800 font-semibold"
+                  : "border-ink-200 text-ink-600 hover:bg-ink-50"
               }`}
             >
               <input
                 type="checkbox"
-                className="w-4 h-4 rounded border-gray-300 text-gc-green focus:ring-gc-green/30 shrink-0"
+                className="w-4 h-4 rounded border-ink-300 text-brand-900 focus:ring-brand-600/25 shrink-0"
                 checked={checked}
                 onChange={() => toggleCondition(cond)}
               />
@@ -685,7 +685,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
         </Field>
       )}
 
-      <div className="pt-1 border-t border-gray-100">
+      <div className="pt-1 border-t border-ink-100">
         <div className="mt-4">
           <Label required>Have you had any operations in the past?</Label>
           <div className="max-w-xs">
@@ -724,7 +724,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
         <button
           type="button"
           onClick={onBack}
-          className="btn-press flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold bg-gray-100 text-gray-600 px-5 py-3 rounded-lg transition-colors hover:bg-gray-200"
+          className="btn-press flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold bg-ink-100 text-ink-600 px-5 py-3 rounded-lg transition-colors hover:bg-ink-200"
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
           Back
@@ -732,7 +732,7 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
         <button
           type="button"
           onClick={onNext}
-          className="btn-press flex-1 text-sm font-semibold bg-gc-green text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
+          className="btn-press flex-1 text-sm font-semibold bg-brand-900 text-white px-5 py-3 rounded-lg transition-colors hover:opacity-90"
         >
           Next: Data Privacy
         </button>
@@ -747,17 +747,17 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2">
-        <NavIcon name="shield" className="w-5 h-5 text-gc-green" />
-        <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
+        <NavIcon name="shield" className="w-5 h-5 text-brand-900" />
+        <h3 className="text-sm font-bold text-ink-800 uppercase tracking-wide">
           Data Privacy Consent Waiver
         </h3>
       </div>
 
-      <div className="border border-gray-200 rounded-xl p-4 md:p-5 bg-gray-50">
-        <p className="font-bold text-gray-800 mb-2 text-sm">
+      <div className="border border-ink-200 rounded-xl p-4 md:p-5 bg-ink-50">
+        <p className="font-bold text-ink-800 mb-2 text-sm">
           Republic Act No. 10173 (Data Privacy Act of 2012):
         </p>
-        <p className="text-sm text-gray-600 leading-relaxed">
+        <p className="text-sm text-ink-600 leading-relaxed">
           I am willing to disclose my personal information with the Gordon College Health
           Services Unit (Clinic). I have the right to access my personal data in a timely manner
           upon official request. The clinic respects patient privacy and is accountable to
@@ -768,16 +768,16 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
 
       <label
         className={`flex items-start gap-3 border rounded-xl px-4 py-3.5 cursor-pointer transition-colors ${
-          form.consent ? "border-gc-green bg-gc-green/5" : "border-gray-200 hover:bg-gray-50"
+          form.consent ? "border-brand-900 bg-brand-50" : "border-ink-200 hover:bg-ink-50"
         }`}
       >
         <input
           type="checkbox"
-          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-gc-green focus:ring-gc-green/30 shrink-0"
+          className="mt-0.5 w-4 h-4 rounded border-ink-300 text-brand-900 focus:ring-brand-600/25 shrink-0"
           checked={form.consent}
           onChange={(e) => update({ consent: e.target.checked })}
         />
-        <span className="text-sm text-gray-700 leading-relaxed">
+        <span className="text-sm text-ink-700 leading-relaxed">
           I have read and agree to the data privacy waiver above, and I confirm that all the
           information provided in this student record is true, complete, and accurate.
         </span>
@@ -786,7 +786,7 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
       {submitError && (
         <div
           role="alert"
-          className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none"
+          className="flex items-start gap-2 bg-signal-rose-bg border border-signal-rose-ring text-signal-rose text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none"
         >
           <NavIcon name="x" className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{submitError}</span>
@@ -800,8 +800,8 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
           disabled={isSaving}
           className={`btn-press flex-1 sm:flex-none sm:w-32 inline-flex items-center justify-center gap-1 text-sm font-semibold px-5 py-3 rounded-lg transition-colors disabled:active:scale-100 ${
             isSaving
-              ? "bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-ink-100 text-ink-400 opacity-50 cursor-not-allowed"
+              : "bg-ink-100 text-ink-600 hover:bg-ink-200"
           }`}
         >
           <NavIcon name="chevron-left" className="w-4 h-4" />
@@ -814,10 +814,10 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
           aria-busy={isSaving}
           className={`btn-press flex-1 inline-flex items-center justify-center gap-2 text-sm font-semibold px-5 py-3 rounded-lg transition-colors disabled:active:scale-100 ${
             isSaving
-              ? "bg-gc-green text-white opacity-50 cursor-not-allowed"
+              ? "bg-brand-900 text-white opacity-50 cursor-not-allowed"
               : form.consent
-              ? "bg-gc-green text-white hover:opacity-90"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              ? "bg-brand-900 text-white hover:opacity-90"
+              : "bg-ink-200 text-ink-400 cursor-not-allowed"
           }`}
         >
           {isSaving && (
@@ -944,18 +944,22 @@ export default function EditStudentInfoModal({
         disabled={isSaving}
         className={`btn-press inline-flex items-center gap-1.5 text-sm font-semibold w-fit transition-colors ${
           isSaving
-            ? "text-gray-400 opacity-50 cursor-not-allowed"
-            : "text-gray-500 hover:text-gc-green"
+            ? "text-ink-400 opacity-50 cursor-not-allowed"
+            : "text-ink-500 hover:text-brand-900"
         }`}
       >
         <NavIcon name="back" className="w-4 h-4" />
         Back
       </button>
 
-      <div className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300">
-        <div className="px-5 md:px-8 pt-5 md:pt-6">
-          <h2 className="font-bold text-gray-800 text-lg md:text-xl">Edit Student Information</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Step {step} of 3</p>
+      <div className="card-hover rounded-panel bg-white shadow-e2">
+        <div className="relative overflow-hidden rounded-t-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-5 py-5 text-white md:px-8 md:py-6">
+          <span aria-hidden className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full border border-white/10" />
+          <h1 className="relative font-serif text-xl font-semibold md:text-2xl">Edit student information</h1>
+          <p className="relative mt-0.5 text-xs text-brand-100">Step {step} of 3</p>
+          <div className="relative mt-3 h-1 overflow-hidden rounded-full bg-white/20">
+            <div className="h-full rounded-full bg-white transition-[width] duration-500 ease-smooth" style={{ width: `${(step / 3) * 100}%` }} />
+          </div>
         </div>
 
         <StepIndicator step={step} />

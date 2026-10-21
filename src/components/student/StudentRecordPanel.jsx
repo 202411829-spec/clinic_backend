@@ -16,12 +16,10 @@ import { formatDisplayName } from "../../lib/format.js";
 function SectionHeader({ icon, title }) {
   return (
     <div className="flex items-center gap-2 mb-4">
-      <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-        <NavIcon name={icon} className="w-4 h-4" />
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
+        <NavIcon name={icon} className="h-[18px] w-[18px]" />
       </span>
-      <h2 className="font-bold text-gc-green text-sm md:text-base leading-tight tracking-wide uppercase">
-        {title}
-      </h2>
+      <h2 className="panel-title font-serif">{title}</h2>
     </div>
   );
 }
@@ -31,8 +29,8 @@ function SectionHeader({ icon, title }) {
 function SubLabel({ children }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="w-1 h-4 bg-gc-accent rounded-full shrink-0" />
-      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">{children}</h3>
+      <span className="h-4 w-1 shrink-0 rounded-full bg-brand-600" />
+      <h3 className="text-[11px] font-bold uppercase tracking-wider text-brand-900">{children}</h3>
     </div>
   );
 }
@@ -44,8 +42,8 @@ function v(value) {
 function InfoField({ label, value }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-gray-400 mb-1">{label}</p>
-      <p className="text-sm font-semibold text-gray-800 break-words">{v(value)}</p>
+      <p className="mb-1 text-xs text-ink-500">{label}</p>
+      <p className="cell-wrap text-sm font-medium text-ink-900">{v(value)}</p>
     </div>
   );
 }
@@ -94,7 +92,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
 
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-300 p-8 text-center text-sm text-red-500">
+      <div role="alert" className="rounded-panel bg-signal-rose-bg p-8 text-center text-sm text-signal-rose shadow-e1">
         {error}
       </div>
     );
@@ -102,8 +100,9 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
 
   if (!student) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-300 p-8 text-center text-sm text-gray-400">
-        Loading your profile…
+      <div className="space-y-4" aria-busy="true" aria-label="Loading your profile">
+        <div className="h-36 animate-pulse rounded-panel bg-ink-100" />
+        <div className="h-64 animate-pulse rounded-panel bg-ink-100/70" />
       </div>
     );
   }
@@ -162,20 +161,42 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   }
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
-      {/* ---------- title row + edit action ---------- */}
-      <div className="flex items-center justify-end">
-        <button
-          onClick={handleEditClick}
-          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-5 py-2.5 rounded-full hover:opacity-90 shadow-sm"
-        >
-          <NavIcon name="edit" className="w-4 h-4" />
-          Edit
-        </button>
-      </div>
+    <div className="stagger flex flex-col gap-5 pb-10">
+      {/* ---------- identity card + edit action ---------- */}
+      <section className="relative overflow-hidden rounded-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 p-5 text-white shadow-e2 md:p-7">
+        <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-48 w-48 rounded-full border border-white/10" />
+        <span aria-hidden className="pointer-events-none absolute -bottom-14 right-20 h-36 w-36 rounded-full bg-white/5" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl font-semibold ring-2 ring-white/30">
+              {[student.firstName, student.lastName].map((n) => (n || "").charAt(0)).join("").toUpperCase() || "ST"}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wider text-brand-100">Student record</p>
+              <h1 className="cell-wrap font-serif text-xl font-semibold leading-tight md:text-2xl">
+                {formatDisplayName(student.name)}
+              </h1>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[student.studentNumber, student.course, student.yearLevel && student.yearLevel !== "-" ? `Year ${student.yearLevel}` : null]
+                  .filter((c) => c && c !== "-")
+                  .map((c) => (
+                    <span key={c} className="cell-wrap rounded-full bg-white/15 px-2.5 py-0.5 text-2xs font-medium">{c}</span>
+                  ))}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleEditClick}
+            className="btn btn-press btn-shine bg-white text-brand-900 shadow-e2 hover:bg-brand-50"
+          >
+            <NavIcon name="edit" className="h-4 w-4" />
+            Edit information
+          </button>
+        </div>
+      </section>
 
       {status === "incomplete" && (
-        <div className="flex items-start justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
+        <div className="flex items-start justify-between gap-3 rounded-card border border-signal-amber-ring bg-signal-amber-bg px-4 py-3 text-sm text-signal-amber animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-start gap-2">
             <NavIcon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
@@ -187,7 +208,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
             <button
               type="button"
               onClick={() => recheck()}
-              className="btn-press shrink-0 text-sm font-semibold text-amber-900 underline underline-offset-2 hover:opacity-75"
+              className="btn-press shrink-0 text-sm font-semibold underline underline-offset-2 hover:opacity-75"
             >
               Retry
             </button>
@@ -196,7 +217,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {savedNotice && (
-        <div className="flex items-start justify-between gap-3 bg-gc-green/5 border border-gc-green/20 text-gc-green text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
+        <div className="flex items-start justify-between gap-3 rounded-card border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800 animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-center gap-2">
             <NavIcon name="check" className="w-4 h-4 shrink-0" />
             Your student information has been updated.
@@ -204,7 +225,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <button
             onClick={() => setSavedNotice(false)}
             aria-label="Dismiss"
-            className="btn-press shrink-0 text-gc-green/70 transition-colors hover:text-gc-green"
+            className="btn-press shrink-0 text-brand-700/70 transition-colors hover:text-brand-800"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>
@@ -212,7 +233,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {saveError && (
-        <div className="flex items-start justify-between gap-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 animate-fade-in-up motion-reduce:animate-none">
+        <div className="flex items-start justify-between gap-3 rounded-card border border-signal-rose-ring bg-signal-rose-bg px-4 py-3 text-sm text-signal-rose animate-fade-in-up motion-reduce:animate-none">
           <span className="flex items-center gap-2">
             <NavIcon name="x" className="w-4 h-4 shrink-0" />
             {saveError}
@@ -220,7 +241,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <button
             onClick={() => setSaveError(null)}
             aria-label="Dismiss"
-            className="btn-press shrink-0 text-red-400 transition-colors hover:text-red-600"
+            className="btn-press shrink-0 text-signal-rose/70 transition-colors hover:text-signal-rose"
           >
             <NavIcon name="x" className="w-4 h-4" />
           </button>
@@ -228,7 +249,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       )}
 
       {/* ---------- student information + emergency contact ---------- */}
-      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover rounded-panel bg-white p-5 shadow-e2 md:p-7">
         <SectionHeader icon="user" title="Student Information" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
@@ -243,7 +264,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
           <InfoField label="Present Address" value={student.presentAddress} />
         </div>
 
-        <div className="mt-5 pt-4 border-t border-gray-200">
+        <div className="mt-6 border-t border-ink-100 pt-5">
           <SubLabel>Emergency Contact</SubLabel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
             <InfoField label="Name" value={emergency.name} />
@@ -255,7 +276,7 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
       </section>
 
       {/* ---------- medical history ---------- */}
-      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-300 p-4 md:p-6">
+      <section className="card-hover rounded-panel bg-white p-5 shadow-e2 md:p-7">
         <SectionHeader icon="medical-cross" title="Medical History" />
 
         <SubLabel>Medical Conditions</SubLabel>
@@ -265,19 +286,19 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
               <span
                 key={c}
                 style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100 animate-fade-in-up motion-reduce:animate-none"
+                className="cell-wrap animate-fade-in-up rounded-full bg-signal-rose-bg px-3 py-1.5 text-xs font-medium text-signal-rose ring-1 ring-inset ring-signal-rose-ring motion-reduce:animate-none"
               >
                 {c}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-400 mb-5">No known medical conditions on file.</p>
+          <p className="mb-5 text-sm text-ink-400">No known medical conditions on file.</p>
         )}
 
         <div className="pt-1">
-          <p className="text-xs text-gray-400 mb-1">Previous Operation</p>
-          <p className="text-sm font-semibold text-gray-800">
+          <p className="mb-1 text-xs text-ink-500">Previous Operation</p>
+          <p className="cell-wrap text-sm font-medium text-ink-900">
             {prevOp ? `${prevOp.date} - ${prevOp.procedure}` : "-"}
           </p>
         </div>

@@ -22,8 +22,8 @@ function getTomorrow() {
 
 function SuccessPanel({ rescheduling, onDone }) {
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center max-w-md mx-auto animate-fade-in-up motion-reduce:animate-none">
-      <div className="w-14 h-14 rounded-full bg-gc-accent/10 text-gc-accent flex items-center justify-center mx-auto mb-4 animate-scale-in">
+    <section className="mx-auto max-w-md animate-fade-in-up rounded-panel bg-white p-8 text-center shadow-e3 motion-reduce:animate-none">
+      <div className="w-14 h-14 rounded-full mx-auto mb-4 flex animate-scale-in items-center justify-center bg-brand-50 text-brand-700 ring-8 ring-brand-50/60">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -36,16 +36,16 @@ function SuccessPanel({ rescheduling, onDone }) {
           <path d="M20 6L9 17l-5-5" />
         </svg>
       </div>
-      <p className="font-bold text-gray-800">
+      <p className="font-serif text-lg font-semibold text-ink-900">
         {rescheduling ? "Appointment Rescheduled!" : "Appointment Booked!"}
       </p>
-      <p className="text-sm text-gray-500 mt-1 mb-5">
+      <p className="mb-5 mt-1 text-sm text-ink-500">
         You'll get a notification once the clinic confirms your slot.
       </p>
       <button
         type="button"
         onClick={onDone}
-        className="btn-press w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white transition-colors hover:bg-gc-green-600"
+        className="btn-primary btn-press btn-shine w-full py-2.5"
       >
         Back to Dashboard
       </button>
@@ -350,7 +350,7 @@ const [slots, setSlots] = useState([]);
 
   return (
     <div className="pt-2 md:pt-6">
-      <h1 className="hidden md:block font-bold text-gray-800 text-lg mb-5">
+      <h1 className="mb-5 hidden font-serif text-2xl font-semibold text-ink-900 md:block">
         {pageTitle}
       </h1>
 
@@ -358,27 +358,27 @@ const [slots, setSlots] = useState([]);
       {isBookingBlocked && (
         <div
           role="alert"
-          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 animate-fade-in-up motion-reduce:animate-none"
+          className="mb-4 rounded-card border border-signal-amber-ring bg-signal-amber-bg px-4 py-3 text-sm text-signal-amber animate-fade-in-up motion-reduce:animate-none"
         >
           <p className="font-semibold">You already have an active appointment (pending).</p>
           <p className="mt-1">Please wait until it is completed or cancelled before booking again.</p>
-          <Link to="/student/dashboard" className="mt-2 inline-block font-semibold text-amber-900 underline underline-offset-2 transition-colors hover:text-amber-700">
+          <Link to="/student/dashboard" className="mt-2 inline-block font-semibold underline underline-offset-2 transition-opacity hover:opacity-75">
             View upcoming appointment
           </Link>
         </div>
       )}
       {bookingError && (
-        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-fade-in-up motion-reduce:animate-none">
+        <div role="alert" className="mb-4 rounded-card border border-signal-rose-ring bg-signal-rose-bg px-4 py-3 text-sm text-signal-rose animate-fade-in-up motion-reduce:animate-none">
           {bookingError}
         </div>
       )}
       {pendingCheckStatus === "loading" && !isReschedule && (
-        <p className="mb-4 text-xs text-gray-400 animate-fade-in">Checking existing appointments…</p>
+        <p className="mb-4 text-xs text-ink-400 animate-fade-in">Checking existing appointments…</p>
       )}
 
       {/* ---------- Mobile: one step at a time ---------- */}
       <div className="md:hidden max-w-sm mx-auto">
-        <p className="text-center font-bold text-gray-800 text-sm mb-3">{pageTitle}</p>
+        <p className="mb-3 text-center font-serif text-lg font-semibold text-ink-900">{pageTitle}</p>
         <BookingStepIndicator step={step} onStepClick={setStep} />
 
         {/* key={step} remounts this wrapper on every mobile step change so
@@ -393,11 +393,11 @@ const [slots, setSlots] = useState([]);
               navigationMode="month"
               minDate={tomorrow}
             />
-            <p className="text-xs text-gray-500 text-center">Booking is available starting tomorrow</p>
+            <p className="text-center text-xs text-ink-500">Booking is available starting tomorrow</p>
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="btn-press w-full rounded-lg bg-gc-green py-2.5 text-sm font-bold text-white transition-colors hover:bg-gc-green-600"
+              className="btn-primary btn-press btn-shine w-full py-2.5"
             >
               Next: Select Time
             </button>
@@ -417,10 +417,10 @@ const [slots, setSlots] = useState([]);
               disabled={!selectedTime}
               onClick={() => setStep(3)}
               className={[
-                "btn-press w-full rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
+                "btn btn-press w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
                 selectedTime
-                  ? "bg-gc-green text-white hover:bg-gc-green-600"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed",
+                  ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
+                  : "bg-ink-100 text-ink-400 cursor-not-allowed",
               ].join(" ")}
             >
               Next: Select Reason
@@ -436,10 +436,10 @@ const [slots, setSlots] = useState([]);
               disabled={!reasonId}
               onClick={() => setStep(4)}
               className={[
-                "btn-press w-full rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
+                "btn btn-press w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
                 reasonId
-                  ? "bg-gc-green text-white hover:bg-gc-green-600"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed",
+                  ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
+                  : "bg-ink-100 text-ink-400 cursor-not-allowed",
               ].join(" ")}
             >
               Next: Confirmation
@@ -476,7 +476,7 @@ const [slots, setSlots] = useState([]);
             navigationMode="month"
             minDate={tomorrow}
           />
-          <p className="text-xs text-gray-500 text-center mt-2">Booking is available starting tomorrow</p>
+          <p className="text-center text-xs text-ink-500 mt-2">Booking is available starting tomorrow</p>
         </div>
         <SelectTimeSlots
           slots={slots}

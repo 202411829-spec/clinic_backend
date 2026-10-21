@@ -4,11 +4,11 @@ import { formatMDY } from "../../lib/calendar";
 function SummaryRow({ label, value }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <span className="text-xs font-semibold text-gray-400 shrink-0">{label}</span>
+      <span className="shrink-0 text-xs text-ink-500">{label}</span>
       <span
         className={[
-          "text-sm font-semibold text-right",
-          value ? "text-gray-800" : "text-gray-300",
+          "cell-wrap text-right text-sm font-medium",
+          value ? "text-ink-900" : "text-ink-300",
         ].join(" ")}
       >
         {value || "—"}
@@ -40,21 +40,21 @@ export default function AppointmentSummaryCard({
   const canBook = Boolean(date && time && reason) && !booking && !disabled;
 
   return (
-    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <div className="border-l-4 border-gc-accent pl-3 mb-3">
-        <h2 className="font-bold text-gray-800 text-xs md:text-sm tracking-wide">
-          APPOINTMENT SUMMARY
+    <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
+      <div className="mb-3 border-l-4 border-brand-600 pl-3">
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-brand-900">
+          Appointment summary
         </h2>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-ink-100">
         <SummaryRow label="Date" value={date ? formatMDY(date) : ""} />
         <SummaryRow label="Time" value={time} />
         <SummaryRow label="Reason" value={reason} />
       </div>
 
       {disabled && disabledReason && (
-        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 animate-fade-in-up motion-reduce:animate-none">
+        <p className="mt-3 rounded-control border border-signal-amber-ring bg-signal-amber-bg px-3 py-2 text-xs text-signal-amber animate-fade-in-up motion-reduce:animate-none">
           {disabledReason}
         </p>
       )}
@@ -63,10 +63,10 @@ export default function AppointmentSummaryCard({
         disabled={!canBook}
         onClick={onBook}
         className={[
-          "btn-press w-full mt-4 rounded-lg py-2.5 text-sm font-bold transition-colors disabled:active:scale-100",
+          "btn btn-press mt-4 w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
           canBook
-            ? "bg-gc-green text-white hover:bg-gc-green-600"
-            : "bg-gray-200 text-gray-400 cursor-not-allowed",
+            ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
+            : "bg-ink-100 text-ink-400 cursor-not-allowed",
         ].join(" ")}
       >
         {booking ? (
