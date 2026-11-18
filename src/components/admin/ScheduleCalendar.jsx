@@ -176,7 +176,7 @@ export default function ScheduleCalendar({
   }
 
   const tabClass = (active) =>
-    `flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+    `flex-1 whitespace-nowrap rounded-full px-2 py-2 text-xs font-semibold transition-colors ${
       active ? "bg-gc-green text-white shadow-sm" : "text-gray-500 hover:bg-white"
     }`;
 
@@ -188,7 +188,7 @@ export default function ScheduleCalendar({
           Specific Dates
         </button>
         <button type="button" role="tab" aria-selected={mode === "default"} onClick={() => setMode("default")} className={tabClass(mode === "default")}>
-          Weekly Open Days
+          Weekly Days
         </button>
       </div>
       <p className="mt-3 mb-4 text-xs leading-relaxed text-gray-500">
@@ -245,16 +245,9 @@ export default function ScheduleCalendar({
             >
               <NavIcon name="chevron-left" className="h-4 w-4" />
             </button>
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
-              <span className="truncate text-sm font-bold text-gray-800">{monthLabel}</span>
-              <button
-                type="button"
-                onClick={goToday}
-                className="rounded-full border border-gc-accent/40 px-2.5 py-0.5 text-[11px] font-semibold text-gc-accent transition-colors hover:bg-gc-accent hover:text-white"
-              >
-                Today
-              </button>
-            </div>
+            <span className="flex-1 whitespace-nowrap text-center text-sm font-bold text-gray-800">
+              {monthLabel}
+            </span>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
@@ -262,6 +255,16 @@ export default function ScheduleCalendar({
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50"
             >
               <NavIcon name="chevron-right" className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-2 flex justify-center">
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded-full border border-gc-accent/40 px-3 py-1 text-[11px] font-semibold text-gc-accent transition-colors hover:bg-gc-accent hover:text-white"
+            >
+              Today · {today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </button>
           </div>
 
