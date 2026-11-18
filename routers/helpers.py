@@ -510,6 +510,8 @@ def get_latest_status_for_appointments(appointment_ids):
     old behavior where they had no history rows to match.
     """
 
+    # Drop None ids (PostgREST would send the string "None" to a bigint column).
+    appointment_ids = list(dict.fromkeys(i for i in (appointment_ids or []) if i is not None))
     if not appointment_ids:
         return {}
 

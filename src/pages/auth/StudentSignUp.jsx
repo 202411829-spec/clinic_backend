@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AuthShell from '../../components/auth/AuthShell.jsx'
 import StudentSignUpForm from '../../components/auth/StudentSignUpForm.jsx'
 import { studentSignIn } from '../../lib/supabaseClient.js'
 
@@ -35,60 +36,13 @@ export default function StudentSignUp() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gc-student">
-      {/* ---------- Mobile / tablet-portrait layout (bottom sheet) ---------- */}
-      <div className="flex min-h-screen flex-col lg:hidden">
-        <div className="flex flex-col items-center px-6 pt-14 pb-16 animate-fade-in-up">
-          <img
-            src={BRAND.logo}
-            alt="Gordon College seal"
-            className="h-[140px] w-[140px] object-contain animate-scale-in"
-          />
-          <h1 className="mt-6 text-2xl font-extrabold tracking-wide text-white">
-            {BRAND.name}
-          </h1>
-          <p className="mt-1 text-[15px] text-white/90">{BRAND.tagline}</p>
-        </div>
-
-        <div className="-mt-8 flex-1 rounded-t-panel bg-white px-6 pb-10 pt-10 sm:px-10 animate-fade-in-up [animation-delay:80ms] [animation-duration:0.35s] motion-reduce:animate-none">
-          <div className="mx-auto w-full max-w-sm">
-            <StudentSignUpForm
-              align="center"
-              onSignupSuccess={handleSignupSuccess}
-              loading={loading}
-              error={error}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ---------- Desktop / tablet-landscape layout (split screen) ---------- */}
-      <div className="hidden h-screen w-full overflow-hidden lg:flex">
-        <div className="flex h-[calc(100%-4px)] w-full">
-          <div className="flex w-[31%] shrink-0 flex-col items-center justify-center animate-fade-in-up">
-            <img
-              src={BRAND.logo}
-              alt="Gordon College seal"
-              className="h-[150px] w-[150px] object-contain animate-scale-in"
-            />
-            <h1 className="mt-5 text-xl font-extrabold tracking-wide text-white">
-              {BRAND.name}
-            </h1>
-            <p className="mt-1 text-sm text-white/90">{BRAND.tagline}</p>
-          </div>
-
-          <div className="flex flex-1 items-center justify-center rounded-tl-[5rem] rounded-bl-[5rem] bg-white px-10">
-            <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-10 shadow-xl shadow-black/5 animate-fade-in-up [animation-delay:80ms] motion-reduce:animate-none">
-              <StudentSignUpForm
-                align="left"
-                onSignupSuccess={handleSignupSuccess}
-                loading={loading}
-                error={error}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthShell brand={BRAND} tone="student">
+      <StudentSignUpForm
+        align="left"
+        onSignupSuccess={handleSignupSuccess}
+        loading={loading}
+        error={error}
+      />
+    </AuthShell>
   )
 }

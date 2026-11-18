@@ -178,3 +178,16 @@ export function shiftByPeriod(date, period, delta) {
   }
   return next;
 }
+
+/**
+ * Monday-to-Sunday week containing `date`, as { from, to } "YYYY-MM-DD"
+ * strings (what <input type="date"> and the logbook filters use).
+ */
+export function getWeekRangeYMD(date = new Date()) {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const sinceMonday = (monday.getDay() + 6) % 7; // Mon=0 … Sun=6
+  monday.setDate(monday.getDate() - sinceMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: toYMD(monday), to: toYMD(sunday) };
+}

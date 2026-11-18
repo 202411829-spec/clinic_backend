@@ -6,6 +6,7 @@ import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";
 import { toYMD } from "../../lib/calendar";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import StatusPill from "./StatusPill.jsx";
 
 // Map the card badge text back onto a pill tone (context bookings say
@@ -40,6 +41,7 @@ function mapAppointment(a) {
 export default function UpcomingAppointmentPanel() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
   const { appointment: contextAppt, cancelAppointment } = useAppointment();
@@ -54,14 +56,13 @@ export default function UpcomingAppointmentPanel() {
     let cancelled = false;
     const today = toYMD(new Date());
     appointmentsApi
-      .list({ student_id: studentId, date_from: today })
+      .list({ student_id: studentId })
       .then((res) => {
         if (cancelled) return;
         const mine = (res?.appointments || [])
           .filter((a) => {
             if (String(a.student_id).toUpperCase().trim() !== String(studentId).toUpperCase().trim())
               return false;
-            if (String(a.appointment_date).slice(0, 10) < today) return false;
             const raw = a.current_status ?? a.status ?? a.new_status;
             if (raw == null || raw === "") return true;
             return String(raw).toLowerCase() === "pending";
@@ -71,7 +72,12 @@ export default function UpcomingAppointmentPanel() {
               `${b.appointment_date} ${b.appointment_time}`
             )
           );
-        setUpcoming(mine.length ? mapAppointment(mine[0]) : null);
+        // A pending appointment blocks new bookings even after its date has
+        // passed, so keep showing it. Prefer the next one that is still ahead;
+        // otherwise fall back to the most recent overdue pending one.
+        const ahead = mine.find((a) => String(a.appointment_date).slice(0, 10) >= today);
+        const pick = ahead || mine[mine.length - 1];
+        setUpcoming(pick ? mapAppointment(pick) : null);
       })
       .catch((err) => console.error("Failed to load appointments:", err));
     return () => {
@@ -106,8 +112,13 @@ function handleReschedule() {
     navigate("/student/book", { state: { reschedule: true, appointmentId: appt?.id } });
   }
 
-  async function handleCancel() {
+  function handleCancel() {
     setMenuOpen(false);
+    if (appt?.id) setConfirmOpen(true);
+  }
+
+  async function doCancel() {
+    setConfirmOpen(false);
     if (appt?.id) {
       try {
         await appointmentsApi.delete(appt.id);
@@ -230,6 +241,13 @@ function handleReschedule() {
           </button>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Cancel your appointment?"
+        message="You can book a new one afterwards."
+        onConfirm={doCancel}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </section>
   );
 }

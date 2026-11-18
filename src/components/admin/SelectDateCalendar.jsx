@@ -44,6 +44,7 @@ export default function SelectDateCalendar({
   }, [selectedDate]);
 
   const weeks = getMonthMatrix(viewYear, viewMonth);
+  const today = new Date();
   const isMonthMode = navigationMode === "month";
 
   const minDay = minDate ? startOfDay(minDate) : null;
@@ -118,6 +119,14 @@ export default function SelectDateCalendar({
       if (!canShiftNextDay) return;
       shiftDay(1);
     }
+  }
+
+  // One-tap way back to today after browsing other dates/months.
+  function goToday() {
+    if (isDisabled(today)) return;
+    setViewYear(today.getFullYear());
+    setViewMonth(today.getMonth());
+    onSelectDate(startOfDay(today));
   }
 
   function pickDay(day) {
@@ -200,7 +209,9 @@ export default function SelectDateCalendar({
                       ? "text-gray-300 bg-gray-50 cursor-not-allowed opacity-60"
                       : selected
                         ? "bg-gc-accent text-white shadow-sm animate-pop-in"
-                        : "text-gray-700 hover:bg-gray-100"
+                        : isSameDate(date, today)
+                          ? "text-gc-accent ring-1 ring-gc-accent/50 hover:bg-gray-100"
+                          : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {day}
@@ -210,6 +221,18 @@ export default function SelectDateCalendar({
           );
         })}
       </div>
+
+      {!isDisabled(today) && (
+        <button
+          type="button"
+          onClick={goToday}
+          disabled={isSameDate(selectedDate, today)}
+          className="btn-press mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gc-accent transition-colors hover:bg-gray-50 disabled:cursor-default disabled:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+        >
+          <NavIcon name="calendar" className="h-3.5 w-3.5" />
+          {isSameDate(selectedDate, today) ? "Showing today" : `Back to today · ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+        </button>
+      )}
     </section>
   );
 }

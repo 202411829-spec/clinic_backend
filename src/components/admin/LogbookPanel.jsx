@@ -8,7 +8,7 @@ import Pagination from "../ui/Pagination.jsx";
 import WalkInVisitForm from "./WalkInVisitForm.jsx";
 import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi } from "../../lib/api.js";
-import { isoToMDY } from "../../lib/calendar.js";
+import { getWeekRangeYMD, isoToMDY } from "../../lib/calendar.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
 
 // Backend dateTime is formatted as "MM/DD/YYYY h:mm AM" (or "MM/DD/YYYY HH:MM"
@@ -103,8 +103,9 @@ export default function LogbookPanel({
   const [department, setDepartment] = useState("All Departments");
   const [course, setCourse] = useState("All Course");
   const [reasonFilter, setReasonFilter] = useState("All Reason");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Default to the current week (Monday – Sunday); the admin can still change or clear it.
+  const [dateFrom, setDateFrom] = useState(() => getWeekRangeYMD().from);
+  const [dateTo, setDateTo] = useState(() => getWeekRangeYMD().to);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
 

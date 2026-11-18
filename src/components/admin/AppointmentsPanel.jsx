@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import NavIcon from "../ui/NavIcon.jsx";
 import StatusBadge from "./StatusBadge.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
@@ -327,6 +328,26 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
       .catch((err) => console.error("Failed to save status:", err));
   }
 
+  // Cancelling is hard to undo, so ask first. Every other status applies at once.
+  const [cancelTarget, setCancelTarget] = useState(null);
+
+  function requestStatusChange(slotId, bookingId, newStatus) {
+    if (/^cancel/i.test(String(newStatus))) {
+      const booking = slots
+        .find((s) => s.id === slotId)
+        ?.bookings.find((b) => b.id === bookingId);
+      if (/^cancel/i.test(String(booking?.status ?? ""))) return; // already cancelled
+      setCancelTarget({ slotId, bookingId, name: booking?.name });
+      return;
+    }
+    handleStatusChange(slotId, bookingId, newStatus);
+  }
+
+  function confirmCancel() {
+    if (cancelTarget) handleStatusChange(cancelTarget.slotId, cancelTarget.bookingId, "Cancelled");
+    setCancelTarget(null);
+  }
+
   function handleSaveTimeBlock(slotId, data) {
     setSlots((prev) =>
       prev.map((slot) => {
@@ -405,7 +426,7 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
           <SlotGroup
             key={slot.id}
             slot={slot}
-            onStatusChange={handleStatusChange}
+            onStatusChange={requestStatusChange}
             editing={openEditId === slot.id}
             onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
             onSaveTimeBlock={handleSaveTimeBlock}
@@ -413,6 +434,17 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
           />
         ))
       )}
+      <ConfirmDialog
+        open={!!cancelTarget}
+        title="Cancel this appointment?"
+        message={
+          cancelTarget?.name
+            ? `${cancelTarget.name}'s appointment will be marked as Cancelled.`
+            : "This appointment will be marked as Cancelled."
+        }
+        onConfirm={confirmCancel}
+        onCancel={() => setCancelTarget(null)}
+      />
     </section>
   );
 }

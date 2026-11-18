@@ -399,7 +399,17 @@ def _apply_logbook_filters(query, embedded_filters):
     return query
 
 
+def _clean_ids(ids):
+    """Drop None (e.g. visit logs with no appointment) and duplicates.
+
+    PostgREST turns a None inside .in_() into the string "None", which a
+    bigint column rejects (22P02: invalid input syntax for type bigint).
+    """
+    return list(dict.fromkeys(i for i in (ids or []) if i is not None))
+
+
 def _fetch_appointments_by_id(appointment_ids):
+    appointment_ids = _clean_ids(appointment_ids)
     if not appointment_ids:
         return {}
     response = execute_with_retry(
@@ -414,6 +424,7 @@ def _fetch_appointments_by_id(appointment_ids):
 
 
 def _fetch_log_medicines(visit_log_ids):
+    visit_log_ids = _clean_ids(visit_log_ids)
     if not visit_log_ids:
         return []
     response = execute_with_retry(
