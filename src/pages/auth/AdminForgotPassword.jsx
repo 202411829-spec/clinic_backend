@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ForgotPasswordForm from '../../components/auth/ForgotPasswordForm.jsx'
 
 const BRAND = {
-  logo: '/gordon-college-logo.png',
+  logo: '/gordon-college-seal.png',
   name: 'GORDON COLLEGE',
   tagline: 'Clinic Appointment System',
 }

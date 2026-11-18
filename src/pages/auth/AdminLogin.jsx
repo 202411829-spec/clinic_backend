@@ -5,7 +5,7 @@ import LoginForm from '../../components/auth/LoginForm.jsx'
 import { adminSignIn } from '../../lib/supabaseClient.js'
 
 const BRAND = {
-  logo: '/gordon-college-logo.png',
+  logo: '/gordon-college-seal.png',
   name: 'GORDON COLLEGE',
   tagline: 'Clinic Appointment System'
 }

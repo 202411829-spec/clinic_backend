@@ -637,7 +637,7 @@ export default function ReportsFullPanel() {
         </div>
 
         {/* Filter toolbar (no overflow-hidden: the date popover must escape it) */}
-        <div className="rounded-panel bg-white p-3 shadow-e2 md:p-4">
+        <div className="relative z-30 rounded-panel bg-white p-3 shadow-e2 md:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex min-w-0 flex-1 items-center gap-1.5" ref={pickerRef}>
               {period !== "All Time" && (

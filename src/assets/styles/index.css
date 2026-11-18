@@ -347,6 +347,12 @@
     background: #fff;
     box-shadow: none;
   }
+  /* Login / sign-up screens: flat seal green (#044B0E), no gradient, glows or grid. */
+  .app-shell--auth,
+  .app-shell.app-shell--auth {
+    background-color: theme('colors.gc.green.DEFAULT');
+    background-image: none;
+  }
   .app-main {
     @apply bg-canvas shadow-float;
     scrollbar-width: thin;

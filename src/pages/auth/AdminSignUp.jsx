@@ -138,7 +138,7 @@ export default function AdminSignUp() {
   const message = fieldError
 
   const BRAND = {
-    logo: '/gordon-college-logo.png',
+    logo: '/gordon-college-seal.png',
     name: 'GORDON COLLEGE',
     tagline: 'Clinic Appointment System',
   }
