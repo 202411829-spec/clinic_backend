@@ -10,7 +10,18 @@ import NavIcon from "../ui/NavIcon.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { departmentOptions, courseOptionsByDept } from "../../data/masterlistSample.js";
 import { masterlistApi } from "../../lib/api.js";
+import { buildSafeProfilePatch } from "../../lib/studentProfileEditPayload.js";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import {
+  buildAddressPatch,
+  getBarangayOptions,
+  getCityOptions,
+  getProvinceOptions,
+  getRegionOptions,
+  hasStructuredAddress,
+  updateAddressField,
+  validateAddressFields,
+} from "../../lib/philippineAddress.js";
 
 // Fallback (only used if the masterlist API lists fail to load) so the
 // modal still renders. IDs are the names themselves here — persistence won't
@@ -67,6 +78,27 @@ function splitName(fullName = "") {
   return { lastName: last, firstName, middleName };
 }
 
+const STRUCTURED_NAME_KEYS = ["firstName", "middleName", "lastName", "suffix"];
+
+function hasStructuredName(parts = {}) {
+  if (Object.prototype.hasOwnProperty.call(parts, "structuredName")) {
+    return parts.structuredName === true;
+  }
+  return STRUCTURED_NAME_KEYS.some((key) => String(parts[key] ?? "").trim() !== "");
+}
+
+function composeContactName(emergency) {
+  const parts = emergency || {};
+  const first = String(parts.firstName || "").trim();
+  const middle = String(parts.middleName || "").trim();
+  const last = String(parts.lastName || "").trim();
+  const suffix = String(parts.suffix || "").trim();
+  const middlePart = middle ? (middle.endsWith(".") ? middle : `${middle}.`) : "";
+  const given = [first, middlePart].filter(Boolean).join(" ");
+  const base = [last, given].filter(Boolean).join(", ");
+  return base && suffix ? `${base} ${suffix}` : base;
+}
+
 // "02/05/2004" -> "2004-02-05" (for <input type="date">); passes ISO through untouched.
 function toDateInputValue(value = "") {
   if (!value) return "";
@@ -110,6 +142,8 @@ function buildInitialForm(student, departments = [], courses = []) {
   const courseObj = courses.find((c) => c.course_name === courseName);
   const { conditions, allergySpecify } = parseConditions(student.medicalConditions);
   const emergency = student.emergencyContact || {};
+  const emergencyParts = splitName(emergency.name);
+  const hasStructuredEmergencyName = hasStructuredName(emergency);
 
   return {
     // Student number is derived from the school email (student_id) and the
@@ -123,13 +157,29 @@ function buildInitialForm(student, departments = [], courses = []) {
     lastName,
     firstName,
     middleName,
+    suffix: student.suffix || "",
     birthday: toDateInputValue(student.birthday),
     sex: student.sex || "",
     civilStatus: student.civilStatus || "",
     contactNumber: student.contactNumber || "",
+    // Keep the legacy free-text address verbatim. Structured fields are loaded
+    // separately and never back-parsed from this value.
     presentAddress: student.presentAddress || "",
+    legacyAddress: student.presentAddress || "",
+    addressRegion: student.addressRegion || "",
+    addressProvince: student.addressProvince || "",
+    addressCity: student.addressCity || "",
+    addressBarangay: student.addressBarangay || "",
+    addressStreet: student.addressStreet || "",
+    addressHouseNumber: student.addressHouseNumber || "",
+    structuredAddressEdited: false,
     emergency: {
-      name: emergency.name || "",
+      structuredName: hasStructuredEmergencyName,
+      name: hasStructuredEmergencyName ? "" : emergency.name || "",
+      firstName: emergency.firstName || emergencyParts.firstName || "",
+      middleName: emergency.middleName || emergencyParts.middleName || "",
+      lastName: emergency.lastName || emergencyParts.lastName || "",
+      suffix: emergency.suffix || "",
       relationship: emergency.relationship || "",
       contactNumber: emergency.contactNumber || "",
       presentAddress: emergency.presentAddress || "",
@@ -169,6 +219,10 @@ function buildStudentFromForm(student, form, photoDataUrl, departments = [], cou
   return {
     ...student,
     name,
+    firstName: form.firstName,
+    middleName: form.middleName,
+    lastName: form.lastName,
+    suffix: form.suffix,
     studentNumber: form.studentNumber,
     // Both `dept`/`course` and `department`/`course` aliases are kept so the
     // panel (which reads `department`) and the form stay consistent after a save.
@@ -182,7 +236,19 @@ function buildStudentFromForm(student, form, photoDataUrl, departments = [], cou
     civilStatus: form.civilStatus,
     contactNumber: form.contactNumber,
     presentAddress: form.presentAddress,
-    emergencyContact: { ...form.emergency },
+    legacyAddress: form.legacyAddress,
+    addressRegion: form.addressRegion,
+    addressProvince: form.addressProvince,
+    addressCity: form.addressCity,
+    addressBarangay: form.addressBarangay,
+    addressStreet: form.addressStreet,
+    addressHouseNumber: form.addressHouseNumber,
+    emergencyContact: {
+      ...form.emergency,
+      name: hasStructuredName(form.emergency)
+        ? composeContactName(form.emergency)
+        : form.emergency.name,
+    },
     medicalConditions: conditions,
     previousOperation:
       form.hadOperation === "Yes"
@@ -214,7 +280,7 @@ const CONDITION_TO_COLUMN = {
 
 function mapToBackendPayload(student, form, photoDataUrl, departments = [], courses = []) {
   const updated = buildStudentFromForm(student, form, photoDataUrl, departments, courses);
-  const { lastName, firstName, middleName } = splitName(updated.name);
+  const { lastName, firstName, middleName } = updated;
 
   const hasAllergy = updated.medicalConditions.some((c) => /^allergy/i.test(c));
   let allergies = "";
@@ -242,22 +308,37 @@ function mapToBackendPayload(student, form, photoDataUrl, departments = [], cour
 
   const ec = updated.emergencyContact || {};
 
+  const emergencyContact = {
+    contact_name: ec.name,
+    relationship: ec.relationship,
+    phone_number: ec.contactNumber,
+    present_address: ec.presentAddress,
+    ...(hasStructuredName(ec)
+      ? {
+          contact_name: composeContactName(ec),
+          first_name: ec.firstName || null,
+          middle_initial: ec.middleName || null,
+          last_name: ec.lastName || null,
+          suffix: ec.suffix || null,
+        }
+      : {}),
+  };
+
   const payload = {
     first_name: firstName,
     middle_initial: middleName || null,
     last_name: lastName,
+    suffix: form.suffix.trim() || null,
     gender: updated.sex,
     birth_date: updated.birthday ? toDateInputValue(updated.birthday) : null,
     civil_status: updated.civilStatus,
     contact_number: updated.contactNumber,
     present_address: updated.presentAddress,
     photo: updated.photo || null,
-    emergency_contact: {
-      contact_name: ec.name,
-      relationship: ec.relationship,
-      phone_number: ec.contactNumber,
-      present_address: ec.presentAddress,
-    },
+    // buildAddressPatch omits address_* until the structured block is touched,
+    // so a legacy-only save never wipes previously stored structured data.
+    ...buildAddressPatch(form),
+    emergency_contact: emergencyContact,
     medical_history,
   };
   // Only send department/course when the student actually selected them,
@@ -269,6 +350,34 @@ function mapToBackendPayload(student, form, photoDataUrl, departments = [], cour
   return payload;
 }
 
+const MAX_NAME_PART = 200;
+const MAX_INITIAL = 10;
+const MAX_SUFFIX = 20;
+
+function validateNameFields(form) {
+  const errors = {};
+  const limits = [
+    ["firstName", form.firstName, MAX_NAME_PART],
+    ["lastName", form.lastName, MAX_NAME_PART],
+    ["middleName", form.middleName, MAX_INITIAL],
+    ["suffix", form.suffix, MAX_SUFFIX],
+  ];
+  limits.forEach(([key, value, max]) => {
+    if (String(value || "").trim().length > max) errors[key] = true;
+  });
+
+  const ec = form.emergency || {};
+  if (hasStructuredName(ec)) {
+    if (!String(ec.firstName || "").trim()) errors.emergencyFirstName = true;
+    if (!String(ec.lastName || "").trim()) errors.emergencyLastName = true;
+    if (String(ec.firstName || "").trim().length > MAX_NAME_PART) errors.emergencyFirstName = true;
+    if (String(ec.lastName || "").trim().length > MAX_NAME_PART) errors.emergencyLastName = true;
+    if (String(ec.middleName || "").trim().length > MAX_INITIAL) errors.emergencyMiddleName = true;
+    if (String(ec.suffix || "").trim().length > MAX_SUFFIX) errors.emergencySuffix = true;
+  }
+  return errors;
+}
+
 const STEP1_REQUIRED = [
   "lastName",
   "firstName",
@@ -278,12 +387,18 @@ const STEP1_REQUIRED = [
   "contactNumber",
   "presentAddress",
 ];
-const STEP1_EMERGENCY_REQUIRED = ["name", "relationship", "contactNumber", "presentAddress"];
-
 function isStep1Valid(form) {
+  const emergency = form.emergency || {};
+  const emergencyNameValid =
+    hasStructuredName(emergency) || String(emergency.name || "").trim() !== "";
+  const emergencyRestValid = ["relationship", "contactNumber", "presentAddress"].every(
+    (k) => String(emergency[k] || "").trim() !== ""
+  );
   return (
     STEP1_REQUIRED.every((k) => String(form[k] || "").trim() !== "") &&
-    STEP1_EMERGENCY_REQUIRED.every((k) => String(form.emergency[k] || "").trim() !== "") &&
+    Object.keys(validateNameFields(form)).length === 0 &&
+    emergencyNameValid &&
+    emergencyRestValid &&
     // Academic program is mandatory: without it the record stays incomplete
     // even though the PATCH itself succeeds, which looked like "not saved".
     String(form.departmentId || "").trim() !== "" &&
@@ -402,10 +517,23 @@ function StepIndicator({ step }) {
 
 /* ---------------------------- step 1: personal information ---------------------------- */
 
-function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto, onNext, touched, departments, courses, onDepartmentChange }) {
+function StepPersonal({ form, update, updateEmergency, onAddressChange, photoPreview, onPickPhoto, onNext, touched, departments, courses, onDepartmentChange }) {
   const age = computeAge(form.birthday);
-  const err = (k) => touched && String(form[k] ?? "").trim() === "";
-  const errEmergency = (k) => touched && String(form.emergency[k] || "").trim() === "";
+  const nameErrors = validateNameFields(form);
+  const addressErrors = validateAddressFields(form);
+  const err = (k) =>
+    touched &&
+    (String(form[k] ?? "").trim() === "" ||
+      Boolean(nameErrors[k]) ||
+      Boolean(addressErrors[k]));
+  const errEmergency = (k) => {
+    if (k === "name") {
+      return touched && !hasStructuredName(form.emergency) && !String(form.emergency.name || "").trim();
+    }
+    if (k === "firstName") return touched && Boolean(nameErrors.emergencyFirstName);
+    if (k === "lastName") return touched && Boolean(nameErrors.emergencyLastName);
+    return touched && String(form.emergency[k] || "").trim() === "";
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -483,11 +611,16 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
           {/* emergency contact */}
           <SectionBlock icon="phone" title="Emergency Contact">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <Field label="Full Name" required error={errEmergency("name")}>
+              <Field
+                label={form.emergency.structuredName ? "Full Name (auto-built)" : "Full Name"}
+                required={!form.emergency.structuredName}
+                error={errEmergency("name")}
+              >
                 <input
                   className={inputClass}
                   placeholder="Contact Person Name"
                   value={form.emergency.name}
+                  disabled={form.emergency.structuredName}
                   onChange={(e) => updateEmergency({ name: e.target.value })}
                 />
               </Field>
@@ -499,6 +632,45 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                   onChange={(e) => updateEmergency({ relationship: e.target.value })}
                 />
               </Field>
+            </div>
+            <div className="rounded-lg border border-ink-200 p-3">
+              <p className="text-xs text-ink-400 mb-2.5">
+                Optional: enter structured name parts. If any part is entered, First Name and Last Name become required and the full name is rebuilt automatically.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <Field label="First Name" required error={errEmergency("firstName")}>
+                  <input
+                    className={inputClass}
+                    placeholder="First Name"
+                    value={form.emergency.firstName}
+                    onChange={(e) => updateEmergency({ firstName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Middle Initial" error={Boolean(nameErrors.emergencyMiddleName)}>
+                  <input
+                    className={inputClass}
+                    placeholder="M.I."
+                    value={form.emergency.middleName}
+                    onChange={(e) => updateEmergency({ middleName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Last Name" required error={errEmergency("lastName")}>
+                  <input
+                    className={inputClass}
+                    placeholder="Last Name"
+                    value={form.emergency.lastName}
+                    onChange={(e) => updateEmergency({ lastName: e.target.value })}
+                  />
+                </Field>
+                <Field label="Suffix" error={Boolean(nameErrors.emergencySuffix)}>
+                  <input
+                    className={inputClass}
+                    placeholder="Optional"
+                    value={form.emergency.suffix}
+                    onChange={(e) => updateEmergency({ suffix: e.target.value })}
+                  />
+                </Field>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <Field label="Contact Number" required error={errEmergency("contactNumber")}>
@@ -524,7 +696,7 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
         {/* personal details */}
         <div className="md:col-span-3">
           <SectionBlock icon="user" title="Personal Details">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <Field label="Last Name" required error={err("lastName")}>
                 <input
                   className={inputClass}
@@ -541,12 +713,20 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                   onChange={(e) => update({ firstName: e.target.value })}
                 />
               </Field>
-              <Field label="Middle Initial / M.I.">
+              <Field label="Middle Initial / M.I." error={Boolean(nameErrors.middleName)}>
                 <input
                   className={inputClass}
                   placeholder="M.I."
                   value={form.middleName}
                   onChange={(e) => update({ middleName: e.target.value })}
+                />
+              </Field>
+              <Field label="Suffix" error={Boolean(nameErrors.suffix)}>
+                <input
+                  className={inputClass}
+                  placeholder="Optional"
+                  value={form.suffix}
+                  onChange={(e) => update({ suffix: e.target.value })}
                 />
               </Field>
             </div>
@@ -610,9 +790,77 @@ function StepPersonal({ form, update, updateEmergency, photoPreview, onPickPhoto
                 className={inputClass}
                 placeholder="House No., Street, Barangay, City / Municipality"
                 value={form.presentAddress}
-                onChange={(e) => update({ presentAddress: e.target.value })}
+                onChange={(e) => onAddressChange("legacyAddress", e.target.value)}
+                disabled={hasStructuredAddress(form)}
               />
+              <p className="text-xs text-ink-400 mt-1">
+                {hasStructuredAddress(form)
+                  ? "Auto-filled from the structured fields below. Legacy text is preserved until a structured field is used."
+                  : "Legacy free-text value. It is never split into structured fields."}
+              </p>
             </Field>
+
+            <div className="md:col-span-2 rounded-lg border border-ink-200 p-3">
+              <p className="text-xs text-ink-400 mb-2.5">
+                Optional: choose PSA PSGC address parts. Street and house details stay free text.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <Field label="Region">
+                  <UniversalDropdown
+                    value={form.addressRegion}
+                    onChange={(v) => onAddressChange("addressRegion", v)}
+                    options={getRegionOptions()}
+                    placeholder="Select Region"
+                  />
+                </Field>
+                <Field label="Province">
+                  <UniversalDropdown
+                    value={form.addressProvince}
+                    onChange={(v) => onAddressChange("addressProvince", v)}
+                    options={getProvinceOptions(form.addressRegion)}
+                    placeholder={form.addressRegion ? "Select Province" : "Select a Region first"}
+                    disabled={!form.addressRegion}
+                  />
+                </Field>
+                <Field label="City / Municipality">
+                  <UniversalDropdown
+                    value={form.addressCity}
+                    onChange={(v) => onAddressChange("addressCity", v)}
+                    options={getCityOptions(form.addressRegion, form.addressProvince)}
+                    placeholder={form.addressProvince ? "Select City / Municipality" : "Select a Province first"}
+                    disabled={!form.addressProvince}
+                  />
+                </Field>
+                <Field label="Barangay">
+                  <UniversalDropdown
+                    value={form.addressBarangay}
+                    onChange={(v) => onAddressChange("addressBarangay", v)}
+                    options={getBarangayOptions(form.addressCity)}
+                    placeholder={form.addressCity ? "Select Barangay" : "Select a City / Municipality first"}
+                    disabled={!form.addressCity}
+                  />
+                </Field>
+                <Field label="Street" error={Boolean(addressErrors.addressStreet)}>
+                  <input
+                    className={inputClass}
+                    placeholder="Street / Road / Purok"
+                    value={form.addressStreet}
+                    onChange={(e) => onAddressChange("addressStreet", e.target.value)}
+                  />
+                </Field>
+                <Field
+                  label="House Number / Building / Lot"
+                  error={Boolean(addressErrors.addressHouseNumber)}
+                >
+                  <input
+                    className={inputClass}
+                    placeholder="Optional"
+                    value={form.addressHouseNumber}
+                    onChange={(e) => onAddressChange("addressHouseNumber", e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
           </SectionBlock>
         </div>
       </div>
@@ -743,7 +991,15 @@ function StepMedical({ form, update, onBack, onNext, touched }) {
 
 /* ---------------------------- step 3: data privacy ---------------------------- */
 
-function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) {
+function StepPrivacy({
+  form,
+  update,
+  onBack,
+  onSubmit,
+  isSaving,
+  submitError,
+  onClearSaveError,
+}) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2">
@@ -775,7 +1031,10 @@ function StepPrivacy({ form, update, onBack, onSubmit, isSaving, submitError }) 
           type="checkbox"
           className="mt-0.5 w-4 h-4 rounded border-ink-300 text-brand-900 focus:ring-brand-600/25 shrink-0"
           checked={form.consent}
-          onChange={(e) => update({ consent: e.target.checked })}
+          onChange={(e) => {
+            update({ consent: e.target.checked });
+            onClearSaveError?.();
+          }}
         />
         <span className="text-sm text-ink-700 leading-relaxed">
           I have read and agree to the data privacy waiver above, and I confirm that all the
@@ -859,6 +1118,9 @@ export default function EditStudentInfoModal({
   onSave,
   isSaving = false,
   saveError = null,
+  onClearSaveError,
+  medicalSummaryLoaded = true,
+  onboarding = false,
 }) {
   const departments = departmentsProp.length ? departmentsProp : fallbackDepartments;
   const [courses, setCourses] = useState(coursesProp.length ? coursesProp : []);
@@ -873,7 +1135,14 @@ export default function EditStudentInfoModal({
     setForm((f) => ({ ...f, ...patch }));
   }
   function updateEmergency(patch) {
-    setForm((f) => ({ ...f, emergency: { ...f.emergency, ...patch } }));
+    setForm((f) => {
+      const emergency = { ...f.emergency, ...patch };
+      if (STRUCTURED_NAME_KEYS.some((key) => key in patch)) emergency.structuredName = true;
+      return { ...f, emergency };
+    });
+  }
+  function handleAddressChange(key, value) {
+    setForm((f) => updateAddressField(f, key, value));
   }
 
   // When the department changes, load that department's courses. Values are
@@ -924,33 +1193,45 @@ export default function EditStudentInfoModal({
       return;
     }
     setTouchedStep2(false);
+    onClearSaveError?.();
     setStep(3);
   }
 
   async function handleSubmit() {
     if (!form.consent || isSaving) return;
     const updatedStudent = buildStudentFromForm(student, form, photoPreview, departments, courses);
-    const payload = mapToBackendPayload(student, form, photoPreview, departments, courses);
+    const payload = buildSafeProfilePatch(
+      mapToBackendPayload(student, form, photoPreview, departments, courses),
+      medicalSummaryLoaded,
+      form.consent
+    );
     await onSave?.(payload, updatedStudent);
   }
 
   return (
     <div className="flex flex-col gap-5 pb-10">
+      {!medicalSummaryLoaded && (
+        <div role="status" className="rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-e1">
+          Emergency contact and medical history are unavailable. Only personal information will be saved; retry medical details before changing those sections.
+        </div>
+      )}
       {/* back link + header — this now lives inline on the page instead of
           a popup box, so it gets the full page width like the desktop mockup */}
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={isSaving}
-        className={`btn-press inline-flex items-center gap-1.5 text-sm font-semibold w-fit transition-colors ${
-          isSaving
-            ? "text-ink-400 opacity-50 cursor-not-allowed"
-            : "text-ink-500 hover:text-brand-900"
-        }`}
-      >
-        <NavIcon name="back" className="w-4 h-4" />
-        Back
-      </button>
+      {!onboarding && (
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isSaving}
+          className={`btn-press inline-flex items-center gap-1.5 text-sm font-semibold w-fit transition-colors ${
+            isSaving
+              ? "text-ink-400 opacity-50 cursor-not-allowed"
+              : "text-ink-500 hover:text-brand-900"
+          }`}
+        >
+          <NavIcon name="back" className="w-4 h-4" />
+          Back
+        </button>
+      )}
 
       <div className="card-hover rounded-panel bg-white shadow-e2">
         <div className="relative overflow-hidden rounded-t-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-5 py-5 text-white md:px-8 md:py-6">
@@ -973,6 +1254,7 @@ export default function EditStudentInfoModal({
               form={form}
               update={update}
               updateEmergency={updateEmergency}
+              onAddressChange={handleAddressChange}
               photoPreview={photoPreview}
               onPickPhoto={handlePickPhoto}
               onNext={handleStep1Next}
@@ -999,6 +1281,7 @@ export default function EditStudentInfoModal({
               onSubmit={handleSubmit}
               isSaving={isSaving}
               submitError={saveError}
+              onClearSaveError={onClearSaveError}
             />
           )}
         </div>

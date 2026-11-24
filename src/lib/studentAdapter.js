@@ -9,6 +9,23 @@ function joinName(profile = {}) {
   return `${profile.last_name ?? ""}, ${profile.first_name ?? ""}${middle}`.trim();
 }
 
+function adaptEmergencyContact(ec = {}) {
+  const hasStructuredName = ["first_name", "middle_initial", "last_name", "suffix"]
+    .some((key) => String(ec[key] ?? "").trim() !== "");
+  const name = ec.contact_name ?? ec.name ?? "-";
+  return {
+    name,
+    firstName: ec.first_name ?? "",
+    middleName: ec.middle_initial ?? "",
+    lastName: ec.last_name ?? "",
+    suffix: ec.suffix ?? "",
+    legacyName: hasStructuredName ? "" : (name === "-" ? "" : name),
+    relationship: ec.relationship ?? "-",
+    contactNumber: ec.contact_number ?? ec.phone ?? "-",
+    presentAddress: ec.present_address ?? "-",
+  };
+}
+
 function formatDate(value) {
   if (!value) return "-";
   try {
@@ -40,6 +57,8 @@ export function adaptStudentProfile(profile, medSummary) {
     id: profile.student_id,
     studentNumber: profile.student_id,
     name: joinName(profile),
+    middleName: profile.middle_initial ?? "",
+    suffix: profile.suffix ?? "",
     dept: profile.department_name ?? "-",
     course: profile.course_name ?? "-",
     deptCourse: `${profile.course_name ?? "-"} / ${profile.department_name ?? "-"}`,
@@ -49,10 +68,15 @@ export function adaptStudentProfile(profile, medSummary) {
     contactNumber: profile.contact_number ?? "-",
     civilStatus: profile.civil_status ?? "-",
     presentAddress: profile.present_address ?? "-",
+    legacyAddress: profile.present_address ?? "",
+    addressRegion: profile.address_region_code ?? "",
+    addressProvince: profile.address_province_code ?? "",
+    addressCity: profile.address_city_code ?? "",
+    addressBarangay: profile.address_barangay_code ?? "",
+    addressStreet: profile.address_street ?? "",
+    addressHouseNumber: profile.address_house_number ?? "",
     emergencyContact: {
-      name: ec.contact_name ?? ec.name ?? "-",
-      relationship: ec.relationship ?? "-",
-      contactNumber: ec.contact_number ?? ec.phone ?? "-",
+      ...adaptEmergencyContact(ec),
       presentAddress: ec.present_address ?? profile.present_address ?? "-",
     },
     medicalConditions: conditions,

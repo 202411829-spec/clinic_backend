@@ -66,6 +66,7 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <P.StudentDashboard /> },
           { path: 'book', element: <P.StudentBook /> },
           { path: 'profile', element: <P.StudentRecord /> },
+          { path: 'profile/edit', element: <P.StudentProfileEdit /> },
           { path: 'record', element: <Navigate to="/student/profile" replace /> },
           { path: 'feedback', element: <P.StudentFeedback /> },
         ],

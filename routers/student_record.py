@@ -12,7 +12,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from flask import Blueprint, g, jsonify, request
-from datetime import date
+from datetime import date, datetime, timezone
 
 from database import supabase
 from routers.auth_guard import require_auth, require_admin, resolve_student_id, is_admin_user
@@ -36,6 +36,29 @@ _YEAR_LABEL_RE = re.compile(r"^Year\s+(?:[IVXLCDM]+|[0-9]+)$", re.IGNORECASE)
 
 def _error(message, status):
     return jsonify({"success": False, "error": message}), status
+
+
+def _ensure_db_ok(response, message):
+    error = getattr(response, "error", None)
+    if error:
+        logger.error("%s: %s", message, getattr(error, "message", error))
+        raise RuntimeError(message)
+
+
+def _record_data_privacy_consent(student_id):
+    message = "Failed to save data privacy consent"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        response = execute_with_retry(
+            supabase.table("students")
+            .update({"data_privacy_consented_at": timestamp})
+            .eq("student_id", student_id)
+            .is_("data_privacy_consented_at", None)
+        )
+    except Exception as exc:
+        logger.error("%s: %s", message, exc)
+        raise RuntimeError(message) from exc
+    _ensure_db_ok(response, message)
 
 
 def _parse_admin_id(value):
@@ -99,6 +122,34 @@ def _iso_or_none(value):
         return date.fromisoformat(str(value)[:10]).isoformat()
     except Exception:
         return None
+
+
+def _clean_name_value(value):
+    """Optional name parts are stored as trimmed text or NULL."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _clean_address_value(value):
+    """Optional address parts are stored as trimmed text or NULL."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _compose_contact_name(emergency):
+    """Build the legacy contact_name from structured fields, if submitted."""
+    first = _clean_name_value(emergency.get("first_name"))
+    middle = _clean_name_value(emergency.get("middle_initial"))
+    last = _clean_name_value(emergency.get("last_name"))
+    suffix = _clean_name_value(emergency.get("suffix"))
+    middle_part = middle if middle and middle.endswith(".") else (f"{middle}." if middle else None)
+    given = " ".join(part for part in (first, middle_part) if part)
+    base = ", ".join(part for part in (last, given) if part)
+    return f"{base} {suffix}" if base and suffix else (base or "")
 
 
 # ---------------------------------------------------------------------------
@@ -549,11 +600,23 @@ def get_medical_summary(student_id):
 
 # Allowed student-editable fields on the `students` table.
 _STUDENT_EDITABLE_FIELDS = {
-    "first_name", "middle_initial", "last_name", "gender",
+    "first_name", "middle_initial", "last_name", "suffix", "gender",
     "birth_date", "civil_status", "contact_number",
     "present_address", "photo",
     "department_id", "course_id",
+    "address_region_code", "address_province_code", "address_city_code",
+    "address_barangay_code", "address_street", "address_house_number",
 }
+
+_EMERGENCY_NAME_FIELDS = ("first_name", "middle_initial", "last_name", "suffix")
+
+_ADDRESS_CODE_FIELDS = (
+    "address_region_code", "address_province_code", "address_city_code",
+    "address_barangay_code",
+)
+_ADDRESS_TEXT_FIELDS = ("address_street", "address_house_number")
+_ADDRESS_FIELD_LIMITS = {key: 32 for key in _ADDRESS_CODE_FIELDS}
+_ADDRESS_FIELD_LIMITS.update({key: 200 for key in _ADDRESS_TEXT_FIELDS})
 
 # Allowed boolean fields on `medical_histories`.
 _MEDICAL_HISTORY_BOOL_FIELDS = {
@@ -620,21 +683,33 @@ def update_student_profile(student_id):
         id=g.user.get("id"),
         email=g.user.get("email"),
     )
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return _error("Invalid request body", 400)
 
-    # Admin can edit any student — check first so the student-id
-    # resolver's email-local-part fallback doesn't misclassify an admin
-    # (e.g. "admin@gordoncollege.edu.ph" -> "ADMIN") as a foreign student.
-    if is_admin_user(auth_user):
-        pass  # allowed
-    else:
-        caller_student_id = resolve_student_id(auth_user)
-        if caller_student_id is not None:
-            # Caller is a student — must be editing their own record.
-            if normalize_student_id(caller_student_id) != sid:
-                return _error("You can only edit your own profile", 403)
-        else:
-            # Neither admin nor a resolvable student — deny.
-            return _error("Forbidden", 403)
+    # Structured address details are optional, but when submitted they must be
+    # short strings. Legacy present_address is never parsed or rewritten here.
+    for key, max_length in _ADDRESS_FIELD_LIMITS.items():
+        if key not in body or body[key] is None:
+            continue
+        value = body[key]
+        if not isinstance(value, str) or len(value.strip()) > max_length:
+            return _error(f"Invalid address field: {key}", 400)
+
+    consent_requested = body.get("data_privacy_consent") is True
+    caller_student_id = resolve_student_id(auth_user)
+    is_owner = (
+        caller_student_id is not None
+        and normalize_student_id(caller_student_id) == sid
+    )
+    is_admin = is_admin_user(auth_user)
+
+    # Admins keep the existing bypass for ordinary fields. Consent never
+    # uses that bypass: only the owner student may record their own consent.
+    if not is_admin and not is_owner:
+        return _error("You can only edit your own profile", 403)
+    if consent_requested and not is_owner:
+        return _error("You can only submit your own data privacy consent", 403)
 
     # --- Verify student exists ---
     existing = execute_with_retry(
@@ -646,8 +721,6 @@ def update_student_profile(student_id):
     if not existing.data:
         return _error("Student not found", 404)
 
-    body = request.get_json(silent=True) or {}
-
     # --- Update students table (partial) ---
     student_payload = {}
     for key in _STUDENT_EDITABLE_FIELDS:
@@ -655,42 +728,82 @@ def update_student_profile(student_id):
             value = body[key]
             if key in _DATE_FIELDS:
                 value = _iso_or_none(value)
+            elif key == "suffix":
+                value = _clean_name_value(value)
+            elif key in _ADDRESS_FIELD_LIMITS:
+                value = _clean_address_value(value)
             student_payload[key] = value
 
-    if student_payload:
-        execute_with_retry(
-            supabase.table("students")
-            .update(student_payload)
-            .eq("student_id", sid)
-        )
+    try:
+        if student_payload:
+            _ensure_db_ok(
+                execute_with_retry(
+                    supabase.table("students")
+                    .update(student_payload)
+                    .eq("student_id", sid)
+                ),
+                "Failed to update profile",
+            )
 
-    # --- Upsert emergency_contact ---
-    ec_body = body.get("emergency_contact")
-    if ec_body and isinstance(ec_body, dict):
-        ec_payload = {}
-        for key in ("contact_name", "relationship", "phone_number", "present_address"):
-            if key in ec_body:
-                ec_payload[key] = ec_body[key]
-        if ec_payload:
-            _upsert_by_student_id("emergency_contacts", sid, ec_payload)
+        # --- Upsert emergency_contact ---
+        ec_body = body.get("emergency_contact")
+        if ec_body and isinstance(ec_body, dict):
+            ec_payload = {}
+            for key in ("contact_name", "relationship", "phone_number", "present_address"):
+                if key in ec_body:
+                    ec_payload[key] = ec_body[key]
 
-    # --- Upsert medical_history ---
-    mh_body = body.get("medical_history")
-    if mh_body and isinstance(mh_body, dict):
-        mh_payload = {}
-        for key in _MEDICAL_HISTORY_BOOL_FIELDS:
-            if key in mh_body:
-                mh_payload[key] = bool(mh_body[key])
-        for key in _MEDICAL_HISTORY_OTHER_FIELDS:
-            if key in mh_body:
-                value = mh_body[key]
-                if key == "operation_date":
-                    value = _iso_or_none(value)
-                elif key == "has_operation_history":
-                    value = bool(value)
-                mh_payload[key] = value
-        if mh_payload:
-            _upsert_by_student_id("medical_histories", sid, mh_payload)
+            # Structured names are optional as a group. When any part is sent,
+            # first/last become required and the legacy contact_name is composed
+            # from them; otherwise an existing contact_name is left untouched.
+            structured_name = any(key in ec_body for key in _EMERGENCY_NAME_FIELDS)
+            if structured_name:
+                if not _clean_name_value(ec_body.get("first_name")) or not _clean_name_value(
+                    ec_body.get("last_name")
+                ):
+                    return _error(
+                        "Emergency contact first name and last name are required", 400
+                    )
+                for key in _EMERGENCY_NAME_FIELDS:
+                    ec_payload[key] = _clean_name_value(ec_body.get(key))
+                ec_payload["contact_name"] = _compose_contact_name(ec_body)
+
+            if ec_payload:
+                _ensure_db_ok(
+                    _upsert_by_student_id("emergency_contacts", sid, ec_payload),
+                    "Failed to save emergency contact",
+                )
+
+        # --- Upsert medical_history ---
+        mh_body = body.get("medical_history")
+        if mh_body and isinstance(mh_body, dict):
+            mh_payload = {}
+            for key in _MEDICAL_HISTORY_BOOL_FIELDS:
+                if key in mh_body:
+                    mh_payload[key] = bool(mh_body[key])
+            for key in _MEDICAL_HISTORY_OTHER_FIELDS:
+                if key in mh_body:
+                    value = mh_body[key]
+                    if key == "operation_date":
+                        value = _iso_or_none(value)
+                    elif key == "has_operation_history":
+                        value = bool(value)
+                    mh_payload[key] = value
+            if mh_payload:
+                _ensure_db_ok(
+                    _upsert_by_student_id("medical_histories", sid, mh_payload),
+                    "Failed to save medical history",
+                )
+
+        # Consent is last. The conditional .is_(..., None) update preserves
+        # the first successful timestamp even under concurrent submissions.
+        if consent_requested:
+            _record_data_privacy_consent(sid)
+    except RuntimeError as exc:
+        return _error(str(exc), 500)
+    except Exception:
+        logger.exception("Unhandled error while saving student profile")
+        return _error("Failed to save profile", 500)
 
     # --- Build response: updated profile + related data ---
     profile = execute_with_retry(

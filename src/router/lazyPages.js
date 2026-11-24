@@ -24,6 +24,7 @@ export const Pending = lazy(() => import('../pages/admin/Pending.jsx'))
 export const StudentDashboard = lazy(() => import('../pages/student/Dashboard.jsx'))
 export const StudentBook = lazy(() => import('../pages/student/Book.jsx'))
 export const StudentRecord = lazy(() => import('../pages/student/StudentRecord.jsx'))
+export const StudentProfileEdit = lazy(() => import('../pages/student/ProfileEdit.jsx'))
 export const StudentFeedback = lazy(() => import('../pages/student/Feedback.jsx'))
 
 export const NotFound = lazy(() => import('../pages/NotFound.jsx'))

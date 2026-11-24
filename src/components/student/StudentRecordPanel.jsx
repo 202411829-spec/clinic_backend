@@ -8,9 +8,9 @@ import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import EditStudentInfoModal from "./EditStudentInfoModal.jsx";
-import { recordsApi, masterlistApi } from "../../lib/api.js";
+import { masterlistApi } from "../../lib/api.js";
 import { useProfileCompleteness } from "../../context/ProfileCompletenessContext.jsx";
-import { isStudentProfileComplete } from "../../lib/profileCompleteness.js";
+import { submitStudentProfilePatch } from "../../lib/studentProfileSave.js";
 import { formatDisplayName } from "../../lib/format.js";
 
 function SectionHeader({ icon, title }) {
@@ -48,11 +48,19 @@ function InfoField({ label, value }) {
   );
 }
 
-export default function StudentRecordPanel({ student: initialStudent, studentId, error }) {
+export default function StudentRecordPanel({
+  student: initialStudent,
+  studentId,
+  error,
+  medicalSummaryError,
+  medicalSummaryLoading,
+  onRetryMedicalSummary,
+}) {
   const navigate = useNavigate();
   const { status, loadError, applyProfile, recheck } = useProfileCompleteness();
   const [student, setStudent] = useState(initialStudent);
   const [editing, setEditing] = useState(false);
+  const [editSummaryLoaded, setEditSummaryLoaded] = useState(true);
   const [savedNotice, setSavedNotice] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,8 +72,8 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
 
   // Keep local copy in sync as the async fetch fills the prop in.
   useEffect(() => {
-    if (initialStudent) setStudent(initialStudent);
-  }, [initialStudent]);
+    if (initialStudent && !editing) setStudent(initialStudent);
+  }, [initialStudent, editing]);
 
   // Load the department + course lists once the student record is known.
   useEffect(() => {
@@ -111,8 +119,25 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
   const emergency = student.emergencyContact ?? {};
   const conditions = student.medicalConditions ?? [];
   const prevOp = student.previousOperation;
+  const medicalNotice = medicalSummaryError ? (
+    <div role="alert" className="mb-1 flex flex-col gap-3 rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-e1 sm:flex-row sm:items-center sm:justify-between">
+      <span>Showing basic profile information. Emergency contact and medical history could not be loaded.</span>
+      {typeof onRetryMedicalSummary === "function" && (
+        <button
+          type="button"
+          onClick={onRetryMedicalSummary}
+          className="shrink-0 rounded-card bg-brand-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-900"
+        >
+          Retry medical details
+        </button>
+      )}
+    </div>
+  ) : medicalSummaryLoading ? (
+    <p role="status" className="mb-1 text-xs text-ink-500">Loading emergency contact and medical history…</p>
+  ) : null;
 
   function handleEditClick() {
+    setEditSummaryLoaded(!medicalSummaryLoading && !medicalSummaryError);
     setEditing(true);
   }
 
@@ -120,20 +145,15 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
     setSaveError(null);
     setIsSaving(true);
     try {
-      const res = await recordsApi.updateProfile(studentId, payload);
+      const { complete } = await submitStudentProfilePatch(
+        studentId,
+        payload,
+        applyProfile
+      );
       setStudent(updatedStudent);
       setEditing(false);
       setSavedNotice(true);
       window.setTimeout(() => setSavedNotice(false), 4000);
-      // Complete-your-record gate: recompute derived completeness straight
-      // from the backend echo (no extra fetch) so the gate lifts the moment
-      // the profile becomes complete, then hand the student off to the
-      // Dashboard. If the record is still incomplete (e.g. the edit form's
-      // department/course selectors were left empty), they simply stay on
-      // this page with the banner explaining what's left.
-      const updatedData = res?.data;
-      const complete = Boolean(updatedData && isStudentProfileComplete(updatedData));
-      applyProfile(updatedData);
       if (complete) {
         window.setTimeout(() => navigate("/student/dashboard"), 1600);
       }
@@ -156,12 +176,14 @@ export default function StudentRecordPanel({ student: initialStudent, studentId,
         onSave={handleSave}
         isSaving={isSaving}
         saveError={saveError}
+        medicalSummaryLoaded={editSummaryLoaded}
       />
     );
   }
 
   return (
     <div className="stagger flex flex-col gap-5 pb-10">
+      {medicalNotice}
       {/* ---------- identity card + edit action ---------- */}
       <section className="relative overflow-hidden rounded-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 p-5 text-white shadow-e2 md:p-7">
         <span aria-hidden className="pointer-events-none absolute -right-10 -top-14 h-48 w-48 rounded-full border border-white/10" />

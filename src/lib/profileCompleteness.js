@@ -1,11 +1,11 @@
 // src/lib/profileCompleteness.js
 // Derived "complete-your-record" check for the student portal.
 //
-// Completeness is deliberately derived (no DB column was added): a student's
-// record counts as "complete" only when the persistent fields the clinic
-// needs are actually filled and at least one emergency contact row exists.
-// The edit modal's consent / operation answers are modal-submission-only and
-// are intentionally NOT part of this persisted check.
+// Completeness is deliberately derived from persistent backend fields: every
+// required profile field, an emergency contact, and a non-null
+// `data_privacy_consented_at` timestamp written only after the student's
+// explicit final submission. The consent checkbox itself is not the source
+// of truth; the persisted timestamp is.
 //
 // Consumed with the record data shape returned by
 // recordsApi.medicalSummary() and by the updateProfile() PATCH echo:
@@ -32,6 +32,7 @@ const REQUIRED_PROFILE_FIELDS = [
   "present_address",
   "department_id",
   "course_id",
+  "data_privacy_consented_at",
 ];
 
 function hasEmergencyContact(data) {

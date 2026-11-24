@@ -276,7 +276,7 @@ export const recordsApi = {
   diagnosis: (annualExamId) => api.get(`/api/records/annual-exams/${annualExamId}/diagnosis`),
   saveDiagnosis: (annualExamId, body) => api.put(`/api/records/annual-exams/${annualExamId}/diagnosis`, body),
   medicalCertificate: (annualExamId) => api.get(`/api/records/annual-exams/${annualExamId}/medical-certificate`),
-  medicalSummary: (studentId) => api.get(`/api/records/${studentId}/medical-summary`),
+  medicalSummary: (studentId, opts) => api.get(`/api/records/${studentId}/medical-summary`, undefined, opts),
   updateProfile: (studentId, body) => api.patch(`/api/records/${studentId}/profile`, body),
 }
 

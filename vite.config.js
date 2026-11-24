@@ -12,6 +12,10 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
+      // The bundled PSGC address dataset is ~2.5 MB; allow PWA precache.
+      workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024
+      },
       manifest: {
         name: 'Gordon College Clinic Appointment System',
         short_name: 'GC Clinic',

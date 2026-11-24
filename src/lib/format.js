@@ -26,11 +26,33 @@ export function formatLongDateISO(isoDate) {
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
-/** "02/05/2004" -> 22 (as of today) */
-export function computeAge(mdyString) {
-  const [mm, dd, yyyy] = (mdyString || "").split("/").map(Number);
-  if (!mm || !dd || !yyyy) return null;
-  const today = new Date();
+/** "2004-02-05" or "02/05/2004" -> 22 (as of today) */
+export function computeAge(birthday, today = new Date()) {
+  const raw = String(birthday ?? "").trim();
+  if (!raw) return null;
+
+  let mm;
+  let dd;
+  let yyyy;
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    [, yyyy, mm, dd] = iso.map(Number);
+  } else {
+    const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!mdy) return null;
+    [, mm, dd, yyyy] = mdy.map(Number);
+  }
+
+  const birthDate = new Date(yyyy, mm - 1, dd);
+  if (
+    birthDate.getFullYear() !== yyyy ||
+    birthDate.getMonth() !== mm - 1 ||
+    birthDate.getDate() !== dd
+  ) {
+    return null;
+  }
+
   let age = today.getFullYear() - yyyy;
   const hadBirthdayThisYear =
     today.getMonth() + 1 > mm || (today.getMonth() + 1 === mm && today.getDate() >= dd);

@@ -180,6 +180,7 @@ CREATE TABLE "students" (
   "student_id"       character varying(32) PRIMARY KEY,   -- school id, e.g. '202411829'
   "first_name"       character varying(200) NOT NULL,
   "middle_initial"   character varying(10),
+  "suffix"           character varying(20),
   "last_name"        character varying(200) NOT NULL,
   "department_id"    bigint REFERENCES "departments"("department_id")
                      ON UPDATE CASCADE ON DELETE SET NULL,
@@ -192,10 +193,17 @@ CREATE TABLE "students" (
   "email"            character varying(320),               -- school email
   "civil_status"     character varying(40),                -- 'Single' | 'Married'
   "present_address"  text,
+  "address_region_code"      character varying(32),
+  "address_province_code"    character varying(32),
+  "address_city_code"        character varying(32),
+  "address_barangay_code"    character varying(32),
+  "address_street"           text,
+  "address_house_number"     text,
   "photo"            text,                                  -- optional 1x1 photo (data URL)
   "is_active"        boolean NOT NULL DEFAULT TRUE,
   "created_at"       timestamptz NOT NULL DEFAULT now(),
   "updated_at"       timestamptz NOT NULL DEFAULT now(),
+  "data_privacy_consented_at" timestamptz,
   CONSTRAINT "chk_students_year_level" CHECK ("year_level" BETWEEN 1 AND 4)
 );
 
@@ -204,6 +212,10 @@ CREATE TABLE "emergency_contacts" (
   "student_id"       character varying(32) NOT NULL REFERENCES "students"("student_id")
                      ON UPDATE CASCADE ON DELETE CASCADE,
   "contact_name"     character varying(200) NOT NULL,
+  "first_name"       character varying(200),
+  "middle_initial"   character varying(10),
+  "last_name"        character varying(200),
+  "suffix"           character varying(20),
   "relationship"     character varying(100),
   "phone_number"     character varying(40),
   "present_address"  text,
@@ -550,7 +562,15 @@ SELECT
   s."contact_number",
   s."email",
   s."civil_status",
-  s."present_address"
+  s."present_address",
+  s."data_privacy_consented_at",
+  s."suffix",
+  s."address_region_code",
+  s."address_province_code",
+  s."address_city_code",
+  s."address_barangay_code",
+  s."address_street",
+  s."address_house_number"
 FROM "students" s
 LEFT JOIN "departments" d ON d."department_id" = s."department_id"
 LEFT JOIN "courses" c ON c."course_id" = s."course_id";
