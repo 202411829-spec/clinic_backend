@@ -37,6 +37,10 @@ test('relative VITE_API_URL resolves against the current origin before URL const
     'https://gccas.vercel.app/api/logbook'
   )
   assert.equal(
+    toApiUrl('/appointments/slots', { origin, baseUrl: '/' }),
+    'https://gccas.vercel.app/api/appointments/slots'
+  )
+  assert.equal(
     toApiUrl('/reasons', { origin, baseUrl: '/' }),
     'https://gccas.vercel.app/api/reasons'
   )
