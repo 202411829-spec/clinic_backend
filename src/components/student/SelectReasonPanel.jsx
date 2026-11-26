@@ -12,7 +12,7 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
   if (!reasons || reasons.length === 0) {
     return (
       <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-        <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+        <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
           Select Reason
         </h2>
         <div className="w-full animate-pulse rounded-control border border-ink-200 px-3 py-2.5 text-sm text-ink-400">
@@ -24,7 +24,7 @@ export default function SelectReasonPanel({ reasons, reasonId, onSelectReason })
 
   return (
     <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-      <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+      <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
         Select Reason
       </h2>
 

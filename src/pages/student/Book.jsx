@@ -48,7 +48,7 @@ function SuccessPanel({ rescheduling, onDone }) {
           <path d="M20 6L9 17l-5-5" />
         </svg>
       </div>
-      <p className="font-serif text-lg font-semibold text-ink-900">
+      <p className="text-lg font-semibold text-ink-900">
         {rescheduling ? "Appointment Rescheduled!" : "Appointment Booked!"}
       </p>
       <p className="mb-5 mt-1 text-sm text-ink-500">
@@ -491,7 +491,7 @@ export default function Book() {
 
   return (
     <div className="pt-2 md:pt-6">
-      <h1 className="mb-5 hidden font-serif text-2xl font-semibold text-ink-900 md:block">
+      <h1 className="mb-5 hidden text-2xl font-semibold text-ink-900 md:block">
         {pageTitle}
       </h1>
 
@@ -520,7 +520,7 @@ export default function Book() {
       {/* ---------- Mobile: one step at a time (Reason -> Calendar ->
           Time Slot -> Summary -> Confirm) ---------- */}
       <div className="md:hidden max-w-sm mx-auto">
-        <p className="mb-3 text-center font-serif text-lg font-semibold text-ink-900">{pageTitle}</p>
+        <p className="mb-3 text-center text-lg font-semibold text-ink-900">{pageTitle}</p>
         <BookingStepIndicator step={step} onStepClick={setStep} />
 
         {/* key={step} remounts this wrapper on every mobile step change so

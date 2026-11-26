@@ -16,7 +16,7 @@ export default function AppointmentHistoryTable({ rows, loading }) {
     <section className="panel card-hover">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title font-serif">Appointment history</h2>
+          <h2 className="panel-title">Appointment history</h2>
           <p className="panel-sub">Every clinic visit you've booked, newest first.</p>
         </div>
       </div>

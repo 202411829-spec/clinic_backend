@@ -2,7 +2,7 @@
 import StudentSidebarContent from "./StudentSidebarContent";
 import { GC_MODAL_CLOSE_MS, getModalMotionStyle, useModalPresence } from "../../lib/gcMotion.js";
 
-export default function StudentMobileSidebarOverlay({ open, onClose, profileComplete }) {
+export default function StudentMobileSidebarOverlay({ open, onClose, profileComplete, user }) {
   const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS);
   const motionStyle = getModalMotionStyle(visible);
 
@@ -28,7 +28,7 @@ export default function StudentMobileSidebarOverlay({ open, onClose, profileComp
         <div className="flex justify-center pt-3">
           <span className="h-1 w-16 rounded-full bg-white/50" />
         </div>
-        <StudentSidebarContent onNavigate={onClose} profileComplete={profileComplete} />
+        <StudentSidebarContent onNavigate={onClose} profileComplete={profileComplete} user={user} />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import logging
+from types import SimpleNamespace
 
 from flask import Blueprint, jsonify, request, g
 from concurrent.futures import ThreadPoolExecutor
@@ -1864,7 +1865,10 @@ def cancel_appointment(appointment_id):
 
     # Verify ownership: normalize both IDs for comparison.
     # Resolve the caller's student_id authoritatively from `app_accounts`
-    # (via the verified g.user).
+    # (via the verified g.user). `require_auth` stores g.user as a dict, but
+    # resolve_student_id reads .id/.email attributes, so adapt it exactly as
+    # feedback.py/student_record.py do. Passing the dict directly resolves
+    # no student and rejects every legitimate self-cancellation.
     student_email = g.user.get("email")
     if not student_email:
         return jsonify({
@@ -1872,7 +1876,13 @@ def cancel_appointment(appointment_id):
             "error": "Unable to verify student identity"
         }), 403
 
-    token_student_id = resolve_student_id(g.user)
+    auth_user = SimpleNamespace(id=g.user.get("id"), email=student_email)
+    token_student_id = resolve_student_id(auth_user)
+    if not token_student_id:
+        return jsonify({
+            "success": False,
+            "error": "Unable to verify student identity"
+        }), 403
 
     if normalize_student_id(token_student_id) != normalize_student_id(appointment.get("student_id")):
         return jsonify({

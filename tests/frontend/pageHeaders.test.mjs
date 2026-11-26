@@ -5,9 +5,14 @@ import { readFileSync } from "node:fs"
 const read = (relativePath) => readFileSync(`src/${relativePath}`, "utf8")
 const primitives = read("components/ui/primitives.jsx")
 const reportsPanel = read("components/admin/ReportsFullPanel.jsx")
+const reportsPage = read("pages/admin/Reports.jsx")
+const clinicSchedulePanel = read("components/admin/ClinicScheduleFullPanel.jsx")
+const clinicSchedulePage = read("pages/admin/ClinicSchedule.jsx")
+const adminsPanel = read("components/admin/AdminsPanel.jsx")
+const adminsPage = read("pages/admin/Admins.jsx")
+const profilePage = read("pages/admin/Profile.jsx")
 const dashboard = read("pages/admin/Dashboard.jsx")
 const masterlist = read("pages/admin/Masterlist.jsx")
-const adminsPanel = read("components/admin/AdminsPanel.jsx")
 
 const sharedHeader = primitives.match(/export function PageHeader[\s\S]*?\r?\n\}/)?.[0] ?? ""
 
@@ -73,4 +78,32 @@ test("Admins uses the shared header with icon, title, subtitle, and actions", ()
   assert.match(header, /setShowAdd\(true\)/)
   assert.doesNotMatch(header, /title="Admins &amp; staff"/)
   assert.doesNotMatch(adminsPanel, /font-serif text-3xl font-semibold text-ink-900/)
+})
+
+test("all four Management pages use the same outer top spacing", () => {
+  assert.match(reportsPage, /<div className="pt-2">/)
+  assert.match(clinicSchedulePage, /<div className="pt-2">/)
+  assert.match(adminsPage, /<div className="pt-2">\s*<AdminsPanel \/>\s*<\/div>/)
+  assert.match(profilePage, /<div className="pt-2">/)
+})
+
+test("Clinic Schedule uses the shared PageHeader above its content card", () => {
+  assert.match(clinicSchedulePanel, /import \{ PageHeader \} from ['"]\.\.\/ui\/primitives\.jsx['"]/)
+  const header = clinicSchedulePanel.match(/<PageHeader[\s\S]*?\n\s+\/>/)?.[0] ?? ""
+  assert.match(header, /title="Clinic Schedule"/)
+  assert.match(header, /subtitle="Set clinic hours, breaks, and appointment availability\."/)
+  assert.match(header, /icon=\{<NavIcon name="calendar" className="h-5 w-5" \/>\}/)
+  assert.match(clinicSchedulePanel, /<div className="space-y-5">\s*<PageHeader/)
+  assert.doesNotMatch(clinicSchedulePanel, /<div className="flex items-center gap-2 mb-3">/)
+  assert.match(clinicSchedulePanel, /<section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">/)
+})
+
+test("Profile uses the shared PageHeader above its content card", () => {
+  assert.match(profilePage, /import \{ PageHeader \} from ['"]\.\.\/\.\.\/components\/ui\/primitives\.jsx['"]/)
+  const header = profilePage.match(/<PageHeader[\s\S]*?\n\s+\/>/)?.[0] ?? ""
+  assert.match(header, /title="Profile"/)
+  assert.match(header, /subtitle="Your account details and clinic license information\."/)
+  assert.match(header, /icon=\{<NavIcon name="user" className="h-5 w-5" \/>\}/)
+  assert.doesNotMatch(profilePage, /<h1 className="text-2xl font-bold text-gray-900">Profile<\/h1>/)
+  assert.match(profilePage, /<div className="mx-auto max-w-2xl space-y-5">/)
 })

@@ -68,7 +68,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   if (status === "loading") {
     return (
       <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-        <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+        <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
           Select Time
         </h2>
         <div className="flex flex-col items-center justify-center py-8 gap-3">
@@ -83,7 +83,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   if (status === "error") {
     return (
       <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-        <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+        <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
           Select Time
         </h2>
         <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
@@ -99,7 +99,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   if (!slots || slots.length === 0) {
     return (
       <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-        <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+        <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
           Select Time
         </h2>
         <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
@@ -115,7 +115,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
   // Ready state with slots
   return (
     <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
-      <h2 className="mb-4 text-center font-serif text-base font-semibold text-ink-900">
+      <h2 className="mb-4 text-center text-base font-semibold text-ink-900">
         Select Time
       </h2>
 

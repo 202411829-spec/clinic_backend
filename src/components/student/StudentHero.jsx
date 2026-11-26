@@ -26,7 +26,7 @@ export default function StudentHero({ firstName, nextLabel }) {
       <div className="relative flex flex-wrap items-end justify-between gap-5">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wider text-brand-100">{today}</p>
-          <h1 className="cell-wrap mt-1.5 font-serif text-2xl font-semibold leading-tight md:text-3xl">
+          <h1 className="cell-wrap mt-1.5 text-2xl font-semibold leading-tight md:text-3xl">
             {greeting()}{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1.5 max-w-md text-sm text-brand-100">

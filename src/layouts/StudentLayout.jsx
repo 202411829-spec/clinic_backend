@@ -105,12 +105,13 @@ export default function StudentLayout() {
 
   return (
     <div className="app-shell app-shell--flat min-h-screen md:h-screen md:flex md:overflow-hidden print:block print:h-auto print:overflow-visible print:bg-white">
-      <StudentSidebar profileComplete={profileComplete} />
+      <StudentSidebar profileComplete={profileComplete} user={currentUser} />
 
       <StudentMobileSidebarOverlay
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         profileComplete={profileComplete}
+        user={currentUser}
       />
 
       <StudentMobileMenuHandle onClick={() => setMobileNavOpen(true)} />
@@ -118,9 +119,9 @@ export default function StudentLayout() {
       <div className="app-main flex-1 min-h-screen md:min-h-0 md:h-[calc(100vh-1.5rem)] md:my-3 md:mr-3 md:rounded-shell md:overflow-y-auto overflow-hidden pb-10 md:pb-0 print:m-0 print:h-auto print:overflow-visible print:rounded-none print:bg-white print:pb-0">
         <Topbar
           user={currentUser}
-          onMenuClick={() => setMobileNavOpen(true)}
           logoutRedirect="/student/login"
           showLogout={false}
+          showProfile={false}
         />
         <main className="px-4 md:px-8 pb-10 print:p-0">
           {checking ? (

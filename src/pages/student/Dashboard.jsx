@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [firstName, setFirstName] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [appointmentRevision, setAppointmentRevision] = useState(0);
 
   useEffect(() => {
     if (!studentId) return undefined;
@@ -37,7 +38,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [studentId]);
+  }, [studentId, appointmentRevision]);
 
   const counts = useMemo(() => {
     const by = (s) => rows.filter((a) => (a.current_status || "pending") === s).length;
@@ -54,7 +55,9 @@ export default function Dashboard() {
       <StudentHero firstName={firstName} />
       <VisitStats counts={counts} />
       <div className="grid gap-4 md:gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3"><UpcomingAppointmentPanel /></div>
+        <div className="lg:col-span-3">
+          <UpcomingAppointmentPanel onAppointmentChange={() => setAppointmentRevision((n) => n + 1)} />
+        </div>
         <div className="lg:col-span-2"><NotificationsPanel /></div>
       </div>
       <AppointmentHistoryTable rows={rows} loading={loading} />

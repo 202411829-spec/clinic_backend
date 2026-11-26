@@ -84,7 +84,7 @@ export default function Feedback() {
             <NavIcon name="feedback" className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="font-serif text-xl font-semibold leading-tight md:text-2xl">Feedback</h1>
+            <h1 className="text-xl font-semibold leading-tight md:text-2xl">Feedback</h1>
             <p className="mt-0.5 text-sm text-brand-100">
               Tell us about your clinic visit — it helps us serve you better.
             </p>
@@ -162,7 +162,7 @@ export default function Feedback() {
 
       {/* History */}
       <section className="card-hover rounded-panel bg-white p-5 shadow-e2 md:p-7">
-        <h2 className="panel-title mb-4 font-serif">Your previous feedback</h2>
+        <h2 className="panel-title mb-4">Your previous feedback</h2>
 
         {history.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">

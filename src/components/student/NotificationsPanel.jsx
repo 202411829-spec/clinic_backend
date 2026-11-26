@@ -42,7 +42,7 @@ export default function NotificationsPanel() {
           )}
         </span>
         <div className="min-w-0">
-          <h2 className="panel-title font-serif">Notifications</h2>
+          <h2 className="panel-title">Notifications</h2>
           <p className="panel-sub mt-0.5">Changes to the clinic schedule and your appointments.</p>
         </div>
       </div>

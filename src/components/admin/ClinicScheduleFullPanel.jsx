@@ -8,6 +8,7 @@ import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
 import { clinicScheduleApi, referenceApi } from "../../lib/api.js";
 import { formatMDY, toYMD } from "../../lib/calendar.js";
+import { PageHeader } from "../ui/primitives.jsx";
 
 function InfoDot({ label }) {
   return (
@@ -414,17 +415,14 @@ export default function ClinicScheduleFullPanel() {
   }
 
   return (
-    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      {/* header */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
-          <NavIcon name="calendar" className="w-4 h-4" />
-        </span>
-        <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
-          Clinic Schedule
-        </h1>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Clinic Schedule"
+        subtitle="Set clinic hours, breaks, and appointment availability."
+        icon={<NavIcon name="calendar" className="h-5 w-5" />}
+      />
 
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       {/* Appointment Reason scope — General keeps the legacy clinic-wide
           schedule; selecting any reason scopes the schedule shown and the
           overrides created below to that reason's own rows. */}
@@ -623,6 +621,7 @@ export default function ClinicScheduleFullPanel() {
           </div>
         </div>
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

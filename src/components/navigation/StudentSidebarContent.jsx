@@ -4,8 +4,48 @@ import NavIcon from "../ui/NavIcon";
 import LogoutMenu from "../auth/LogoutMenu";
 import { studentMainNav } from "../../data/studentNav";
 
+function initialsFromName(name = "") {
+  const parts = String(name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "ST";
+  const initials = parts.length > 1
+    ? `${parts[0][0]}${parts[parts.length - 1][0]}`
+    : `${parts[0][0]}${parts[0][1] ?? ""}`;
+  return initials.toUpperCase() || "ST";
+}
+
+// Mirrors AdminSidebarProfile's compact identity block, but keeps the
+// student's real name and course/program label. It stays inside the existing
+// w-64 rail: min-w-0 + wrapping/clamping prevents long names from escaping.
+function StudentSidebarProfile({ user, onNavigate }) {
+  const displayName = user?.name || "Student";
+  const program = user?.role || "Student portal";
+
+  return (
+    <NavLink
+      to="/student/record"
+      onClick={onNavigate}
+      aria-label={`Open record for ${displayName}`}
+      className="block shrink-0 border-b border-white/15 px-4 py-4 transition-colors duration-200 hover:bg-white/10"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold text-white ring-1 ring-white/25">
+          {initialsFromName(displayName)}
+        </div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="line-clamp-2 break-words text-xs font-semibold text-white" title={displayName}>
+            {displayName}
+          </p>
+          <p className="mt-0.5 line-clamp-2 break-words text-[11px] font-semibold text-white/70" title={program}>
+            {program}
+          </p>
+        </div>
+      </div>
+    </NavLink>
+  );
+}
+
 /**
- * Pure nav content (logo header + MAIN group) for the student portal.
+ * Pure nav content (logo header, student profile, MAIN group) for the student portal.
  * Rendered by both StudentSidebar.jsx (desktop rail) and
  * StudentMobileSidebarOverlay.jsx (mobile sheet) so the two stay in sync.
  *
@@ -13,7 +53,7 @@ import { studentMainNav } from "../../data/studentNav";
  * layout pattern as the admin sidebar, so the two portals match at the
  * same w-64 sidebar width.
  */
-export default function StudentSidebarContent({ onNavigate, profileComplete }) {
+export default function StudentSidebarContent({ onNavigate, profileComplete, user }) {
   // While the record is incomplete, the portal is hard-gated to the Record
   // page, so the nav must not lead students toward locked pages. Only the
   // Record item is offered until the gate lifts.
@@ -47,6 +87,8 @@ export default function StudentSidebarContent({ onNavigate, profileComplete }) {
       </div>
 
       <div className="mx-4 h-px bg-white/15" />
+
+      <StudentSidebarProfile user={user} onNavigate={onNavigate} />
 
       <nav className="flex-1 overflow-y-auto px-2 pt-5">
         <p className="px-4 text-[11px] font-bold tracking-wider text-white/60 uppercase mb-2">

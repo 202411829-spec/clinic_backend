@@ -31,7 +31,29 @@ function mapAppointment(a) {
   };
 }
 
-export default function UpcomingAppointmentPanel() {
+// Shared by the initial load and the post-cancel refresh. A pending
+// appointment still blocks booking after its date passes, so keep showing
+// the next pending row (or the most recent overdue one) exactly as before.
+function pickUpcomingAppointment(res, studentId, today = toYMD(new Date())) {
+  const mine = (res?.appointments || [])
+    .filter((a) => {
+      if (String(a.student_id).toUpperCase().trim() !== String(studentId).toUpperCase().trim())
+        return false;
+      const raw = a.current_status ?? a.status ?? a.new_status;
+      if (raw == null || raw === "") return true;
+      return String(raw).toLowerCase() === "pending";
+    })
+    .sort((a, b) =>
+      `${a.appointment_date} ${a.appointment_time}`.localeCompare(
+        `${b.appointment_date} ${b.appointment_time}`
+      )
+    );
+  const ahead = mine.find((a) => String(a.appointment_date).slice(0, 10) >= today);
+  const pick = ahead || mine[mine.length - 1];
+  return pick ? mapAppointment(pick) : null;
+}
+
+export default function UpcomingAppointmentPanel({ onAppointmentChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -47,30 +69,10 @@ export default function UpcomingAppointmentPanel() {
   useEffect(() => {
     if (!studentId) return undefined;
     let cancelled = false;
-    const today = toYMD(new Date());
     appointmentsApi
       .list({ student_id: studentId })
       .then((res) => {
-        if (cancelled) return;
-        const mine = (res?.appointments || [])
-          .filter((a) => {
-            if (String(a.student_id).toUpperCase().trim() !== String(studentId).toUpperCase().trim())
-              return false;
-            const raw = a.current_status ?? a.status ?? a.new_status;
-            if (raw == null || raw === "") return true;
-            return String(raw).toLowerCase() === "pending";
-          })
-          .sort((a, b) =>
-            `${a.appointment_date} ${a.appointment_time}`.localeCompare(
-              `${b.appointment_date} ${b.appointment_time}`
-            )
-          );
-        // A pending appointment blocks new bookings even after its date has
-        // passed, so keep showing it. Prefer the next one that is still ahead;
-        // otherwise fall back to the most recent overdue pending one.
-        const ahead = mine.find((a) => String(a.appointment_date).slice(0, 10) >= today);
-        const pick = ahead || mine[mine.length - 1];
-        setUpcoming(pick ? mapAppointment(pick) : null);
+        if (!cancelled) setUpcoming(pickUpcomingAppointment(res, studentId));
       })
       .catch((err) => console.error("Failed to load appointments:", err));
     return () => {
@@ -103,17 +105,32 @@ export default function UpcomingAppointmentPanel() {
 
   async function doCancel() {
     setConfirmOpen(false);
-    if (appt?.id) {
-      try {
-        await appointmentsApi.delete(appt.id);
-        // Only clear after successful API response
-        cancelAppointment();
-        setUpcoming(null);
-        setError(null);
-      } catch (err) {
-        console.error("Failed to cancel appointment:", err);
-        setError("Failed to cancel appointment. Please try again.");
+    if (!appt?.id) return;
+
+    try {
+      const result = await appointmentsApi.delete(appt.id);
+      if (result && result.success === false) {
+        throw new Error(result.error || "Failed to cancel appointment. Please try again.");
       }
+
+      // Only clear and show the existing notification feedback after the
+      // backend confirms the cancellation. NotificationsPanel renders it.
+      cancelAppointment();
+      onAppointmentChange?.();
+
+      // Refresh the card from the backend so a second pending appointment,
+      // if any, appears immediately instead of leaving stale cancelled data.
+      try {
+        const res = await appointmentsApi.list({ student_id: studentId });
+        setUpcoming(pickUpcomingAppointment(res, studentId));
+      } catch (refreshErr) {
+        console.error("Failed to refresh appointments after cancel:", refreshErr);
+        setUpcoming(null);
+      }
+      setError(null);
+    } catch (err) {
+      console.error("Failed to cancel appointment:", err);
+      setError(err?.message || "Failed to cancel appointment. Please try again.");
     }
   }
 
@@ -132,7 +149,7 @@ export default function UpcomingAppointmentPanel() {
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
             <NavIcon name="calendar" className="h-5 w-5" />
           </span>
-          <h2 className="panel-title font-serif">Upcoming appointment</h2>
+          <h2 className="panel-title">Upcoming appointment</h2>
         </div>
 
         {appt && (

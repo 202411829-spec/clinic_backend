@@ -5,10 +5,10 @@ import StudentSidebarContent from "./StudentSidebarContent";
  * Desktop-only fixed sidebar for the student portal. Hidden below the md
  * breakpoint; StudentMobileSidebarOverlay.jsx handles small screens instead.
  */
-export default function StudentSidebar({ profileComplete }) {
+export default function StudentSidebar({ profileComplete, user }) {
   return (
     <aside className="hidden md:flex md:flex-col w-64 shrink-0 h-screen sticky top-0 print:hidden">
-      <StudentSidebarContent profileComplete={profileComplete} />
+      <StudentSidebarContent profileComplete={profileComplete} user={user} />
     </aside>
   );
 }

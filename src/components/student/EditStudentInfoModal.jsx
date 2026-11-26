@@ -1389,7 +1389,7 @@ export default function EditStudentInfoModal({
       <div className="card-hover rounded-panel bg-white shadow-e2">
         <div className="relative overflow-hidden rounded-t-panel bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-5 py-5 text-white md:px-8 md:py-6">
           <span aria-hidden className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full border border-white/10" />
-          <h1 className="relative font-serif text-xl font-semibold md:text-2xl">Edit student information</h1>
+          <h1 className="relative text-xl font-semibold md:text-2xl">Edit student information</h1>
           <p className="relative mt-0.5 text-xs text-brand-100">Step {step} of 3</p>
           <div className="relative mt-3 h-1 overflow-hidden rounded-full bg-white/20">
             <div className="h-full rounded-full bg-white transition-[width] duration-500 ease-smooth" style={{ width: `${(step / 3) * 100}%` }} />

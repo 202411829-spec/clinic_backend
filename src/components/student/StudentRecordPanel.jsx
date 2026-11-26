@@ -19,7 +19,7 @@ function SectionHeader({ icon, title }) {
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card bg-brand-50 text-brand-800">
         <NavIcon name={icon} className="h-[18px] w-[18px]" />
       </span>
-      <h2 className="panel-title font-serif">{title}</h2>
+      <h2 className="panel-title">{title}</h2>
     </div>
   );
 }
@@ -199,7 +199,7 @@ export default function StudentRecordPanel({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider text-brand-100">Student record</p>
-              <h1 className="cell-wrap font-serif text-xl font-semibold leading-tight md:text-2xl">
+              <h1 className="cell-wrap text-xl font-semibold leading-tight md:text-2xl">
                 {formatDisplayName(student.name)}
               </h1>
               <div className="mt-2 flex flex-wrap gap-1.5">

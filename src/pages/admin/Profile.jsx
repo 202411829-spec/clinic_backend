@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import NavIcon from '../../components/ui/NavIcon.jsx'
+import { PageHeader } from '../../components/ui/primitives.jsx'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
 import { formatAdminFormalName } from '../../lib/format.js'
@@ -106,9 +108,15 @@ export default function AdminProfile() {
     !admin.license_no?.trim()
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+    <div className="pt-2">
+      <div className="mx-auto max-w-2xl space-y-5">
+        <PageHeader
+          title="Profile"
+          subtitle="Your account details and clinic license information."
+          icon={<NavIcon name="user" className="h-5 w-5" />}
+        />
 
+        <div className="space-y-4">
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
 
       {error && (
@@ -246,7 +254,10 @@ export default function AdminProfile() {
             </div>
           </div>
         </>
-      )}
+       )}
+        </div>
+      </div>
     </div>
   )
 }
+
