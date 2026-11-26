@@ -135,6 +135,41 @@ test("record-backed filter options exclude empty values and cascade across categ
   assert.equal(reconciled.changed, true)
 })
 
+test("record-backed panels wire the derived singular option keys into every filter", () => {
+  const derived = deriveRecordFilterOptions({
+    records: [{ dept: "CCS", course: "BSIT", reason: "Consultation" }],
+    fields: {
+      department: (row) => row.dept,
+      course: (row) => row.course,
+      reason: (row) => row.reason,
+    },
+  })
+
+  assert.deepEqual(derived.department, [{ value: "CCS", label: "CCS" }])
+  assert.equal(derived.departments, undefined)
+
+  for (const file of [
+    "src/components/admin/AppointmentsFullPanel.jsx",
+    "src/components/admin/AppointmentsPanel.jsx",
+    "src/components/admin/LogbookPanel.jsx",
+  ]) {
+    const source = readFileSync(file, "utf8")
+    assert.match(
+      source,
+      /const \{ department: departments, course: courses, reason: reasons \} = options;/,
+      `${file} should alias the singular derived keys`
+    )
+    assert.doesNotMatch(
+      source,
+      /const \{ departments, courses, reasons \} = options;/,
+      `${file} should not destructure option keys that deriveRecordFilterOptions never returns`
+    )
+    for (const prop of ["departments", "courses", "reasons"]) {
+      assert.match(source, new RegExp(`options=\\{${prop}\\}`), `${file} should pass ${prop}`)
+    }
+  }
+})
+
 test("OR within categories and AND across categories filter appointment slots", () => {
   const slots = [
     {

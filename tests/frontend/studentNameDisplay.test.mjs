@@ -71,9 +71,9 @@ test("student identity moves into the sidebar above MAIN and leaves the topbar",
 
   assert.match(desktopSidebar, /w-64 shrink-0/)
   assert.match(sidebar, /<StudentSidebarProfile user=\{user\} onNavigate=\{onNavigate\} \/>/)
-  assert.match(sidebar, /line-clamp-2 break-words/)
+  assert.match(sidebar, /truncate whitespace-nowrap/)
   assert.match(sidebar, /min-w-0 flex-1 leading-tight/)
-  assert.match(sidebar, /title=\{displayName\}/)
+  assert.match(sidebar, /title=\{identityTooltip\}/)
   assert.match(sidebar, /title=\{program\}/)
   assert.match(sidebar, /to="\/student\/record"/)
 
@@ -86,4 +86,26 @@ test("student identity moves into the sidebar above MAIN and leaves the topbar",
   assert.match(layout, /showProfile=\{false\}/)
   assert.match(header, /showProfile = true/)
   assert.match(header, /\{showProfile \? \(/)
+})
+
+test("admin and student sidebar profiles keep identity text on one line", () => {
+  const admin = readFileSync("src/components/navigation/AdminSidebarProfile.jsx", "utf8")
+  const sidebar = readFileSync("src/components/navigation/StudentSidebarContent.jsx", "utf8")
+  const layout = readFileSync("src/layouts/StudentLayout.jsx", "utf8")
+
+  assert.match(admin, /flex min-w-0 items-center gap-3/)
+  assert.match(admin, /min-w-0 flex-1 leading-tight/)
+  assert.match(admin, /h-10 w-10 shrink-0/)
+  assert.match(admin, /truncate whitespace-nowrap text-xs font-semibold text-white" title=\{email\}/)
+  assert.match(admin, /title=\{displayRole\}/)
+  assert.doesNotMatch(admin, /break-all|break-words|line-clamp/)
+
+  assert.match(sidebar, /const identityTooltip = user\?\.email \|\| displayName/)
+  assert.match(sidebar, /truncate whitespace-nowrap text-xs font-semibold text-white" title=\{identityTooltip\}/)
+  assert.match(sidebar, /min-w-0 flex-1 leading-tight/)
+  assert.match(sidebar, /h-10 w-10 shrink-0/)
+  assert.doesNotMatch(sidebar, /break-all|break-words|line-clamp/)
+
+  assert.match(layout, /const \{ studentId, email \} = useAuth\(\)/)
+  assert.match(layout, /email: email \|\| ""/)
 })

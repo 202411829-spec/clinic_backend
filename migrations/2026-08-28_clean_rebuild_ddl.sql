@@ -354,6 +354,24 @@ CREATE TABLE "clinic_schedules" (
 CREATE INDEX "idx_clinic_schedules_working_date_reason_id"
   ON "clinic_schedules" ("working_date", "reason_id");
 
+-- Persisted admin deletions, so regenerated/default slots stay deleted.
+CREATE TABLE "time_slot_deletions" (
+  "deletion_id"   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "working_date"  date NOT NULL,
+  "slot_start"    time NOT NULL,
+  "slot_end"      time NOT NULL,
+  "reason_id"     bigint,
+  "created_at"    timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX "uq_time_slot_deletions_general"
+  ON "time_slot_deletions" ("working_date", "slot_start")
+  WHERE "reason_id" IS NULL;
+CREATE UNIQUE INDEX "uq_time_slot_deletions_reason"
+  ON "time_slot_deletions" ("working_date", "slot_start", "reason_id")
+  WHERE "reason_id" IS NOT NULL;
+CREATE INDEX "idx_time_slot_deletions_scope"
+  ON "time_slot_deletions" ("working_date", "reason_id");
+
 -- Materialized slot instances for a given day (was time_slot).
 CREATE TABLE "time_slots" (
   "slot_id"        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

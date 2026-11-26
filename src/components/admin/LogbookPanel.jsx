@@ -10,6 +10,7 @@ import Pagination from "../ui/Pagination.jsx";
 import WalkInVisitModal from "./WalkInVisitModal.jsx";
 import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi } from "../../lib/api.js";
+import { matchesAppointmentSearch } from "../../lib/appointmentSlots.js";
 import { getWeekRangeYMD, isoToMDY } from "../../lib/calendar.js";
 import { clampPage, getPageCount } from "../../lib/pagination.js";
 import { buildLogbookQueryParams } from "../../lib/logbookQuery.js";
@@ -137,23 +138,16 @@ export default function LogbookPanel({
         records: entries,
         fields: filterFields,
         selections: filterSelections,
-        matches: (entry) => {
-          const query = search.trim().toLowerCase();
-          if (!query) return true;
-          return [
-            entry?.name,
-            entry?.studentId,
-            entry?.course,
-            entry?.dept,
+        matches: (entry) =>
+          matchesAppointmentSearch(entry, search, [
             entry?.reason,
             entry?.complaint,
             entry?.medicine,
-          ].some((value) => String(value ?? "").toLowerCase().includes(query));
-        },
+          ]),
       }),
     [entries, filterFields, filterSelections, search]
   );
-  const { departments, courses, reasons } = options;
+  const { department: departments, course: courses, reason: reasons } = options;
 
   useEffect(() => {
     const { next, changed } = reconcileRecordFilterSelections({
@@ -167,17 +161,12 @@ export default function LogbookPanel({
   }, [options, filterSelections, department, course, reasonFilter]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return entries.filter((e) => {
-      const matchesSearch =
-        !q ||
-        (e.name || "").toLowerCase().includes(q) ||
-        (e.studentId || "").toLowerCase().includes(q) ||
-        (e.course || "").toLowerCase().includes(q) ||
-        (e.dept || "").toLowerCase().includes(q) ||
-        (e.reason || "").toLowerCase().includes(q) ||
-        (e.complaint || "").toLowerCase().includes(q) ||
-        (e.medicine || "").toLowerCase().includes(q);
+      const matchesSearch = matchesAppointmentSearch(e, search, [
+        e.reason,
+        e.complaint,
+        e.medicine,
+      ]);
       // OR within each category (isFilterSelected), AND across categories.
       const matchesDept = isFilterSelected(e.dept, department);
       const matchesCourse = isFilterSelected(e.course, course);
@@ -504,25 +493,27 @@ export default function LogbookPanel({
         <p className="hidden print:block text-sm text-gray-600 mb-4">
           {printSummary}
         </p>
-        <table className="w-full text-sm min-w-[860px] md:min-w-0 border-collapse print:min-w-0 print:table-fixed print:w-full print:text-[9.5px] print:leading-tight">
+        <table className="w-full text-sm min-w-[960px] md:min-w-0 border-collapse print:min-w-0 print:table-fixed print:w-full print:text-[9.5px] print:leading-tight">
           {/* Print-only column widths — keeps the table within the printable
               page width instead of letting long cell content push columns
               past the page edge (browsers clip overflow when printing,
               they don't add horizontal scroll). Text wraps at spaces only
               (no forced mid-word breaking). Ignored on screen. */}
           <colgroup>
-            <col className="print:w-[14%]" />
-            <col className="print:w-[16%]" />
-            <col className="print:w-[6%]" />
-            <col className="print:w-[18%]" />
-            <col className="print:w-[6%]" />
-            <col className="print:w-[15%]" />
             <col className="print:w-[12%]" />
-            <col className="print:w-[13%]" />
+            <col className="print:w-[11%]" />
+            <col className="print:w-[15%]" />
+            <col className="print:w-[5%]" />
+            <col className="print:w-[16%]" />
+            <col className="print:w-[5%]" />
+            <col className="print:w-[14%]" />
+            <col className="print:w-[12%]" />
+            <col className="print:w-[10%]" />
           </colgroup>
           <thead>
             <tr className="text-left text-xs text-ink-500 bg-ink-50/70">
               <th className="py-2 px-4 md:px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 print:whitespace-normal">Date / Time</th>
+              <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Student ID</th>
               <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Name</th>
               <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">Age</th>
               <th className="py-2 px-2 print:px-1 print:py-1 font-semibold border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal print:whitespace-normal">Dept. & Course</th>
@@ -538,6 +529,7 @@ export default function LogbookPanel({
                 <td className="py-2.5 px-4 md:px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">
                   {row.dateTime}
                 </td>
+                <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 font-medium whitespace-nowrap print:whitespace-normal">{row.studentId}</td>
                 <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{row.name}</td>
                 <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap print:whitespace-normal">{row.age}</td>
                 <td className="py-2.5 px-2 print:px-1 print:py-1 text-ink-600 border-b border-ink-100 print:border print:border-gray-300 whitespace-nowrap md:whitespace-normal md:[overflow-wrap:anywhere] print:[overflow-wrap:break-word] print:whitespace-normal">{row.deptCourse}</td>
@@ -557,7 +549,7 @@ export default function LogbookPanel({
             ))}
             {pageRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-sm text-gray-400 border-b border-ink-100 print:border print:border-gray-300">
+                <td colSpan={9} className="py-8 text-center text-sm text-gray-400 border-b border-ink-100 print:border print:border-gray-300">
                   No visits match your search or filters.
                 </td>
               </tr>

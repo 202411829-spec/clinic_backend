@@ -62,7 +62,7 @@ export default function Dashboard() {
         />
       </Reveal>
       <Reveal delay={90}>
-        <AppointmentsPanel />
+        <AppointmentsPanel reasonRecords={reasonRecords} />
       </Reveal>
     </div>
   );

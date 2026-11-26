@@ -30,16 +30,20 @@ export function appointmentCourseValue(booking) {
 
 // One search rule shared by the visible blocks and the option derivation, so
 // typing a course name cannot make the Courses dropdown look empty while the
-// same record is still present in the loaded slots.
-export function matchesAppointmentSearch(booking, search = "") {
+// same record is still present in the loaded slots. `extraFields` lets another
+// record-backed screen (Logbook) add its own columns without forking the rule.
+export function matchesAppointmentSearch(booking, search = "", extraFields = []) {
   const query = String(search ?? "").trim().toLowerCase();
   if (!query) return true;
 
   return [
     booking?.name,
+    booking?.student_id,
+    booking?.studentId,
     booking?.dept,
     appointmentCourseValue(booking),
     booking?.deptCourse,
+    ...(Array.isArray(extraFields) ? extraFields : []),
   ].some((value) => String(value ?? "").toLowerCase().includes(query));
 }
 
@@ -85,6 +89,19 @@ export function buildAppointmentCourseOptions(slots) {
 
 export function buildAppointmentReasonOptions(slots) {
   return buildAppointmentOptionValues(slots, "reason");
+}
+
+// Body sent with a persisted time-block deletion. Virtual slots have a
+// negative id and no database row, so the date/time scope travels with them.
+export function timeSlotDeletePayload(slot, date) {
+  const [timeStart = "", timeEnd = ""] = String(slot?.time ?? "").split(" - ");
+  return {
+    date,
+    slot_start: slot?.slot_start || timeStart,
+    slot_end: slot?.slot_end || timeEnd,
+    schedule_id: slot?.schedule_id ?? null,
+    reason_id: slot?.reason_id ?? null,
+  };
 }
 
 export function filterAppointmentSlots(

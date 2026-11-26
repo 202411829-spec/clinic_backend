@@ -14,6 +14,7 @@ export default function ConfirmDialog({
   title = "Are you sure?",
   message,
   confirmLabel = "Yes, cancel it",
+  busyLabel = "Cancelling…",
   cancelLabel = "No, keep it",
   busy = false,
   onConfirm,
@@ -84,7 +85,7 @@ export default function ConfirmDialog({
             autoFocus
             className="btn-press rounded-card bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
           >
-            {busy ? "Cancelling…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs"
 import {
   appointmentCourseValue,
   filterAppointmentSlots,
+  matchesAppointmentSearch,
 } from "../../src/lib/appointmentSlots.js"
 
 const panelSource = readFileSync(
@@ -15,6 +16,7 @@ const widgetSource = readFileSync(
   "src/components/admin/AppointmentsPanel.jsx",
   "utf8"
 )
+const dashboardSource = readFileSync("src/pages/admin/Dashboard.jsx", "utf8")
 const routerSource = readFileSync("src/router/index.jsx", "utf8")
 const studentRecordSource = readFileSync(
   "src/pages/admin/StudentRecord.jsx",
@@ -128,6 +130,36 @@ test("search, department, and reason filters hide blocks without matches", () =>
   )
 })
 
+test("shared search matches student IDs and supports logbook-only fields", () => {
+  const booking = {
+    name: "Doe, Juan",
+    student_id: "202311330",
+    dept: "CCS",
+    course: "BSIT",
+  }
+
+  assert.equal(matchesAppointmentSearch(booking, "2023113"), true)
+  assert.equal(matchesAppointmentSearch(booking, "juan"), true)
+  assert.equal(matchesAppointmentSearch(booking, "bsit"), true)
+  assert.equal(matchesAppointmentSearch({ studentId: "202311330" }, "311330"), true)
+  assert.equal(
+    matchesAppointmentSearch(
+      { reason: "Consultation" },
+      "consult",
+      ["Consultation"]
+    ),
+    true
+  )
+  assert.equal(matchesAppointmentSearch(booking, "no-such-value"), false)
+})
+
+test("appointments tables display the real student ID", () => {
+  for (const source of [panelSource, widgetSource]) {
+    assert.match(source, /<th>Student ID<\/th>/)
+    assert.match(source, /\{b\.student_id \|\| "-"\}/)
+  }
+})
+
 test("course search and legacy course records produce real Courses options", () => {
   assert.deepEqual(
     filterAppointmentSlots(SLOTS, { search: "bsn" }).map((s) => s.id),
@@ -164,7 +196,7 @@ test("Appointments page renders the final filtered blocks and exact empty state"
   assert.match(panelSource, /No appointments today\./)
   assert.doesNotMatch(panelSource, /No appointment today\./)
   assert.match(panelSource, /filteredSlots\.map\(\(slot\) =>/)
-  assert.match(panelSource, /appointmentsApi\s*\.slots\(toYMD\(selectedDate\)\)/)
+  assert.match(panelSource, /fetchAdminAppointmentSlots\(toYMD\(selectedDate\)\)/)
   assert.match(panelSource, /\}, \[selectedDate\]\);/)
 })
 
@@ -183,7 +215,12 @@ test("Dashboard Appointment widget renders only real appointment blocks", () => 
   assert.doesNotMatch(widgetSource, /No appointment today\./)
   assert.doesNotMatch(widgetSource, /AppointmentsSummary/)
   assert.doesNotMatch(widgetSource, /summaryCounts/)
-  assert.match(widgetSource, /appointmentsApi\s*\.slots\(toYMD\(new Date\(\)\)\)/)
+  assert.match(
+    widgetSource,
+    /fetchAdminAppointmentSlots\(toYMD\(new Date\(\)\), reasonRecords\)/
+  )
+  assert.match(widgetSource, /export default function AppointmentsPanel\(\{ reasonRecords = \[\] \}\)/)
+  assert.match(dashboardSource, /<AppointmentsPanel reasonRecords=\{reasonRecords\} \/>/)
   assert.match(widgetSource, /<StatusMenu/)
   assert.match(widgetSource, /<StatusBadge/)
   assert.match(widgetSource, /<SlotActionMenu/)

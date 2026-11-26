@@ -240,6 +240,13 @@ export const appointmentsApi = {
   updateStatus: (appointmentId, body, opts) =>
     api.patch(`/appointments/${appointmentId}/status`, body, opts),
   delete: (appointmentId, opts) => api.del(`/appointments/${appointmentId}`, opts),
+  // Persisted admin time-block deletion. The body carries the date/time scope
+  // needed for virtual slots that have no time_slots row yet.
+  deleteTimeSlot: (slotId, body, opts) =>
+    api.del(`/appointments/time-slots/${slotId}`, {
+      body: JSON.stringify(body),
+      ...opts,
+    }),
 }
 
 // ---- Logbook ----

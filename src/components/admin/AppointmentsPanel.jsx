@@ -9,12 +9,14 @@ import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
 import PortalOverlay from "../ui/PortalOverlay.jsx";
 import { appointmentsApi } from "../../lib/api.js";
+import { fetchAdminAppointmentSlots } from "../../lib/adminAppointmentFeed.js";
 import { toYMD } from "../../lib/calendar.js";
 import { formatTimeRange } from "../../lib/timeFormat";
 import {
   appointmentCourseValue,
   filterAppointmentSlots,
   matchesAppointmentSearch,
+  timeSlotDeletePayload,
 } from "../../lib/appointmentSlots.js";
 import {
   deriveRecordFilterOptions,
@@ -88,7 +90,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
   );
 }
 
-function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
+function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, onSaveTimeBlock, onRequestDeleteTimeBlock }) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState(null);
 
@@ -139,11 +141,7 @@ function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, 
 
           <SlotActionMenu
             onEdit={() => onToggleEdit(slot.id)}
-            onDelete={() => {
-              if (window.confirm(`Delete the ${formatTimeRange(slot.time)} time block?`)) {
-                onDeleteTimeBlock(slot.id);
-              }
-            }}
+            onDelete={() => onRequestDeleteTimeBlock(slot)}
             editing={editing}
             slot={slot}
             onCloseEdit={() => onToggleEdit(null)}
@@ -159,10 +157,11 @@ function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, 
         <div>
           {slot.bookings.length > 0 ? (
             <div className="tbl-scroll border-t border-ink-100">
-              <table className="tbl min-w-[560px]">
+              <table className="tbl min-w-[680px]">
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Student ID</th>
                     <th>Age</th>
                     <th>Dept</th>
                     <th className="hidden md:table-cell">Sex</th>
@@ -175,6 +174,7 @@ function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, 
                   {slot.bookings.map((b) => (
                     <tr key={b.id} className="row-hover">
                       <td className="cell-wrap min-w-[140px] font-medium text-ink-900">{b.name}</td>
+                      <td className="cell-wrap min-w-[110px] whitespace-nowrap">{b.student_id || "-"}</td>
                       <td className="tnum whitespace-nowrap">{b.age}</td>
                       <td className="cell-wrap min-w-[80px]">{b.dept}</td>
                       <td className="hidden whitespace-nowrap md:table-cell">{b.sex}</td>
@@ -215,11 +215,15 @@ function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, 
   );
 }
 
-export default function AppointmentsPanel() {
+export default function AppointmentsPanel({ reasonRecords = [] }) {
   const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [dateLabel, setDateLabel] = useState("");
   const [openEditId, setOpenEditId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingSlot, setDeletingSlot] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleteMessage, setDeleteMessage] = useState("");
 
   // Search and filter state — categorical filters are OR sets; empty = All.
   const [search, setSearch] = useState("");
@@ -227,15 +231,14 @@ export default function AppointmentsPanel() {
   const [course, setCourse] = useState([]);
   const [reasonFilter, setReasonFilter] = useState([]);
 
-  // Recent slots for the dashboard widget. Reasons are provided by the parent
-  // Dashboard via props (fetched once, shared). This is the single fetch for
-  // today; visible appointment blocks are derived from these same bookings.
+  // Recent slots for the dashboard widget. Reason records from the parent
+  // Dashboard tell the shared feed which dedicated schedules to include, so
+  // Dental Service bookings are not lost behind the legacy General feed.
   useEffect(() => {
-    appointmentsApi
-      .slots(toYMD(new Date()))
-      .then((res) => setSlots(res?.slots || []))
+    fetchAdminAppointmentSlots(toYMD(new Date()), reasonRecords)
+      .then((mergedSlots) => setSlots(mergedSlots))
       .catch((err) => console.error("Failed to load slots:", err));
-  }, []);
+  }, [reasonRecords]);
 
   // Every option comes from the bookings this widget can actually render.
   // Each category ignores its own selection when deriving options, so adding
@@ -273,7 +276,7 @@ export default function AppointmentsPanel() {
       }),
     [bookings, filterFields, filterSelections, search]
   );
-  const { departments, courses, reasons } = options;
+  const { department: departments, course: courses, reason: reasons } = options;
 
   useEffect(() => {
     const { next, changed } = reconcileRecordFilterSelections({
@@ -347,9 +350,46 @@ export default function AppointmentsPanel() {
     );
   }
 
-  function handleDeleteTimeBlock(slotId) {
-    setSlots((prev) => prev.filter((slot) => slot.id !== slotId));
-    setOpenEditId((cur) => (cur === slotId ? null : cur));
+  function requestDeleteTimeBlock(slot) {
+    setDeleteError(null);
+    setDeleteMessage("");
+    setDeleteTarget(slot);
+  }
+
+  async function confirmDeleteTimeBlock() {
+    if (!deleteTarget || deletingSlot) return;
+
+    const target = deleteTarget;
+    const date = toYMD(new Date());
+    setDeletingSlot(true);
+    setDeleteError(null);
+    setDeleteMessage("");
+
+    try {
+      // The block is removed only after the backend confirms the delete.
+      await appointmentsApi.deleteTimeSlot(
+        target.id,
+        timeSlotDeletePayload(target, date)
+      );
+
+      try {
+        const refreshed = await fetchAdminAppointmentSlots(date, reasonRecords);
+        setSlots(refreshed);
+      } catch {
+        setSlots((prev) => prev.filter((slot) => slot.id !== target.id));
+        setDeleteError("Time block deleted, but the list could not be refreshed. Reload to verify.");
+      }
+
+      setOpenEditId((cur) => (cur === target.id ? null : cur));
+      setDeleteTarget(null);
+      setDeleteMessage(`Deleted ${formatTimeRange(target.time)} time block.`);
+    } catch (err) {
+      // Preserve the block and show the backend's reason for refusal.
+      setDeleteError(err?.message || "Failed to delete the time block. Please try again.");
+      setDeleteTarget(null);
+    } finally {
+      setDeletingSlot(false);
+    }
   }
 
   function handleViewRecord(studentId) {
@@ -417,6 +457,17 @@ export default function AppointmentsPanel() {
         />
       </div>
 
+      {deleteError && (
+        <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-card border border-signal-rose-ring bg-signal-rose-bg px-4 py-3 text-sm text-signal-rose">
+          <span>{deleteError}</span>
+          <button type="button" onClick={() => setDeleteError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
+        </div>
+      )}
+      {deleteMessage && (
+        <div role="status" className="mb-3 rounded-card border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          {deleteMessage}
+        </div>
+      )}
       {!hasAppointments ? (
         <div className="py-12 text-center text-gray-500 text-sm">
           No appointments today.
@@ -431,7 +482,7 @@ export default function AppointmentsPanel() {
             editing={openEditId === slot.id}
             onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
             onSaveTimeBlock={handleSaveTimeBlock}
-            onDeleteTimeBlock={handleDeleteTimeBlock}
+            onRequestDeleteTimeBlock={requestDeleteTimeBlock}
           />
         ))
       )}
@@ -445,6 +496,23 @@ export default function AppointmentsPanel() {
         }
         onConfirm={confirmCancel}
         onCancel={() => setCancelTarget(null)}
+      />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this time block?"
+        message={
+          deleteTarget
+            ? `The ${formatTimeRange(deleteTarget.time)} time block will be removed from this date.`
+            : ""
+        }
+        confirmLabel="Yes, delete it"
+        busyLabel="Deleting…"
+        cancelLabel="No, keep it"
+        busy={deletingSlot}
+        onConfirm={confirmDeleteTimeBlock}
+        onCancel={() => {
+          if (!deletingSlot) setDeleteTarget(null);
+        }}
       />
     </section>
   );

@@ -13,6 +13,8 @@ import {
 } from "../../src/lib/logbookPdf.js"
 
 const fullPage = readFileSync("src/components/admin/LogbookFullPanel.jsx", "utf8")
+const widget = readFileSync("src/components/admin/LogbookPanel.jsx", "utf8")
+const logbookRouter = readFileSync("routers/logbook.py", "utf8")
 const pdfLib = readFileSync("src/lib/logbookPdf.js", "utf8")
 const pdfHelper = readFileSync("src/lib/pdf.js", "utf8")
 
@@ -155,4 +157,25 @@ test("full Logbook draws a paged landscape document and repeats its header", () 
   assert.match(pdfHelper, /const pageWidth = doc\.internal\.pageSize\.getWidth\(\)/)
   assert.match(pdfHelper, /const center = pageWidth \/ 2/)
   assert.match(pdfHelper, /const rightEdge = pageWidth - margin/)
+})
+
+test("both Logbook tables show the real student ID", () => {
+  assert.match(fullPage, /studentId: r\.student_id \?\? "-"/)
+  assert.match(fullPage, /<th[^>]*>Student ID<\/th>/)
+  assert.match(fullPage, /\{entry\.studentId\}/)
+
+  assert.match(widget, /studentId: r\.student_id \?\? "-"/)
+  assert.match(widget, /<th[^>]*>Student ID<\/th>/)
+  assert.match(widget, /\{row\.studentId\}/)
+  assert.match(widget, /colSpan=\{9\}/)
+})
+
+test("Logbook search reuses the Appointments rule and the backend already searches student IDs", () => {
+  assert.match(widget, /import \{ matchesAppointmentSearch \} from "\.\.\/\.\.\/lib\/appointmentSlots\.js"/)
+  assert.match(widget, /matchesAppointmentSearch\(entry, search, \[/)
+  assert.match(widget, /matchesAppointmentSearch\(e, search, \[/)
+  assert.doesNotMatch(widget, /const q = search\.trim\(\)\.toLowerCase\(\)/)
+
+  assert.match(logbookRouter, /student_id\.ilike\.\{like\}/)
+  assert.match(logbookRouter, /full_name\.ilike\.\{like\}/)
 })

@@ -108,7 +108,7 @@ export default function AdminProfile() {
     !admin.license_no?.trim()
 
   return (
-    <div className="pt-2">
+    <div className="pt-3 sm:pt-4">
       <div className="mx-auto max-w-2xl space-y-5">
         <PageHeader
           title="Profile"

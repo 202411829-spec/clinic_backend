@@ -28,10 +28,12 @@ export default function AdminSidebarProfile() {
           {initialsFromEmail(email)}
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="break-all text-xs font-semibold text-white" title={email}>
+          <p className="truncate whitespace-nowrap text-xs font-semibold text-white" title={email}>
             {email}
           </p>
-          <p className="mt-0.5 break-words text-[11px] font-semibold text-white/70">{displayRole}</p>
+          <p className="mt-0.5 truncate whitespace-nowrap text-[11px] font-semibold text-white/70" title={displayRole}>
+            {displayRole}
+          </p>
         </div>
       </div>
     </div>

@@ -59,14 +59,14 @@ function buildRoleLabel(profile) {
 
 export default function StudentLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { studentId } = useAuth();
+  const { studentId, email } = useAuth();
   const location = useLocation();
   const { status, checking, profileComplete } = useProfileCompleteness();
 
   // Was previously hardcoded to a fixed name/role regardless of who was
   // actually logged in — now pulled from the real masterlist profile for
   // the current session, matching what the Student Record page shows.
-  const [currentUser, setCurrentUser] = useState({ name: "", role: "" });
+  const [currentUser, setCurrentUser] = useState({ name: "", role: "", email: "" });
 
   useEffect(() => {
     if (!studentId) return undefined;
@@ -82,18 +82,19 @@ export default function StudentLayout() {
             profile.last_name
           ),
           role: buildRoleLabel(profile),
+          email: email || "",
         });
       })
       .catch(() => {
         // No matching masterlist record for this login (e.g. an account
         // without a students row yet) — fall back to the username instead
         // of silently showing someone else's name.
-        if (!cancelled) setCurrentUser({ name: studentId, role: "" });
+        if (!cancelled) setCurrentUser({ name: studentId, role: "", email: email || "" });
       });
     return () => {
       cancelled = true;
     };
-  }, [studentId]);
+  }, [studentId, email]);
 
   // HARD GATE: while the record is incomplete the student may only reach the
   // onboarding edit page. Rendering <Navigate> here swaps the whole route

@@ -78,14 +78,16 @@ test("Department multi-select exposes every real department and no placeholder",
   assert.equal(options.includes("Select"), false)
 })
 
-test("Appointments panels share the Department option builder", () => {
+test("Appointments panels derive Department options from their bookings", () => {
   for (const file of [
     "src/components/admin/AppointmentsPanel.jsx",
     "src/components/admin/AppointmentsFullPanel.jsx",
   ]) {
     const source = read(file)
-    assert.match(source, /buildAppointmentDepartmentOptions\(slots\)/)
-    assert.doesNotMatch(source, /return \["All Department", \.\.\.Array\.from\(set\)\]/)
+    assert.match(source, /deriveRecordFilterOptions/)
+    assert.match(source, /department: \(booking\) => booking\?\.dept/)
+    assert.match(source, /const \{ department: departments, course: courses, reason: reasons \} = options;/)
+    assert.doesNotMatch(source, /const \{ departments, courses, reasons \} = options;/)
   }
 })
 

@@ -15,10 +15,11 @@ function initialsFromName(name = "") {
 
 // Mirrors AdminSidebarProfile's compact identity block, but keeps the
 // student's real name and course/program label. It stays inside the existing
-// w-64 rail: min-w-0 + wrapping/clamping prevents long names from escaping.
+// w-64 rail: min-w-0 + truncation keeps long text on one line.
 function StudentSidebarProfile({ user, onNavigate }) {
   const displayName = user?.name || "Student";
   const program = user?.role || "Student portal";
+  const identityTooltip = user?.email || displayName;
 
   return (
     <NavLink
@@ -32,10 +33,10 @@ function StudentSidebarProfile({ user, onNavigate }) {
           {initialsFromName(displayName)}
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="line-clamp-2 break-words text-xs font-semibold text-white" title={displayName}>
+          <p className="truncate whitespace-nowrap text-xs font-semibold text-white" title={identityTooltip}>
             {displayName}
           </p>
-          <p className="mt-0.5 line-clamp-2 break-words text-[11px] font-semibold text-white/70" title={program}>
+          <p className="mt-0.5 truncate whitespace-nowrap text-[11px] font-semibold text-white/70" title={program}>
             {program}
           </p>
         </div>

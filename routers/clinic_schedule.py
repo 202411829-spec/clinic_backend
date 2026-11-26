@@ -25,6 +25,12 @@ clinic_schedule_bp = Blueprint("clinic_schedule", __name__)
 
 SETTINGS_TABLE = "clinic_appointment_settings"
 SCHEDULE_TABLE = "clinic_schedules"
+DELETION_TABLE = "time_slot_deletions"
+
+TIME_SLOT_DELETION_MIGRATION = (
+    "Time-block deletion storage is missing. Apply "
+    "migrations/2026-11-27_time_slot_deletions.sql, then reload the schema cache."
+)
 
 
 # Defaults used when the global settings row lacks a value.
@@ -92,6 +98,109 @@ def normalize_time(value):
         value = value.split(" ")[-1]
 
     return value[:5]
+
+
+def _is_missing_deletion_table_error(error):
+    """True when PostgREST cannot see time_slot_deletions yet."""
+    if PostgrestAPIError is not None and isinstance(error, PostgrestAPIError):
+        code = str(getattr(error, "code", "") or "")
+        message = str(getattr(error, "message", "") or str(error))
+        details = str(getattr(error, "details", "") or "")
+        hint = str(getattr(error, "hint", "") or "")
+        haystack = " ".join([message, details, hint]).lower()
+        if code in {"42P01", "PGRST205"} and "time_slot_deletions" in haystack:
+            return True
+
+    haystack = str(error).lower()
+    return "time_slot_deletions" in haystack and (
+        "42p01" in haystack
+        or "pgrst205" in haystack
+        or "does not exist" in haystack
+        or "schema cache" in haystack
+    )
+
+
+def get_deleted_slot_starts(working_date, reason_id=None):
+    """
+    HH:MM starts deliberately removed for this date/scope.
+
+    A missing table is treated as "no recorded deletions" on read paths so
+    older schemas keep working; write paths call record_time_slot_deletion()
+    and surface the migration message instead of pretending to persist.
+    """
+    if not working_date:
+        return set()
+
+    try:
+        response = execute_with_retry(
+            supabase
+            .table(DELETION_TABLE)
+            .select("slot_start")
+            .eq("working_date", working_date)
+        )
+    except Exception as exc:
+        if _is_missing_deletion_table_error(exc):
+            logger.warning("time_slot_deletions table missing; treating as no deletions")
+            return set()
+        raise
+
+    rows = [
+        row for row in (response.data or [])
+        if schedule_row_matches_reason_scope(row, reason_id)
+    ]
+    return {
+        normalized
+        for row in rows
+        if (normalized := normalize_time(row.get("slot_start")))
+    }
+
+
+def record_time_slot_deletion(working_date, slot_start, slot_end, reason_id=None):
+    """
+    Persist one removed block so schedule regeneration cannot restore it.
+
+    Returns the deletion row. Raises RuntimeError with the migration hint when
+    the additive table has not been applied.
+    """
+    start = normalize_time(slot_start)
+    end = normalize_time(slot_end)
+
+    if not working_date or not start or not end:
+        raise ValueError("Working date and slot start/end are required")
+
+    existing_query = (
+        supabase
+        .table(DELETION_TABLE)
+        .select("deletion_id")
+        .eq("working_date", working_date)
+        .eq("slot_start", start)
+    )
+    if reason_id is None:
+        existing_query = existing_query.is_("reason_id", None)
+    else:
+        existing_query = existing_query.eq("reason_id", reason_id)
+
+    try:
+        existing = (execute_with_retry(existing_query).data or [])
+        if existing:
+            return existing[0]
+
+        response = execute_with_retry(
+            supabase
+            .table(DELETION_TABLE)
+            .insert({
+                "working_date": working_date,
+                "slot_start": start,
+                "slot_end": end,
+                "reason_id": reason_id,
+            })
+        )
+    except Exception as exc:
+        if _is_missing_deletion_table_error(exc):
+            raise RuntimeError(TIME_SLOT_DELETION_MIGRATION) from exc
+        raise
+
+    return (response.data or [None])[0]
 
 
 def get_default_settings():
@@ -475,6 +584,14 @@ def materialize_time_slots(schedule_row):
         return 0
 
     blocks = generate_time_blocks(config)
+
+    # A block an admin deleted for this date/scope must stay deleted even
+    # when schedule edits regenerate the children from working hours.
+    deleted_starts = get_deleted_slot_starts(
+        schedule_row.get("working_date"),
+        schedule_row.get("reason_id"),
+    )
+    blocks = [block for block in blocks if block["start"] not in deleted_starts]
 
     if not blocks:
         return 0

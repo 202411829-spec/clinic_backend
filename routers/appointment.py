@@ -6,10 +6,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from database import supabase
 from routers.clinic_schedule import (
+    SCHEDULE_TABLE,
+    TIME_SLOT_DELETION_MIGRATION,
     get_schedule_for_date,
     get_default_settings,
+    get_deleted_slot_starts,
     materialize_time_slots,
     generate_time_blocks,
+    normalize_time,
+    record_time_slot_deletion,
     resolve_reason_scope,
     schedule_row_matches_reason_scope,
     DEFAULT_SLOT_INTERVAL_MINUTES,
@@ -53,6 +58,34 @@ def _is_bookable_date(date_str):
     except (ValueError, TypeError, AttributeError):
         return False
     return parsed >= _get_tomorrow_date()
+
+
+def _default_slot_config(settings):
+    """Shared virtual/default slot config for reads and delete materialization."""
+    try:
+        slot_interval = int(
+            settings.get("slot_interval_minutes", DEFAULT_SLOT_INTERVAL_MINUTES)
+        )
+    except (TypeError, ValueError):
+        slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
+    if slot_interval <= 0:
+        slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
+
+    try:
+        max_students = int(
+            settings.get("max_students_per_slot", DEFAULT_MAX_STUDENTS_PER_SLOT)
+        )
+    except (TypeError, ValueError):
+        max_students = DEFAULT_MAX_STUDENTS_PER_SLOT
+
+    return {
+        "work_start": settings.get("work_start"),
+        "work_end": settings.get("work_end"),
+        "break_start": settings.get("break_start"),
+        "break_end": settings.get("break_end"),
+        "slot_interval": slot_interval,
+        "max_students": max_students,
+    }
 
 
 def _caller_is_admin():
@@ -800,33 +833,20 @@ def get_time_slots():
                     "slots": []
                 })
             # Build config like clinic_schedule preview
-            try:
-                slot_interval = int(
-                    settings.get(
-                        "slot_interval_minutes", DEFAULT_SLOT_INTERVAL_MINUTES
-                    )
-                )
-            except (TypeError, ValueError):
-                slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
-            if slot_interval <= 0:
-                slot_interval = DEFAULT_SLOT_INTERVAL_MINUTES
-            try:
-                max_students = int(
-                    settings.get(
-                        "max_students_per_slot", DEFAULT_MAX_STUDENTS_PER_SLOT
-                    )
-                )
-            except (TypeError, ValueError):
-                max_students = DEFAULT_MAX_STUDENTS_PER_SLOT
-            config = {
-                "work_start": settings.get("work_start"),
-                "work_end": settings.get("work_end"),
-                "break_start": settings.get("break_start"),
-                "break_end": settings.get("break_end"),
-                "slot_interval": slot_interval,
-                "max_students": max_students,
-            }
-            blocks = generate_time_blocks(config)
+            slot_config = _default_slot_config(settings)
+            max_students = slot_config["max_students"]
+            blocks = generate_time_blocks(slot_config)
+
+            # Persisted admin deletions apply to virtual/default slots too;
+            # otherwise a deleted block simply regenerates on every reload.
+            deleted_starts = get_deleted_slot_starts(
+                requested_date,
+                reason_scope,
+            )
+            blocks = [
+                block for block in blocks
+                if block["start"] not in deleted_starts
+            ]
 
             # Fetch appointments for date to compute booked counts
             appointment_query = (
@@ -917,6 +937,7 @@ def get_time_slots():
                     "id": virtual_slot_id,
                     "slot_id": virtual_slot_id,
                     "schedule_id": None,
+                    "reason_id": reason_scope,
                     "time": f"{block['start']} - {block['end']}",
                     "slot_start": block["start"],
                     "slot_end": block["end"],
@@ -1197,6 +1218,242 @@ def get_time_slots():
         "success": True,
         "count": len(formatted_slots),
         "slots": formatted_slots
+    })
+
+
+# ============================================================
+# DELETE A TIME BLOCK
+#
+# DELETE /appointments/time-slots/<slot_id>
+# Body (needed for virtual/default slots that have no DB row):
+#   { "date": "2026-11-28", "slot_start": "08:00", "slot_end": "08:30",
+#     "reason_id": 3 }
+#
+# Real time_slot rows are deleted from the database. Virtual slots are
+# persisted by materializing a schedule for that date with a recorded
+# deletion, so GET /appointments/slots cannot regenerate them. Appointments
+# are never deleted or detached: any existing booking blocks the delete.
+# ============================================================
+
+@appointment_bp.route(
+    "/appointments/time-slots/<slot_id>",
+    methods=["DELETE"]
+)
+@require_admin
+@handle_errors("Delete time block error")
+def delete_time_slot(slot_id):
+    # Negative ids identify virtual/default slots; Flask's int converter
+    # rejects them, so accept a string segment and parse it here.
+    try:
+        slot_id = int(slot_id)
+    except (TypeError, ValueError):
+        return jsonify({
+            "success": False,
+            "error": "Invalid time slot id."
+        }), 400
+
+    data = request.get_json(silent=True) or {}
+    working_date = str(data.get("date") or "").strip()[:10]
+
+    try:
+        datetime.strptime(working_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return jsonify({
+            "success": False,
+            "error": "A valid date is required."
+        }), 400
+
+    try:
+        reason_scope = resolve_reason_scope(
+            data.get("reason_id"),
+            reasons_by_id=build_reason_lookup(),
+        )
+    except ValueError as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 400
+
+    # ---- Real materialized slot -------------------------------------
+    if slot_id > 0:
+
+        slot_response = execute_with_retry(
+            supabase
+            .table("time_slots")
+            .select("*")
+            .eq("slot_id", slot_id)
+        )
+        slot_rows = slot_response.data or []
+
+        if not slot_rows:
+            return jsonify({
+                "success": False,
+                "error": "Time block not found"
+            }), 404
+
+        slot_row = slot_rows[0]
+
+        bookings = (
+            execute_with_retry(
+                supabase
+                .table("appointments")
+                .select("appointment_id")
+                .eq("time_slot_id", slot_id)
+            ).data
+            or []
+        )
+        if bookings:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Cannot delete a time block that has existing appointments. "
+                    "Cancel or move those bookings first."
+                )
+            }), 409
+
+        schedule_row = None
+        if slot_row.get("schedule_id") is not None:
+            schedule_response = execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .select("*")
+                .eq("schedule_id", slot_row.get("schedule_id"))
+            )
+            schedule_row = (schedule_response.data or [None])[0]
+
+        row_scope = (schedule_row or {}).get("reason_id")
+        if row_scope in (None, "", "null"):
+            row_scope = reason_scope
+
+        slot_start = normalize_time(slot_row.get("slot_start"))
+        slot_end = normalize_time(slot_row.get("slot_end"))
+        row_date = (schedule_row or {}).get("working_date") or working_date
+
+        try:
+            # Record first: even if a later schedule edit regenerates the
+            # children, the block stays removed.
+            record_time_slot_deletion(
+                row_date,
+                slot_start,
+                slot_end,
+                row_scope,
+            )
+            delete_response = execute_with_retry(
+                supabase
+                .table("time_slots")
+                .delete()
+                .eq("slot_id", slot_id)
+            )
+        except RuntimeError as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+                "migration_required": "migrations/2026-11-27_time_slot_deletions.sql",
+            }), 503
+
+        if not delete_response.data:
+            return jsonify({
+                "success": False,
+                "error": "Time block not found"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Time block deleted",
+            "slot_id": slot_id,
+        })
+
+    # ---- Virtual/default slot (no real time_slots row) --------------
+    time_parts = str(data.get("time") or "").split(" - ")
+    slot_start = normalize_time(
+        data.get("slot_start") or (time_parts[0] if time_parts else None)
+    )
+    slot_end = normalize_time(
+        data.get("slot_end") or (time_parts[1] if len(time_parts) > 1 else None)
+    )
+
+    if not slot_start or not slot_end:
+        return jsonify({
+            "success": False,
+            "error": "Slot start and end times are required."
+        }), 400
+
+    bookings = (
+        execute_with_retry(
+            supabase
+            .table("appointments")
+            .select("appointment_id")
+            .eq("appointment_date", working_date)
+            .eq("appointment_time", slot_start)
+        ).data
+        or []
+    )
+    if bookings:
+        return jsonify({
+            "success": False,
+            "error": (
+                "Cannot delete a time block that has existing appointments. "
+                "Cancel or move those bookings first."
+            )
+        }), 409
+
+    override = get_schedule_for_date(working_date, reason_id=reason_scope)
+
+    try:
+        if not override:
+            settings = get_default_settings()
+            if not settings:
+                return jsonify({
+                    "success": False,
+                    "error": "No default clinic schedule is configured."
+                }), 500
+
+            schedule_payload = {
+                "working_date": working_date,
+                "work_start": settings.get("work_start"),
+                "work_end": settings.get("work_end"),
+                "break_start": settings.get("break_start"),
+                "break_end": settings.get("break_end"),
+                "is_enabled": True,
+                "closure_reason": None,
+            }
+            # Older production schemas may not have reason_id yet; omitting
+            # it keeps this write compatible with the legacy general scope.
+            if reason_scope is not None:
+                schedule_payload["reason_id"] = reason_scope
+
+            schedule_response = execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .insert(schedule_payload)
+            )
+            override = (schedule_response.data or [None])[0]
+            if not override:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to create the schedule needed to persist this deletion."
+                }), 500
+
+        record_time_slot_deletion(
+            working_date,
+            slot_start,
+            slot_end,
+            reason_scope,
+        )
+        # Regenerate the day's real slots from the deletion record, so the
+        # deleted virtual block never returns on the next fetch.
+        materialize_time_slots(override)
+    except RuntimeError as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "migration_required": "migrations/2026-11-27_time_slot_deletions.sql",
+        }), 503
+
+    return jsonify({
+        "success": True,
+        "message": "Time block deleted",
+        "slot_id": slot_id,
     })
 
 

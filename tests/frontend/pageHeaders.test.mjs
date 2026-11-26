@@ -45,6 +45,7 @@ test("Dashboard keeps its greeting left and date right in the shared header", ()
   assert.doesNotMatch(header, /eyebrow=\{todayLabel\}/)
   assert.match(header, /className="animate-fade-up[^\"]*\[&>div:last-child\]:ml-auto/)
   assert.match(dashboard, /<div className="space-y-5 pt-3 sm:pt-4">/)
+  assert.doesNotMatch(dashboard, /<div className="pt-2">/)
   assert.doesNotMatch(dashboard, /font-serif text-3xl font-semibold/)
 })
 
@@ -80,11 +81,15 @@ test("Admins uses the shared header with icon, title, subtitle, and actions", ()
   assert.doesNotMatch(adminsPanel, /font-serif text-3xl font-semibold text-ink-900/)
 })
 
-test("all four Management pages use the same outer top spacing", () => {
-  assert.match(reportsPage, /<div className="pt-2">/)
-  assert.match(clinicSchedulePage, /<div className="pt-2">/)
-  assert.match(adminsPage, /<div className="pt-2">\s*<AdminsPanel \/>\s*<\/div>/)
-  assert.match(profilePage, /<div className="pt-2">/)
+test("all four Management pages use the Dashboard top spacing", () => {
+  assert.match(reportsPage, /<div className="pt-3 sm:pt-4">/)
+  assert.match(clinicSchedulePage, /<div className="pt-3 sm:pt-4">/)
+  assert.match(adminsPage, /<div className="pt-3 sm:pt-4">\s*<AdminsPanel \/>\s*<\/div>/)
+  assert.match(profilePage, /<div className="pt-3 sm:pt-4">/)
+  assert.doesNotMatch(reportsPage, /<div className="pt-2">/)
+  assert.doesNotMatch(clinicSchedulePage, /<div className="pt-2">/)
+  assert.doesNotMatch(adminsPage, /<div className="pt-2">/)
+  assert.doesNotMatch(profilePage, /<div className="pt-2">/)
 })
 
 test("Clinic Schedule uses the shared PageHeader above its content card", () => {

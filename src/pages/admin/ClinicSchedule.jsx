@@ -3,7 +3,7 @@ import ClinicScheduleFullPanel from "../../components/admin/ClinicScheduleFullPa
 
 export default function ClinicSchedule() {
   return (
-    <div className="pt-2">
+    <div className="pt-3 sm:pt-4">
       <ClinicScheduleFullPanel />
     </div>
   );
