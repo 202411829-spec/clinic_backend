@@ -26,7 +26,10 @@ import {
   makeYMD,
   MONTH_LABELS_LONG,
   MONTH_LABELS_SHORT,
+  parseAcademicYearISO,
   parseNonNegativeYear,
+  previewYearRange,
+  toAcademicYearISO,
 } from "../../lib/reportPeriodSelection.js";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -412,6 +415,152 @@ export function MonthRangeCalendarPanel({
         </button>
         <span className="gc-cal-hint">
           {hint ?? (value?.from && !value?.to ? "Select end month" : "Select start and end month")}
+        </span>
+      </div>
+    </>
+  );
+}
+
+// Year ranges use the same two-click continuous-range states as the month
+// grid, with each cell representing the first day of a calendar year.
+export function YearRangeCalendarPanel({
+  value,
+  viewYear,
+  setViewYear,
+  focusISO,
+  setFocusISO,
+  hoverISO,
+  setHoverISO,
+  onPick,
+  onClear,
+  hint,
+}) {
+  const currentYear = parseNonNegativeYear(viewYear) ?? new Date().getFullYear();
+  const pageStart = Math.floor(currentYear / 12) * 12;
+  const years = Array.from({ length: 12 }, (_, offset) => pageStart + offset);
+  const preview = previewYearRange(value, hoverISO);
+  const startYear = parseAcademicYearISO(preview.start);
+  const endYear = parseAcademicYearISO(preview.end);
+
+  function shiftPage(delta) {
+    const next = pageStart + delta * 12;
+    if (next < 0) return;
+    setViewYear(next);
+  }
+
+  function moveFocus(iso, deltaYears) {
+    const year = parseAcademicYearISO(iso);
+    if (year == null) return;
+    const nextYear = Math.max(0, year + deltaYears);
+    const nextISO = toAcademicYearISO(nextYear);
+    setFocusISO(nextISO);
+    setViewYear(nextYear);
+    window.setTimeout(() => {
+      document.querySelector(`[data-iso="${nextISO}"]`)?.focus();
+    }, 0);
+  }
+
+  return (
+    <>
+      <div className="gc-cal" onMouseLeave={() => setHoverISO("")}>
+        <div className="gc-cal-head">
+          <button
+            type="button"
+            className="gc-cal-navbtn gc-no-btn-anim"
+            aria-label="Previous years"
+            disabled={pageStart === 0}
+            onClick={() => shiftPage(-1)}
+          >
+            <NavIcon name="chevron-left" className="h-4 w-4" />
+          </button>
+          <p className="gc-cal-month" aria-live="polite">
+            {years[0]} – {years[years.length - 1]}
+          </p>
+          <button
+            type="button"
+            className="gc-cal-navbtn gc-no-btn-anim"
+            aria-label="Next years"
+            onClick={() => shiftPage(1)}
+          >
+            <NavIcon name="chevron-right" className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div
+          className="gc-cal-grid gc-month-grid"
+          role="grid"
+          aria-label={`Years ${years[0]} to ${years[years.length - 1]}`}
+        >
+          {years.map((year) => {
+            const iso = toAcademicYearISO(year);
+            const isStart = startYear === year;
+            const isEnd = endYear === year;
+            const inRange = startYear != null && endYear != null && year >= startYear && year <= endYear;
+            const isMiddle = inRange && !isStart && !isEnd;
+            const selected = isStart || isEnd || isMiddle;
+            const cellClasses = [
+              "gc-cal-cell gc-month-cell",
+              inRange ? "is-in-range" : "",
+              isStart ? "is-range-start" : "",
+              isEnd ? "is-range-end" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            const yearClasses = [
+              "gc-cal-day gc-month-day gc-no-btn-anim",
+              isStart ? "is-range-start" : "",
+              isEnd ? "is-range-end" : "",
+              isMiddle ? "is-in-range" : "",
+              isStart && isEnd ? "is-range-solo" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+
+            return (
+              <div key={iso} className={cellClasses}>
+                <button
+                  type="button"
+                  data-iso={iso}
+                  role="gridcell"
+                  aria-selected={selected}
+                  aria-label={String(year)}
+                  tabIndex={focusISO === iso ? 0 : -1}
+                  className={yearClasses}
+                  onMouseEnter={() => setHoverISO(iso)}
+                  onFocus={() => {
+                    setFocusISO(iso);
+                    setHoverISO(iso);
+                  }}
+                  onClick={() => onPick(iso)}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      moveFocus(iso, 1);
+                    } else if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      moveFocus(iso, -1);
+                    } else if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      moveFocus(iso, 4);
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      moveFocus(iso, -4);
+                    }
+                  }}
+                >
+                  <span className="gc-cal-daynum">{year}</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="gc-cal-footer">
+        <button type="button" className="gc-cal-clear gc-no-btn-anim" onClick={onClear}>
+          Clear
+        </button>
+        <span className="gc-cal-hint">
+          {hint ?? (value?.from && !value?.to ? "Select end year" : "Select start and end year")}
         </span>
       </div>
     </>

@@ -3,16 +3,19 @@
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import SelectDateCalendar from "./SelectDateCalendar.jsx";
 import NavIcon from "../ui/NavIcon.jsx";
-import { MonthRangeCalendarPanel } from "../ui/DateRangePicker.jsx";
+import { MonthRangeCalendarPanel, YearRangeCalendarPanel } from "../ui/DateRangePicker.jsx";
 import { formatAcademicMonthRangeLabel } from "../../lib/academicPeriod.js";
 import { toYMD } from "../../lib/calendar.js";
 import {
+  formatAcademicYearRangeLabel,
   formatDaySetLabel,
   formatMonthListLabel,
   getWeekIndexForDay,
   getWeeksForMonth,
   MONTH_LABELS_LONG,
+  parseAcademicYearISO,
   parseNonNegativeYear,
+  toAcademicYearISO,
   toggleRegularMonth,
 } from "../../lib/reportPeriodSelection.js";
 
@@ -60,8 +63,23 @@ export default function RegularTimePeriodPicker({
   setMonthHoverISO,
   onMonthRangePick,
   onClearMonthRange,
+  yearRange,
+  yearViewYear,
+  setYearViewYear,
+  yearFocusISO,
+  setYearFocusISO,
+  yearHoverISO,
+  setYearHoverISO,
+  onYearRangePick,
+  onClearYearRange,
 }) {
   const parsedYear = parseNonNegativeYear(yearInput);
+  const safeYearRange = yearRange ?? { from: "", to: "" };
+  const yearAnchor =
+    parseAcademicYearISO(safeYearRange.to || safeYearRange.from) ??
+    parsedYear ??
+    new Date().getFullYear();
+  const showPeriodHeading = period === "Day" || period === "All Time";
   const monthOptions = MONTH_LABELS_LONG.map((label, value) => ({ value, label }));
 
   // Reports always passes selectedDays; Logbook reuses this picker for
@@ -91,8 +109,10 @@ export default function RegularTimePeriodPicker({
 
   return (
     <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="font-bold text-gray-800 text-sm md:text-base">Regular Time · {period}</h2>
+      <div className={`mb-3 flex items-center justify-end gap-2 ${showPeriodHeading ? "justify-between" : ""}`}>
+        {showPeriodHeading && (
+          <h2 className="font-bold text-gray-800 text-sm md:text-base">Regular Time · {period}</h2>
+        )}
         <button
           type="button"
           onClick={onDone}
@@ -226,12 +246,21 @@ export default function RegularTimePeriodPicker({
 
       {period === "Year" && (
         <div className="space-y-3">
-          <YearInput label="Year" value={yearInput} onChange={onYearInputChange} />
-          <p className="rounded-lg bg-gc-green/10 px-3 py-2 text-xs font-semibold text-gc-green">
-            {parsedYear == null
-              ? "Enter a valid non-negative year. Year 0 is allowed."
-              : `Reporting year: ${parsedYear}`}
+          <p className="text-xs font-semibold text-gray-700">
+            Selected: {formatAcademicYearRangeLabel(safeYearRange) || "Choose a start year"}
           </p>
+          <YearRangeCalendarPanel
+            value={safeYearRange}
+            viewYear={yearViewYear ?? yearAnchor}
+            setViewYear={(year) => setYearViewYear?.(year)}
+            focusISO={yearFocusISO ?? toAcademicYearISO(yearAnchor)}
+            setFocusISO={(iso) => setYearFocusISO?.(iso)}
+            hoverISO={yearHoverISO ?? ""}
+            setHoverISO={(iso) => setYearHoverISO?.(iso)}
+            onPick={(iso) => onYearRangePick?.(iso)}
+            onClear={onClearYearRange}
+            hint="Tap a start year, then an end year. Use the arrows to change years."
+          />
         </div>
       )}
 

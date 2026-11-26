@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 import { buildPaginationPages, clampPage, getPageCount } from "../../src/lib/pagination.js"
+import { buildWindowedPaginationPages } from "../../src/lib/pagination.js"
 
 const shared = readFileSync("src/components/ui/Pagination.jsx", "utf8")
 const masterlist = readFileSync("src/pages/admin/Masterlist.jsx", "utf8")
@@ -91,4 +92,17 @@ test("moving to the last page and then filtering clamps back to page one", () =>
   assert.equal(afterFilter, 1)
   assert.equal(clampPage(beforeFilter, afterFilter), 1)
   assert.deepEqual(buildPaginationPages(clampPage(beforeFilter, afterFilter), afterFilter), [1])
+})
+
+test("compact window keeps three numbered buttons from real page counts", () => {
+  assert.deepEqual(buildWindowedPaginationPages(1, 1, 3), [1])
+  assert.deepEqual(buildWindowedPaginationPages(1, 2, 3), [1, 2])
+  assert.deepEqual(buildWindowedPaginationPages(1, 10, 3), [1, 2, 3])
+  assert.deepEqual(buildWindowedPaginationPages(5, 10, 3), [4, 5, 6])
+  assert.deepEqual(buildWindowedPaginationPages(10, 10, 3), [8, 9, 10])
+
+  assert.match(shared, /const displayedPages = maxPageButtons/)
+  assert.match(shared, /\{displayedPages\.map\(\(p, i\) =>/)
+  assert.match(shared, /disabled=\{currentPage === 1\}/)
+  assert.match(shared, /disabled=\{currentPage === pageCount\}/)
 })

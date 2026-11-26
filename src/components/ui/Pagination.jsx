@@ -1,12 +1,24 @@
 // src/components/Pagination.jsx
-// Shared pagination control with prev/next buttons, page numbers, and
-// ellipsis, used by LogbookFullPanel and LogbookPanel.
+// Shared pagination control with prev/next buttons and page numbers, used by
+// Logbook and Appointments. The default keeps ellipsis; callers that want a
+// compact fixed-width window can pass maxPageButtons.
 
 import { buildPaginationPages, clampPage } from "../../lib/pagination.js";
+import { buildWindowedPaginationPages } from "../../lib/pagination.js";
 
-export default function Pagination({ page, pageCount, onChange, label, className = "" }) {
+export default function Pagination({
+  page,
+  pageCount,
+  onChange,
+  label,
+  className = "",
+  maxPageButtons,
+}) {
   const currentPage = clampPage(page, pageCount);
   const pages = buildPaginationPages(currentPage, pageCount);
+  const displayedPages = maxPageButtons
+    ? buildWindowedPaginationPages(currentPage, pageCount, maxPageButtons)
+    : pages;
 
   return (
     <div className={className}>
@@ -24,7 +36,7 @@ export default function Pagination({ page, pageCount, onChange, label, className
             </svg>
           </button>
 
-          {pages.map((p, i) =>
+          {displayedPages.map((p, i) =>
             p === "…" ? (
               <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">
                 …

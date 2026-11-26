@@ -8,15 +8,24 @@ import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
 import PortalOverlay from "../ui/PortalOverlay.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import AppointmentDatePicker from "./AppointmentDatePicker.jsx";
 import { appointmentsApi } from "../../lib/api.js";
-import { filterAppointmentSlots } from "../../lib/appointmentSlots.js";
+import {
+  appointmentCourseValue,
+  filterAppointmentSlots,
+  matchesAppointmentSearch,
+} from "../../lib/appointmentSlots.js";
 import {
   deriveRecordFilterOptions,
   reconcileRecordFilterSelections,
 } from "../../lib/filterMultiSelect.js";
+import { clampPage, getPageCount } from "../../lib/pagination.js";
 import { toYMD } from "../../lib/calendar";
 import { formatTimeRange } from "../../lib/timeFormat";
+
+const PAGE_SIZE = 5;
+const MAX_PAGE_BUTTONS = 3;
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -85,7 +94,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
   );
 }
 
-function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
+function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState(null);
 
@@ -184,7 +193,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                           onChange={(newStatus) =>
                             onStatusChange(slot.id, b.id, newStatus)
                           }
-                          onViewRecord={() => handleViewRecord(b.student_id)}
+                          onViewRecord={() => onViewRecord(b.student_id)}
                         />
                       </td>
                     </tr>
@@ -222,6 +231,12 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
   const [department, setDepartment] = useState([]);
   const [course, setCourse] = useState([]);
   const [reasonFilter, setReasonFilter] = useState([]);
+  const [page, setPage] = useState(1);
+
+  // A new date/search/category view starts on the first real page.
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDate, search, department, course, reasonFilter]);
 
   // Fetch real time slots + bookings for the selected date.
   useEffect(() => {
@@ -255,7 +270,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
   const filterFields = useMemo(
     () => ({
       department: (booking) => booking?.dept,
-      course: (booking) => booking?.course,
+      course: appointmentCourseValue,
       reason: (booking) => booking?.reason,
     }),
     []
@@ -272,12 +287,9 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
         selections: filterSelections,
         matches: (booking) => {
           if (String(booking?.status ?? "").trim().toLowerCase() === "cancelled") return false;
-          const query = search.trim().toLowerCase();
-          if (!query) return true;
-          // Keep the same searchable fields as filterAppointmentSlots.
-          return [booking?.name, booking?.dept].some((value) =>
-            String(value ?? "").toLowerCase().includes(query)
-          );
+          // Shared with filterAppointmentSlots so course searches cannot make
+          // the Courses dropdown look empty while its records are still loaded.
+          return matchesAppointmentSearch(booking, search);
         },
       }),
     [bookings, filterFields, filterSelections, search]
@@ -366,7 +378,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
     setOpenEditId((cur) => (cur === slotId ? null : cur));
   }
 
-  const filteredSlots = useMemo(
+  const matchingSlots = useMemo(
     () =>
       filterAppointmentSlots(slots, {
         search,
@@ -375,6 +387,23 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
         reason: reasonFilter,
       }),
     [slots, search, department, course, reasonFilter]
+  );
+  const pageCount = getPageCount(matchingSlots.length, PAGE_SIZE);
+  const currentPage = clampPage(page, pageCount);
+
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [page, currentPage]);
+
+  // Only slice after filtering, so pageCount/record count stay truthful and no
+  // matching block is hidden or duplicated to force a three-button display.
+  const filteredSlots = useMemo(
+    () =>
+      matchingSlots.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [matchingSlots, currentPage]
   );
 
   const hasAppointments = filteredSlots.length > 0;
@@ -388,6 +417,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
     department,
     course,
     reason: reasonFilter,
+    page: currentPage,
   });
 
   return (
@@ -461,6 +491,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
             key={`${slot.id}:${expansionViewKey}`}
             slot={slot}
             onStatusChange={requestStatusChange}
+            onViewRecord={handleViewRecord}
             editing={openEditId === slot.id}
             onToggleEdit={(id) =>
               setOpenEditId((cur) => (cur === id ? null : id))
@@ -469,6 +500,15 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
             onDeleteTimeBlock={handleDeleteTimeBlock}
           />
         ))}
+      {!loading && !error && hasAppointments && (
+        <Pagination
+          page={currentPage}
+          pageCount={pageCount}
+          onChange={setPage}
+          maxPageButtons={MAX_PAGE_BUTTONS}
+          className="mt-4"
+        />
+      )}
       <ConfirmDialog
         open={!!cancelTarget}
         title="Cancel this appointment?"

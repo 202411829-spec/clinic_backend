@@ -11,7 +11,11 @@ import PortalOverlay from "../ui/PortalOverlay.jsx";
 import { appointmentsApi } from "../../lib/api.js";
 import { toYMD } from "../../lib/calendar.js";
 import { formatTimeRange } from "../../lib/timeFormat";
-import { filterAppointmentSlots } from "../../lib/appointmentSlots.js";
+import {
+  appointmentCourseValue,
+  filterAppointmentSlots,
+  matchesAppointmentSearch,
+} from "../../lib/appointmentSlots.js";
 import {
   deriveRecordFilterOptions,
   reconcileRecordFilterSelections,
@@ -243,7 +247,7 @@ export default function AppointmentsPanel() {
   const filterFields = useMemo(
     () => ({
       department: (booking) => booking?.dept,
-      course: (booking) => booking?.course,
+      course: appointmentCourseValue,
       reason: (booking) => booking?.reason,
     }),
     []
@@ -260,13 +264,10 @@ export default function AppointmentsPanel() {
         selections: filterSelections,
         matches: (booking, key) => {
           if (String(booking?.status ?? "").trim().toLowerCase() === "cancelled") return false;
-          const query = search.trim().toLowerCase();
-          if (!query) return true;
-          // Keep the same searchable fields as filterAppointmentSlots.
+          // Keep the same searchable fields as filterAppointmentSlots, so a
+          // course search keeps real Courses options available.
           return key === "department" || key === "course" || key === "reason"
-            ? [booking?.name, booking?.dept].some((value) =>
-                String(value ?? "").toLowerCase().includes(query)
-              )
+            ? matchesAppointmentSearch(booking, search)
             : true;
         },
       }),

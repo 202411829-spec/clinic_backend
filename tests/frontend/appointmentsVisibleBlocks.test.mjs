@@ -2,7 +2,10 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
-import { filterAppointmentSlots } from "../../src/lib/appointmentSlots.js"
+import {
+  appointmentCourseValue,
+  filterAppointmentSlots,
+} from "../../src/lib/appointmentSlots.js"
 
 const panelSource = readFileSync(
   "src/components/admin/AppointmentsFullPanel.jsx",
@@ -29,6 +32,7 @@ const SLOTS = [
         id: "a1",
         name: "Alice",
         dept: "Nursing",
+        course: "BSN",
         reason: "Consultation",
         status: "pending",
       },
@@ -66,6 +70,7 @@ const SLOTS = [
         id: "a3",
         name: "Bob",
         dept: "Dentistry",
+        course: "BSD",
         reason: "Follow-up",
         status: "completed",
       },
@@ -120,6 +125,36 @@ test("search, department, and reason filters hide blocks without matches", () =>
       reason: "Follow-up",
     }),
     []
+  )
+})
+
+test("course search and legacy course records produce real Courses options", () => {
+  assert.deepEqual(
+    filterAppointmentSlots(SLOTS, { search: "bsn" }).map((s) => s.id),
+    ["morning"]
+  )
+  assert.deepEqual(
+    filterAppointmentSlots(SLOTS, { course: ["BSD"] }).map((s) => s.id),
+    ["afternoon"]
+  )
+
+  const legacySlots = [
+    {
+      id: "legacy",
+      capacity: 11,
+      bookings: [
+        { id: "a4", name: "Cara", dept: "CCS", deptCourse: "BSIT - CCS", status: "pending" },
+      ],
+    },
+  ]
+  assert.equal(appointmentCourseValue(legacySlots[0].bookings[0]), "BSIT")
+  assert.deepEqual(
+    filterAppointmentSlots(legacySlots, { search: "bsit" }).map((s) => s.id),
+    ["legacy"]
+  )
+  assert.deepEqual(
+    filterAppointmentSlots(legacySlots, { course: ["BSIT"] }).map((s) => s.id),
+    ["legacy"]
   )
 })
 
@@ -234,7 +269,34 @@ test("Appointments page View Record opens the selected student's record", () => 
   )
   assert.match(
     panelSource,
-    /onViewRecord=\{\(\) => handleViewRecord\(b\.student_id\)\}/
+    /function SlotGroup\(\{ slot, onStatusChange, onViewRecord,/
   )
+  assert.match(panelSource, /onViewRecord=\{handleViewRecord\}/)
+  assert.match(panelSource, /onViewRecord=\{\(\) => onViewRecord\(b\.student_id\)\}/)
   assert.doesNotMatch(panelSource, /Viewing record for/)
+})
+
+test("Appointments page paginates real filtered slots with a compact page window", () => {
+  assert.match(panelSource, /const PAGE_SIZE = 5;/)
+  assert.match(panelSource, /const MAX_PAGE_BUTTONS = 3;/)
+  assert.match(
+    panelSource,
+    /const pageCount = getPageCount\(matchingSlots\.length, PAGE_SIZE\)/
+  )
+  assert.match(panelSource, /const currentPage = clampPage\(page, pageCount\)/)
+  assert.match(
+    panelSource,
+    /matchingSlots\.slice\(\s*\(currentPage - 1\) \* PAGE_SIZE,\s*currentPage \* PAGE_SIZE\s*\)/
+  )
+  assert.match(
+    panelSource,
+    /<Pagination\s+page=\{currentPage\}\s+pageCount=\{pageCount\}/
+  )
+  assert.match(panelSource, /maxPageButtons=\{MAX_PAGE_BUTTONS\}/)
+  assert.match(
+    panelSource,
+    /useEffect\(\(\) => \{\s*setPage\(1\);\s*\}, \[selectedDate, search, department, course, reasonFilter\]\)/
+  )
+  assert.match(panelSource, /page: currentPage/)
+  assert.doesNotMatch(panelSource, /\[1,\s*2,\s*3\]/)
 })

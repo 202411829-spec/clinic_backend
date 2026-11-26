@@ -5,9 +5,17 @@ import { readFileSync } from "node:fs";
 import { pickRangeDate } from "../../src/lib/dateRangeCalendar.js";
 import { getOverlayPosition } from "../../src/lib/gcOverlayPosition.js";
 import { buildLogbookQueryParams } from "../../src/lib/logbookQuery.js";
+import {
+  buildRegularTimeDates,
+  formatRegularPeriodLabel,
+  pickAcademicYearRange,
+  shiftYearRange,
+  toAcademicYearISO,
+} from "../../src/lib/reportPeriodSelection.js";
 import { dayRangeDates, resolveRegularTimeRange } from "../../src/lib/regularTimeRange.js";
 
 const read = (relativePath) => readFileSync(`src/${relativePath}`, "utf8");
+const sharedCalendar = read("components/ui/DateRangePicker.jsx");
 const logbookPicker = read("components/admin/LogbookRangePicker.jsx");
 const sharedPeriodPicker = read("components/admin/RegularTimePeriodPicker.jsx");
 const widget = read("components/admin/LogbookPanel.jsx");
@@ -168,4 +176,53 @@ test("Reports non-Day periods and Academic Timeline behavior stay intact", () =>
   assert.match(reportsPanel, /buildAcademicDates\(\{ schoolStartYear, semester, monthRange: academicMonthRange \}\)/);
   assert.match(reportsPanel, /if \(isContinuousDay\) \{[\s\S]*?shiftDayRange\(dayRange, delta\)/);
   assert.match(reportsPanel, /applyRegularPatch\(shiftRegularSelection\(\{/);
+});
+
+test("shared Regular Time picker hides Week/Month/Year headings but keeps every control", () => {
+  assert.match(sharedPeriodPicker, /const showPeriodHeading = period === "Day" \|\| period === "All Time"/);
+  assert.match(sharedPeriodPicker, /\{showPeriodHeading && \([\s\S]*?Regular Time · \{period\}/);
+  assert.match(sharedPeriodPicker, /onClick=\{onDone\}/);
+  for (const period of ["Week", "Month", "Year"]) {
+    assert.doesNotMatch(sharedPeriodPicker, new RegExp(`Regular Time · ${period}`));
+  }
+
+  assert.match(sharedPeriodPicker, /<MonthRangeCalendarPanel[\s\S]*?onClear=\{onClearMonthRange\}/);
+  assert.match(sharedPeriodPicker, /max-h-64 space-y-2 overflow-y-auto/);
+  assert.match(sharedPeriodPicker, /Report dates: \{activeWeek\.from\} to \{activeWeek\.to\}/);
+  assert.match(sharedCalendar, /export function YearRangeCalendarPanel/);
+  assert.match(sharedPeriodPicker, /<YearRangeCalendarPanel[\s\S]*?onClear=\{onClearYearRange\}/);
+
+  for (const [name, source] of [["Reports", reportsPanel], ["Logbook", logbookPicker]]) {
+    assert.match(source, /<RegularTimePeriodPicker[\s\S]*?yearRange=\{/, `${name} must share the year-range picker`);
+  }
+});
+
+test("year range picking is start/end based and applies to report dates", () => {
+  const start = toAcademicYearISO(2024);
+  const end = toAcademicYearISO(2025);
+
+  assert.deepEqual(pickAcademicYearRange({ from: "", to: "" }, start), { from: start, to: "" });
+  assert.deepEqual(pickAcademicYearRange({ from: start, to: "" }, toAcademicYearISO(2026)), {
+    from: start,
+    to: "2026-01-01",
+  });
+  assert.deepEqual(pickAcademicYearRange({ from: start, to: "" }, toAcademicYearISO(2022)), {
+    from: "2022-01-01",
+    to: start,
+  });
+  assert.deepEqual(pickAcademicYearRange({ from: start, to: end }, toAcademicYearISO(2029)), {
+    from: "2029-01-01",
+    to: "",
+  });
+
+  const range = { from: start, to: end };
+  const dates = buildRegularTimeDates({ period: "Year", yearRange: range });
+  assert.equal(dates.length, 731);
+  assert.equal(dates[0], "2024-01-01");
+  assert.equal(dates.at(-1), "2025-12-31");
+  assert.equal(formatRegularPeriodLabel({ period: "Year", yearRange: range }), "2024 – 2025");
+
+  const resolved = resolveRegularTimeRange({ period: "Year", yearRange: range });
+  assert.deepEqual([resolved.from, resolved.to], ["2024-01-01", "2025-12-31"]);
+  assert.deepEqual(shiftYearRange(range, 1), { from: "2025-01-01", to: "2026-01-01" });
 });

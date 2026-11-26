@@ -16,9 +16,13 @@ import {
 import { REGULAR_TIME_PERIODS } from "./reportPeriods.js";
 import {
   buildRegularTimeDates,
+  formatAcademicYearRangeLabel,
   formatRegularPeriodLabel,
   getWeekIndexForDay,
+  getYearRangeDates,
+  normalizeYearRange,
   parseYMD,
+  toAcademicYearISO,
 } from "./reportPeriodSelection.js";
 
 const MAX_INITIAL_DAYS = 366;
@@ -31,6 +35,7 @@ export function regularTimeArgs(selection) {
     month = 0,
     weekIndex = null,
     selectedMonths = [],
+    yearRange = { from: "", to: "" },
     period = "Day",
   } = selection || {};
 
@@ -44,6 +49,7 @@ export function regularTimeArgs(selection) {
     monthsYear: yearInput,
     selectedMonths,
     year: yearInput,
+    yearRange,
   };
 }
 
@@ -155,6 +161,7 @@ export function initialRegularTimeSelection(value, now = new Date()) {
     month,
     weekIndex: null,
     selectedMonths: [month],
+    yearRange: EMPTY_RANGE,
   };
 
   const explicitPeriod =
@@ -170,6 +177,15 @@ export function initialRegularTimeSelection(value, now = new Date()) {
   if (!first) return { ...base, period: explicitPeriod || "Day" };
 
   const anchorDate = new Date(first.year, first.month, first.day);
+  const last = parseYMD(dayRange.to);
+  const yearRange = value?.yearRange
+    ? normalizeYearRange(value.yearRange)
+    : explicitPeriod === "Year"
+      ? normalizeYearRange({
+          from: toAcademicYearISO(first.year),
+          to: toAcademicYearISO(last?.year ?? first.year),
+        })
+      : EMPTY_RANGE;
   const monthRange = normalizeMonthRange(
     value?.monthRange ||
       (explicitPeriod === "Month"
@@ -184,6 +200,7 @@ export function initialRegularTimeSelection(value, now = new Date()) {
     date: anchorDate,
     dayRange,
     monthRange,
+    yearRange,
     selectedDays: dayRangeDates(dayRange),
     yearInput: String(first.year),
     month: first.month,
@@ -246,6 +263,22 @@ export function resolveRegularTimeRange(selection) {
           label: monthRange.to
             ? formatAcademicMonthRangeLabel(monthRange, " to ")
             : `From ${formatAcademicMonthLabel(monthRange.from)}`,
+        };
+      }
+    }
+  }
+
+  if (period === "Year") {
+    const yearRange = normalizeYearRange(selection?.yearRange);
+    if (yearRange.from) {
+      const completeRange = yearRange.to ? yearRange : { ...yearRange, to: yearRange.from };
+      const dates = getYearRangeDates(completeRange);
+      if (dates.length) {
+        return {
+          from: dates[0],
+          to: dates[dates.length - 1],
+          dates,
+          label: formatAcademicYearRangeLabel(yearRange),
         };
       }
     }

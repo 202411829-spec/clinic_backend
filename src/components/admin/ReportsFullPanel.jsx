@@ -41,8 +41,11 @@ import {
   formatRegularFileLabel,
   formatRegularPeriodLabel,
   getDailyAverage,
+  parseAcademicYearISO,
   parseNonNegativeYear,
+  pickAcademicYearRange,
   shiftRegularSelection,
+  toAcademicYearISO,
   toggleRegularDay,
 } from "../../lib/reportPeriodSelection.js";
 import { GC_MODAL_CLOSE_MS, useModalPresence, useTriggerOrigin } from "../../lib/gcMotion.js";
@@ -357,6 +360,10 @@ export default function ReportsFullPanel() {
   // legacy multi-day selection stays intact for non-Day periods and Academic Time.
   const [dayRange, setDayRange] = useState(EMPTY_RANGE);
   const [selectedRegularMonths, setSelectedRegularMonths] = useState([TODAY_MONTH]);
+  const [regularYearRange, setRegularYearRange] = useState(EMPTY_RANGE);
+  const [regularYearViewYear, setRegularYearViewYear] = useState(TODAY_YEAR);
+  const [regularYearFocusISO, setRegularYearFocusISO] = useState(toAcademicYearISO(TODAY_YEAR));
+  const [regularYearHoverISO, setRegularYearHoverISO] = useState("");
   const [schoolStartYear, setSchoolStartYear] = useState(DEFAULT_SCHOOL_START_YEAR);
   const [semester, setSemester] = useState(SEMESTER_OPTIONS[0]);
   const [academicMonthRange, setAcademicMonthRange] = useState(EMPTY_RANGE);
@@ -427,6 +434,19 @@ export default function ReportsFullPanel() {
     setAcademicMonthHoverISO("");
   }, [timeCategory, pickerOpen, academicMonthAnchorISO]);
 
+  useEffect(() => {
+    if (timeCategory !== "Regular Time" || period !== "Year" || !pickerOpen) return;
+    const anchorISO =
+      regularYearRange.to ||
+      regularYearRange.from ||
+      toAcademicYearISO(parseNonNegativeYear(regularYearInput) ?? TODAY_YEAR);
+    const year = parseAcademicYearISO(anchorISO);
+    if (year == null) return;
+    setRegularYearViewYear(year);
+    setRegularYearFocusISO(anchorISO);
+    setRegularYearHoverISO("");
+  }, [timeCategory, period, pickerOpen, regularYearRange, regularYearInput]);
+
   const academicMonthRangeKey = `${academicMonthRange.from}|${academicMonthRange.to}`;
   const academicDates = useMemo(
     () =>
@@ -438,6 +458,7 @@ export default function ReportsFullPanel() {
   const academicDatesKey = academicDates.join("|");
 
   const regularYear = parseNonNegativeYear(regularYearInput);
+  const regularYearRangeKey = `${regularYearRange.from}|${regularYearRange.to}`;
   const dateKey = toYMD(date);
   const departmentKey = department.join("|");
   const selectedDaysKey = selectedDays.join("|");
@@ -458,6 +479,7 @@ export default function ReportsFullPanel() {
       monthsYear: regularYear,
       selectedMonths: selectedRegularMonths,
       year: regularYear,
+      yearRange: regularYearRange,
     });
   }, [
     isContinuousDay,
@@ -466,6 +488,7 @@ export default function ReportsFullPanel() {
     period,
     selectedDaysKey,
     regularYear,
+    regularYearRangeKey,
     regularMonth,
     weekIndex,
     selectedRegularMonthsKey,
@@ -482,6 +505,7 @@ export default function ReportsFullPanel() {
     monthsYear: regularYear,
     selectedMonths: selectedRegularMonths,
     year: regularYear,
+    yearRange: regularYearRange,
   };
 
   // Real report data for the selected period (+ department filter). Each
@@ -686,6 +710,25 @@ export default function ReportsFullPanel() {
     setDayHoverISO("");
   }
 
+  function handlePickYear(iso) {
+    const next = pickAcademicYearRange(regularYearRange, iso);
+    setRegularYearRange(next);
+    const picked = parseAcademicYearISO(iso);
+    if (picked == null) return;
+    setRegularYearInput(String(picked));
+    setRegularYearViewYear(picked);
+    setRegularYearFocusISO(iso);
+    setRegularYearHoverISO("");
+  }
+
+  function handleClearYearRange() {
+    const year = parseNonNegativeYear(regularYearInput) ?? TODAY_YEAR;
+    setRegularYearRange(EMPTY_RANGE);
+    setRegularYearViewYear(year);
+    setRegularYearFocusISO(toAcademicYearISO(year));
+    setRegularYearHoverISO("");
+  }
+
   function handleToggleDay(nextDate) {
     const nextSelection = toggleRegularDay(selectedDays, toYMD(nextDate));
     setSelectedDays(nextSelection);
@@ -709,6 +752,17 @@ export default function ReportsFullPanel() {
     if (Object.prototype.hasOwnProperty.call(patch, "selectedRegularMonths")) {
       setSelectedRegularMonths(patch.selectedRegularMonths);
     }
+    if (Object.prototype.hasOwnProperty.call(patch, "yearRange")) {
+      const next = patch.yearRange;
+      setRegularYearRange(next);
+      const anchorISO = next?.to || next?.from || "";
+      const anchor = parseAcademicYearISO(anchorISO);
+      if (anchor != null) {
+        setRegularYearViewYear(anchor);
+        setRegularYearFocusISO(anchorISO);
+        setRegularYearHoverISO("");
+      }
+    }
   }
 
   function shiftPeriod(delta) {
@@ -731,6 +785,7 @@ export default function ReportsFullPanel() {
       monthsYear: regularYear,
       selectedMonths: selectedRegularMonths,
       year: regularYear,
+      yearRange: regularYearRange,
     }, delta));
   }
 
@@ -1128,6 +1183,15 @@ export default function ReportsFullPanel() {
                       onWeekChange={setWeekIndex}
                       onMonthsChange={setSelectedRegularMonths}
                       onDone={() => setPickerOpen(false)}
+                      yearRange={regularYearRange}
+                      yearViewYear={regularYearViewYear}
+                      setYearViewYear={setRegularYearViewYear}
+                      yearFocusISO={regularYearFocusISO}
+                      setYearFocusISO={setRegularYearFocusISO}
+                      yearHoverISO={regularYearHoverISO}
+                      setYearHoverISO={setRegularYearHoverISO}
+                      onYearRangePick={handlePickYear}
+                      onClearYearRange={handleClearYearRange}
                     />
                   )}
                 </PortalOverlay>

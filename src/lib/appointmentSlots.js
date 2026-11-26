@@ -13,6 +13,36 @@ function normalizeStatus(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+// Appointments may arrive with a plain `course`, a `course_name` from a joined
+// reference row, or the legacy `Course - Department` shape. Read the real
+// value from whichever field the endpoint supplied; never invent one.
+export function appointmentCourseValue(booking) {
+  const direct = String(booking?.course ?? "").trim();
+  if (direct && direct !== "-") return direct;
+
+  const named = String(booking?.course_name ?? "").trim();
+  if (named && named !== "-") return named;
+
+  const combined = String(booking?.deptCourse ?? "").trim();
+  const parsed = combined.split(" - ")[0].trim();
+  return parsed && parsed !== "-" ? parsed : "";
+}
+
+// One search rule shared by the visible blocks and the option derivation, so
+// typing a course name cannot make the Courses dropdown look empty while the
+// same record is still present in the loaded slots.
+export function matchesAppointmentSearch(booking, search = "") {
+  const query = String(search ?? "").trim().toLowerCase();
+  if (!query) return true;
+
+  return [
+    booking?.name,
+    booking?.dept,
+    appointmentCourseValue(booking),
+    booking?.deptCourse,
+  ].some((value) => String(value ?? "").toLowerCase().includes(query));
+}
+
 // One category match: an array is an OR set (empty = All), a scalar is the
 // legacy single-value equality check with the old "All ..." sentinels.
 function matchesCategory(filter, value) {
@@ -43,7 +73,14 @@ export function buildAppointmentDepartmentOptions(slots) {
 }
 
 export function buildAppointmentCourseOptions(slots) {
-  return buildAppointmentOptionValues(slots, "course");
+  const values = new Set();
+  (Array.isArray(slots) ? slots : []).forEach((slot) => {
+    (Array.isArray(slot?.bookings) ? slot.bookings : []).forEach((booking) => {
+      const value = appointmentCourseValue(booking);
+      if (value) values.add(value);
+    });
+  });
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
 }
 
 export function buildAppointmentReasonOptions(slots) {
@@ -68,13 +105,9 @@ export function filterAppointmentSlots(
       // Visibility is based on the appointment records that will actually be
       // rendered, not on a backend "booked" number that could disagree.
       const bookings = activeBookings.filter((booking) => {
-        const name = String(booking.name ?? "").toLowerCase();
         const dept = String(booking.dept ?? "");
-        const courseName = String(booking.course ?? "");
-        const matchesSearch =
-          !query ||
-          name.includes(query) ||
-          dept.toLowerCase().includes(query);
+        const courseName = appointmentCourseValue(booking);
+        const matchesSearch = matchesAppointmentSearch(booking, query);
         // OR within each category, AND across categories.
         const matchesDepartment = matchesCategory(department, dept);
         const matchesCourse = matchesCategory(course, courseName);

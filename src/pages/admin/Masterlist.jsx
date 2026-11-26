@@ -8,7 +8,6 @@ import { useDebouncedValue } from '../../lib/hooks.js'
 import { clampPage, getPageCount } from '../../lib/pagination.js'
 import {
   MasterlistIcon,
-  SearchIcon,
   SortIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -20,7 +19,6 @@ import {
   reconcileRecordFilterSelections,
 } from '../../lib/filterMultiSelect.js'
 import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
-import { PageHeader } from '../../components/ui/primitives.jsx'
 
 const COLUMNS = [
   { key: 'name', label: 'Name', sortable: true },
@@ -221,24 +219,32 @@ export default function Masterlist() {
   }
 
   return (
-    <div>
-      <PageHeader
-        className="pt-2"
-        title="Masterlist"
-        subtitle="View and manage the master list of students."
-        icon={<MasterlistIcon className="h-5 w-5" />}
-      />
+    <div className="pt-2">
+      <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+        {/* Header — matches the Appointments/Logbook card headers. */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="w-8 h-8 rounded-md bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">
+            <MasterlistIcon className="w-4 h-4" />
+          </span>
+          <div>
+            <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
+              Masterlist
+            </h1>
+            <p className="text-xs text-gray-400 leading-tight">
+              View and manage the master list of students.
+            </p>
+          </div>
+        </div>
 
-      <div className="mt-6 rounded-2xl border border-gray-100 p-5 shadow-sm">
         {/* Search + filters */}
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
+            <NavIcon name="search" className="w-4 h-4 shrink-0 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by surname, name, student ID, or course..."
-              className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20"
+              className="w-full outline-none placeholder:text-gray-400 text-gray-700"
             />
           </div>
 
@@ -271,13 +277,13 @@ export default function Masterlist() {
           />
         </div>
 
-        {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
+        {error && <p className="mb-4 text-sm font-medium text-red-600">{error}</p>}
 
         {/* Table: only scrolls horizontally on small screens (below md),
             where the min-width kicks in. On desktop the min-width is
             removed and the table fits the panel width with no side
             scroll — columns share the available space instead. */}
-        <div className="tbl-scroll mt-5">
+        <div className="tbl-scroll">
           <table className="tbl min-w-[900px] md:min-w-0">
             <thead>
               <tr>
@@ -382,7 +388,7 @@ export default function Masterlist() {
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   )
 }

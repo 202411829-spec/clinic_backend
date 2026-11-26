@@ -170,6 +170,17 @@ test("pending invitations show invitation status and hide approval actions", () 
   assert.match(panel, /\{!a\.is_invitation && \(/)
 })
 
+test("pending requests modal keeps its wide table scrollable inside the dialog", () => {
+  assert.match(panel, /maxWidth="max-w-5xl" labelledBy="requests-title"/)
+  assert.match(panel, /<div className="min-h-0 flex-1 overflow-y-auto p-5">/)
+  assert.match(panel, /<div className="tbl-scroll w-full max-w-full min-w-0 rounded-card ring-1 ring-ink-100">/)
+  assert.match(panel, /<table className="tbl table-fixed min-w-\[960px\]">/)
+  assert.match(panel, /<th className="min-w-\[150px\] whitespace-nowrap">Status<\/th>/)
+  assert.match(panel, /<th className="min-w-\[270px\] whitespace-nowrap text-right">Actions<\/th>/)
+  assert.match(panel, /<td className="min-w-\[270px\]">\s*<div className="flex flex-wrap items-center justify-end gap-2">/)
+  assert.doesNotMatch(panel, /<table className="tbl min-w-\[640px\]">/)
+})
+
 test("pending applicant page refreshes its own admin status", () => {
   assert.match(pending, /Pending approval/)
   assert.match(pending, /window\.location\.reload\(\)/)

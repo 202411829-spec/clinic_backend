@@ -15,6 +15,29 @@
     font-feature-settings: 'cv05' 1, 'ss03' 1;
   }
 
+  /* Scrollbars are hidden system-wide, including portaled dropdowns, modals,
+     tables and any nested scroll area. Only the bar itself is hidden: overflow
+     values, heights, padding and scroll interactions are untouched. The
+     standard property covers Firefox and modern Chrome/Edge, -ms covers legacy
+     Edge/IE, and ::-webkit-* covers the Chromium/WebKit track and thumb. */
+  * {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar,
+  *::-webkit-scrollbar-button,
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-track-piece,
+  *::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-corner {
+    width: 0;
+    height: 0;
+    background: transparent;
+    display: none;
+  }
+
   body {
     font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -177,7 +200,6 @@
   .tbl-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    scrollbar-width: thin;
   }
 
   /* Chrome autofill would otherwise paint fields pale yellow. */
@@ -355,8 +377,6 @@
   }
   .app-main {
     @apply bg-canvas shadow-float;
-    scrollbar-width: thin;
-    scrollbar-color: theme('colors.ink.300') transparent;
   }
 
   /* Frosted surface for floating UI over dark chrome. */

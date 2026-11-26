@@ -114,6 +114,96 @@ export function getYearDates(yearValue) {
   return Array.from({ length: 12 }, (_, month) => getMonthDates(year, month)).flat();
 }
 
+// Year ranges use Jan 1 ISO anchors so they share the month/day range states
+// without relying on lexicographic comparison for years beyond 9999.
+export function toAcademicYearISO(yearValue) {
+  const year = parseNonNegativeYear(yearValue);
+  return year == null ? "" : makeYMD(year, 0, 1);
+}
+
+export function parseAcademicYearISO(iso) {
+  const parts = parseYMD(iso);
+  return parts && parts.month === 0 && parts.day === 1 ? parts.year : null;
+}
+
+export function normalizeYearRange(range) {
+  const from = typeof range?.from === "string" && range.from ? range.from : "";
+  const to = typeof range?.to === "string" && range.to ? range.to : "";
+  const start = parseAcademicYearISO(from);
+  const end = parseAcademicYearISO(to);
+  if (start == null || end == null) return { from, to };
+  return start <= end
+    ? { from: toAcademicYearISO(start), to: toAcademicYearISO(end) }
+    : { from: toAcademicYearISO(end), to: toAcademicYearISO(start) };
+}
+
+export function previewYearRange(range, hoverISO) {
+  const normalized = normalizeYearRange(range);
+  const hovered = parseAcademicYearISO(hoverISO);
+  const start = parseAcademicYearISO(normalized.from);
+  if (start == null || normalized.to || hovered == null) {
+    return { start: normalized.from, end: normalized.to, isPreview: false };
+  }
+  return hovered < start
+    ? {
+        start: toAcademicYearISO(hovered),
+        end: normalized.from,
+        isPreview: true,
+      }
+    : {
+        start: normalized.from,
+        end: toAcademicYearISO(hovered),
+        isPreview: true,
+      };
+}
+
+export function pickAcademicYearRange(range, iso) {
+  const picked = parseAcademicYearISO(iso);
+  if (picked == null) return normalizeYearRange(range);
+
+  const current = normalizeYearRange(range);
+  if (!current.from || current.to) return { from: toAcademicYearISO(picked), to: "" };
+
+  const start = parseAcademicYearISO(current.from);
+  return picked < start
+    ? { from: toAcademicYearISO(picked), to: current.from }
+    : { from: current.from, to: toAcademicYearISO(picked) };
+}
+
+export function shiftYearRange(range, delta) {
+  const normalized = normalizeYearRange(range);
+  const start = parseAcademicYearISO(normalized.from);
+  if (start == null) return { from: "", to: "" };
+
+  const end = parseAcademicYearISO(normalized.to);
+  const step = Number(delta) < 0 ? -1 : 1;
+  return {
+    from: toAcademicYearISO(Math.max(0, start + step)),
+    to: end == null ? "" : toAcademicYearISO(Math.max(0, end + step)),
+  };
+}
+
+export function formatAcademicYearRangeLabel(range, separator = " – ") {
+  const normalized = normalizeYearRange(range);
+  const start = parseAcademicYearISO(normalized.from);
+  if (start == null) return "";
+  const end = parseAcademicYearISO(normalized.to);
+  if (end == null) return `From ${start}`;
+  return end === start ? String(start) : `${start}${separator}${end}`;
+}
+
+export function getYearRangeDates(range) {
+  const normalized = normalizeYearRange(range);
+  const start = parseAcademicYearISO(normalized.from);
+  if (start == null) return [];
+  const end = parseAcademicYearISO(normalized.to) ?? start;
+  const dates = [];
+  for (let year = start; year <= end; year += 1) {
+    dates.push(...getYearDates(year));
+  }
+  return dates;
+}
+
 export function getWeeksForMonth(yearValue, monthValue) {
   const year = parseNonNegativeYear(yearValue);
   const month = clampMonth(monthValue);
@@ -204,6 +294,7 @@ export function buildRegularTimeDates({
   monthsYear,
   selectedMonths,
   year,
+  yearRange,
 }) {
   switch (period) {
     case "Day": {
@@ -224,8 +315,10 @@ export function buildRegularTimeDates({
       return normalizeRegularMonths(selectedMonths)
         .flatMap((month) => getMonthDates(parsedYear, month));
     }
-    case "Year":
-      return getYearDates(year);
+    case "Year": {
+      const rangeDates = getYearRangeDates(yearRange);
+      return rangeDates.length ? rangeDates : getYearDates(year);
+    }
     case "All Time":
       return date instanceof Date && !Number.isNaN(date.getTime()) ? [toYMD(date)] : [];
     default:
@@ -243,6 +336,7 @@ export function formatRegularPeriodLabel({
   monthsYear,
   selectedMonths,
   year,
+  yearRange,
 }) {
   switch (period) {
     case "Day": {
@@ -266,6 +360,8 @@ export function formatRegularPeriodLabel({
       return months ? `${months} ${parsedYear}` : "Choose months";
     }
     case "Year": {
+      const rangeLabel = formatAcademicYearRangeLabel(yearRange);
+      if (rangeLabel) return rangeLabel;
       const parsedYear = parseNonNegativeYear(year);
       return parsedYear == null ? "Enter a valid year" : String(parsedYear);
     }
@@ -351,6 +447,8 @@ export function shiftRegularSelection(selection, delta) {
   }
 
   if (period === "Year") {
+    const shifted = shiftYearRange(selection.yearRange, step);
+    if (shifted.from) return { yearRange: shifted, yearInput: parseAcademicYearISO(shifted.from)?.toString() ?? "0" };
     const year = parseNonNegativeYear(selection.year) ?? 0;
     return { yearInput: String(Math.max(0, year + step)) };
   }

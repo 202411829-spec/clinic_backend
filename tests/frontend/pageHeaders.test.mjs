@@ -43,14 +43,24 @@ test("Dashboard keeps its greeting left and date right in the shared header", ()
   assert.doesNotMatch(dashboard, /font-serif text-3xl font-semibold/)
 })
 
-test("Masterlist keeps its title, subtitle, and icon meaning in the shared header", () => {
-  assert.match(masterlist, /import \{ PageHeader \} from ['"]\.\.\/\.\.\/components\/ui\/primitives\.jsx['"]/)
-  const header = masterlist.match(/<PageHeader[\s\S]*?\n\s+\/>/)?.[0] ?? ""
-  assert.match(header, /title="Masterlist"/)
-  assert.doesNotMatch(header, /title="MASTERLIST"/)
-  assert.match(header, /subtitle="View and manage the master list of students\."/)
-  assert.match(header, /icon=\{<MasterlistIcon className="h-5 w-5" \/>\}/)
-  assert.doesNotMatch(header, /text-gc-accent/)
+test("Masterlist keeps its title, subtitle, and icon inside the table card", () => {
+  assert.doesNotMatch(masterlist, /<PageHeader/)
+  assert.match(masterlist, /<div className="pt-2">/)
+
+  const card = masterlist.match(/<section[\s\S]*?<\/section>/)?.[0] ?? ""
+  assert.match(card, /card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6/)
+  assert.match(card, /flex items-center gap-2 mb-4/)
+  assert.match(card, /w-8 h-8 rounded-md bg-gc-green\/10 text-gc-green/)
+  assert.match(card, /<MasterlistIcon className="w-4 h-4" \/>/)
+  assert.match(card, /font-bold text-gc-green text-base md:text-lg leading-tight/)
+  assert.match(card, />\s*Masterlist\s*</)
+  assert.match(card, /View and manage the master list of students\./)
+  assert.match(card, /grid grid-cols-1 md:grid-cols-4 gap-2 mb-4/)
+  assert.match(card, /<NavIcon name="search"/)
+  assert.match(card, /triggerTestId="masterlist-department-filter"/)
+  assert.match(card, /triggerTestId="masterlist-course-filter"/)
+  assert.match(card, /triggerTestId="masterlist-year-filter"/)
+  assert.match(card, /<table className="tbl min-w-\[900px\] md:min-w-0">/)
 })
 
 test("Admins uses the shared header with icon, title, subtitle, and actions", () => {

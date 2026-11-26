@@ -14,7 +14,14 @@ import { toYMD } from "../../lib/calendar.js";
 import { EMPTY_RANGE, parseISODate, pickRangeDate, startOfDay } from "../../lib/dateRangeCalendar.js";
 import { parseAcademicMonthISO, toAcademicMonthISO } from "../../lib/academicPeriod.js";
 import { normalizeRegularTimePeriod } from "../../lib/reportPeriods.js";
-import { parseNonNegativeYear, shiftRegularSelection } from "../../lib/reportPeriodSelection.js";
+import {
+  normalizeYearRange,
+  parseAcademicYearISO,
+  parseNonNegativeYear,
+  pickAcademicYearRange,
+  shiftRegularSelection,
+  toAcademicYearISO,
+} from "../../lib/reportPeriodSelection.js";
 import {
   dayRangeDates,
   dayRangeLabel,
@@ -60,6 +67,16 @@ export default function LogbookRangePicker({
   );
   const [monthFocusISO, setMonthFocusISO] = useState(initialMonthAnchorISO);
   const [monthHoverISO, setMonthHoverISO] = useState("");
+  const initialYearAnchorISO =
+    initial.yearRange?.to ||
+    initial.yearRange?.from ||
+    toAcademicYearISO(parseNonNegativeYear(initial.yearInput) ?? new Date().getFullYear());
+  const [yearRange, setYearRange] = useState(initial.yearRange);
+  const [yearViewYear, setYearViewYear] = useState(
+    parseAcademicYearISO(initialYearAnchorISO) ?? parseNonNegativeYear(initial.yearInput) ?? new Date().getFullYear()
+  );
+  const [yearFocusISO, setYearFocusISO] = useState(initialYearAnchorISO);
+  const [yearHoverISO, setYearHoverISO] = useState("");
 
   const [open, setOpen] = useState(false);
   const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS);
@@ -120,12 +137,25 @@ export default function LogbookRangePicker({
     setMonthHoverISO("");
   }, [open, period, monthRange, month, yearInput]);
 
+  useEffect(() => {
+    if (!open || period !== "Year") return;
+    const anchorISO =
+      yearRange.to ||
+      yearRange.from ||
+      toAcademicYearISO(parseNonNegativeYear(yearInput) ?? new Date().getFullYear());
+    const year = parseAcademicYearISO(anchorISO);
+    if (year == null) return;
+    setYearViewYear(year);
+    setYearFocusISO(anchorISO);
+    setYearHoverISO("");
+  }, [open, period, yearRange, yearInput]);
+
   // Day uses a continuous start/end range; the expanded list is only the
   // adapter that keeps the existing date_from/date_to query contract intact.
   const selectedDays = useMemo(() => dayRangeDates(dayRange), [dayRange]);
   const selection = useMemo(
-    () => ({ period, date, dayRange, monthRange, selectedDays, yearInput, month, weekIndex, selectedMonths }),
-    [period, date, dayRange, monthRange, selectedDays, yearInput, month, weekIndex, selectedMonths]
+    () => ({ period, date, dayRange, monthRange, yearRange, selectedDays, yearInput, month, weekIndex, selectedMonths }),
+    [period, date, dayRange, monthRange, yearRange, selectedDays, yearInput, month, weekIndex, selectedMonths]
   );
   const range = useMemo(
     () => ({ ...resolveRegularTimeRange(selection), period: selection.period }),
@@ -166,6 +196,16 @@ export default function LogbookRangePicker({
     setMonthViewYear(anchor?.getFullYear() ?? year);
     setMonthFocusISO(anchorISO);
     setMonthHoverISO("");
+
+    const yearAnchorISO =
+      next.yearRange?.to ||
+      next.yearRange?.from ||
+      toAcademicYearISO(parseNonNegativeYear(next.yearInput) ?? new Date().getFullYear());
+    const yearAnchor = parseAcademicYearISO(yearAnchorISO);
+    setYearRange(normalizeYearRange(next.yearRange));
+    setYearViewYear(yearAnchor ?? parseNonNegativeYear(next.yearInput) ?? new Date().getFullYear());
+    setYearFocusISO(yearAnchorISO);
+    setYearHoverISO("");
 
     const dayAnchorISO = next.dayRange?.to || next.dayRange?.from || toYMD(next.date);
     const dayAnchor = parseISODate(dayAnchorISO) || today;
@@ -231,6 +271,25 @@ export default function LogbookRangePicker({
     applyGateRef.current?.markMonthDraftDirty();
   }
 
+  function handlePickYear(iso) {
+    const next = pickAcademicYearRange(yearRange, iso);
+    setYearRange(next);
+    const picked = parseAcademicYearISO(iso);
+    if (picked == null) return;
+    setYearInput(String(picked));
+    setYearViewYear(picked);
+    setYearFocusISO(iso);
+    setYearHoverISO("");
+  }
+
+  function handleClearYearRange() {
+    const year = parseNonNegativeYear(yearInput) ?? new Date().getFullYear();
+    setYearRange(EMPTY_RANGE);
+    setYearViewYear(year);
+    setYearFocusISO(toAcademicYearISO(year));
+    setYearHoverISO("");
+  }
+
   function applyRegularPatch(patch) {
     if (Object.prototype.hasOwnProperty.call(patch, "date")) setDate(patch.date);
     if (Object.prototype.hasOwnProperty.call(patch, "yearInput")) setYearInput(patch.yearInput);
@@ -241,6 +300,17 @@ export default function LogbookRangePicker({
     if (Object.prototype.hasOwnProperty.call(patch, "weekIndex")) setWeekIndex(patch.weekIndex);
     if (Object.prototype.hasOwnProperty.call(patch, "selectedRegularMonths")) {
       setSelectedMonths(patch.selectedRegularMonths);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, "yearRange")) {
+      const next = patch.yearRange;
+      setYearRange(next);
+      const anchorISO = next?.to || next?.from || "";
+      const anchor = parseAcademicYearISO(anchorISO);
+      if (anchor != null) {
+        setYearViewYear(anchor);
+        setYearFocusISO(anchorISO);
+        setYearHoverISO("");
+      }
     }
   }
 
@@ -425,6 +495,15 @@ export default function LogbookRangePicker({
               setMonthHoverISO={setMonthHoverISO}
               onMonthRangePick={handlePickMonth}
               onClearMonthRange={handleClearMonthRange}
+              yearRange={yearRange}
+              yearViewYear={yearViewYear}
+              setYearViewYear={setYearViewYear}
+              yearFocusISO={yearFocusISO}
+              setYearFocusISO={setYearFocusISO}
+              yearHoverISO={yearHoverISO}
+              setYearHoverISO={setYearHoverISO}
+              onYearRangePick={handlePickYear}
+              onClearYearRange={handleClearYearRange}
             />
           )}
         </PortalOverlay>

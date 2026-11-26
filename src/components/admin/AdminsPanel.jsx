@@ -649,7 +649,7 @@ export default function AdminsPanel() {
 
       {/* ---------- Requests modal ---------- */}
       {showRequests && (
-        <ModalShell onClose={() => setShowRequests(false)} maxWidth="max-w-3xl" labelledBy="requests-title">
+        <ModalShell onClose={() => setShowRequests(false)} maxWidth="max-w-5xl" labelledBy="requests-title">
           {(requestClose) => (
             <>
           <div className="flex items-center justify-between border-b border-ink-100 px-6 py-4">
@@ -662,7 +662,7 @@ export default function AdminsPanel() {
           {requestMessage && (
             <p className="border-b border-ink-100 px-6 py-2 text-xs font-medium text-ink-600">{requestMessage}</p>
           )}
-          <div className="overflow-auto p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {pendingLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -676,16 +676,24 @@ export default function AdminsPanel() {
                 <p className="mt-1 text-sm text-ink-500">New sign-ups and re-activation requests will show up here.</p>
               </div>
             ) : (
-              <div className="tbl-scroll rounded-card ring-1 ring-ink-100">
-                <table className="tbl min-w-[640px]">
+              <div className="tbl-scroll w-full max-w-full min-w-0 rounded-card ring-1 ring-ink-100">
+                <table className="tbl table-fixed min-w-[960px]">
+                  <colgroup>
+                    <col className="w-[150px]" />
+                    <col className="w-[200px]" />
+                    <col className="w-[90px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[150px]" />
+                    <col className="w-[270px]" />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>License no.</th>
-                      <th>Status</th>
-                      <th className="text-right">Actions</th>
+                      <th className="min-w-[150px]">Name</th>
+                      <th className="min-w-[200px]">Email</th>
+                      <th className="min-w-[90px]">Role</th>
+                      <th className="min-w-[100px]">License no.</th>
+                      <th className="min-w-[150px] whitespace-nowrap">Status</th>
+                      <th className="min-w-[270px] whitespace-nowrap text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="tbl-animate">
@@ -693,7 +701,7 @@ export default function AdminsPanel() {
                       const name = formatAdminFormalName(a) || '—'
                       return (
                         <tr key={a.admin_id} className="row-hover">
-                          <td className="min-w-[160px]">
+                          <td className="min-w-[150px]">
                             <div className="flex min-w-0 items-center gap-2.5">
                               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${roleTone(a.role)}`}>
                                 {initials(a)}
@@ -701,22 +709,22 @@ export default function AdminsPanel() {
                               <span className="cell-wrap font-medium text-ink-900">{name}</span>
                             </div>
                           </td>
-                          <td className="cell-clip" style={{ '--cell-max': '220px' }} title={a.email}>{a.email}</td>
-                          <td><RolePill role={a.role} /></td>
-                          <td className="cell-wrap">{a.license_no || '—'}</td>
-                          <td className="cell-wrap">
+                          <td className="cell-clip min-w-[200px]" style={{ '--cell-max': '200px' }} title={a.email}>{a.email}</td>
+                          <td className="min-w-[90px]"><RolePill role={a.role} /></td>
+                          <td className="cell-wrap min-w-[100px]">{a.license_no || '—'}</td>
+                          <td className="min-w-[150px] whitespace-nowrap">
                             {a.is_invitation ? (
-                              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
+                              <span className="inline-flex whitespace-nowrap rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
                                 {a.invitation_status || 'Awaiting signup'}
                               </span>
                             ) : (
-                              <span className="rounded-full bg-signal-amber-bg px-2 py-0.5 text-xs font-medium text-signal-amber ring-1 ring-inset ring-signal-amber-ring">
+                              <span className="inline-flex whitespace-nowrap rounded-full bg-signal-amber-bg px-2 py-0.5 text-xs font-medium text-signal-amber ring-1 ring-inset ring-signal-amber-ring">
                                 Pending approval
                               </span>
                             )}
                           </td>
-                          <td>
-                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <td className="min-w-[270px]">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
                               {isSuperAdmin && (
                                 <button
                                   onClick={() => handleResendInvite(a)}
