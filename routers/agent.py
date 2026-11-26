@@ -299,11 +299,13 @@ def _handle_get_reports(args: dict):
     try:
         from supabase_client import supabase as _supa
 
+        report_day = str(d)[:10]
         rpc = execute_with_retry(
             _supa.rpc(
                 "report_breakdown",
                 {
-                    "p_report_date": str(d)[:10],
+                    "p_date_from": report_day,
+                    "p_date_to": report_day,
                     "p_department_id": int(dept) if dept else None,
                 },
             )
@@ -382,6 +384,8 @@ def _handle_list_admins(args: dict):
                 "username": r.get("username"),
                 "first_name": r.get("first_name"),
                 "last_name": r.get("last_name"),
+                "middle_initial": r.get("middle_initial"),
+                "suffix": r.get("suffix"),
                 "role": r.get("role"),
                 "is_active": r.get("is_active"),
                 "status": _status(

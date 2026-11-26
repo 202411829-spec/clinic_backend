@@ -1,0 +1,37 @@
+- generic [ref=e155]:
+  - generic [ref=e156]:
+    - img "Gordon College seal" [ref=e157]
+    - heading "GORDON COLLEGE" [level=1] [ref=e158]
+    - paragraph [ref=e159]: Clinic Appointment System
+  - generic [ref=e162]:
+    - paragraph [ref=e163]: Admin Portal
+    - heading "Welcome" [level=1] [ref=e164]
+    - paragraph [ref=e165]: Book, reschedule, or check the status of your clinic appointments.
+    - generic [ref=e166]:
+      - generic [ref=e167]:
+        - generic [ref=e168]: Username
+        - generic [ref=e169]:
+          - textbox "Username Username" [ref=e170]:
+            - /placeholder: Username
+          - generic: "@gordoncollege.edu.ph"
+      - generic [ref=e171]:
+        - generic [ref=e172]: Password
+        - generic [ref=e173]:
+          - textbox "Password Password" [ref=e174]:
+            - /placeholder: Your password
+          - button "Show password" [ref=e175] [cursor=pointer]
+        - generic [ref=e179]:
+          - generic [ref=e180] [cursor=pointer]:
+            - checkbox "Remember me Remember me" [ref=e182]
+            - text: Remember me
+          - link "Forgot password?" [ref=e183] [cursor=pointer]:
+            - /url: /admin/forgot-password
+      - button "Login" [ref=e184] [cursor=pointer]
+      - generic [ref=e185]:
+        - generic [ref=e186]: or continue with
+        - button "Continue with Google (Coming soon)" [disabled] [ref=e190]
+      - paragraph [ref=e196]: By clicking the login button, you recognize the authority of Gordon College to process your personal and sensitive information, pursuant to the Gordon College Privacy Notice and Applicable laws
+    - paragraph [ref=e197]:
+      - text: Request admin access?
+      - link "Sign up" [ref=e198] [cursor=pointer]:
+        - /url: /admin/signup

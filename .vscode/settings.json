@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "**/.env": true,
+    "**/.env.local": true,
+    "**/.env.frontend": true,
+    "**/*token*.txt": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/dev-dist": true
+  }
+}

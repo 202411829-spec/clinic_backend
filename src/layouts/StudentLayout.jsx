@@ -8,11 +8,12 @@ import StudentMobileMenuHandle from "../components/navigation/StudentMobileMenuH
 import { useAuth } from "../context/AuthContext.jsx";
 import { useProfileCompleteness } from "../context/ProfileCompletenessContext.jsx";
 import { masterlistApi } from "../lib/api.js";
+import { formatStudentNaturalName } from "../lib/format.js";
 import { ContentLoader } from "../components/ui/PageLoader.jsx";
 
-// The one student page that is always reachable — the rest (Dashboard / Book
-// / Feedback) stay locked behind the complete-your-record gate below.
-const RECORD_PATH = "/student/profile";
+// The one student page an incomplete record may reach — the existing edit
+// form is exposed here as a dedicated onboarding route.
+const EDIT_PATH = "/student/profile/edit";
 
 // Lightweight loader shown in the main pane while profile completeness is
 // being determined, so the gate never flash-redirects blind before it knows.
@@ -74,9 +75,12 @@ export default function StudentLayout() {
       .getStudent(studentId)
       .then((profile) => {
         if (cancelled || !profile) return;
-        const middle = profile.middle_initial ? ` ${profile.middle_initial}.` : "";
         setCurrentUser({
-          name: `${profile.first_name ?? ""}${middle} ${profile.last_name ?? ""}`.trim(),
+          name: formatStudentNaturalName(
+            profile.first_name,
+            profile.middle_initial,
+            profile.last_name
+          ),
           role: buildRoleLabel(profile),
         });
       })
@@ -92,11 +96,11 @@ export default function StudentLayout() {
   }, [studentId]);
 
   // HARD GATE: while the record is incomplete the student may only reach the
-  // Record page. Rendering <Navigate> here swaps the whole route (sidebar and
-  // the child page) so Dashboard/Book/Feedback never even flash. The Record
-  // page is exempted below so it is always reachable.
-  if (!checking && status === "incomplete" && location.pathname !== RECORD_PATH) {
-    return <Navigate to={RECORD_PATH} replace />;
+  // onboarding edit page. Rendering <Navigate> here swaps the whole route
+  // (sidebar and the child page) so Dashboard/Book/Record/Feedback never even
+  // flash. The edit page is exempted below so it is always reachable.
+  if (!checking && status === "incomplete" && location.pathname !== EDIT_PATH) {
+    return <Navigate to={EDIT_PATH} replace />;
   }
 
   return (

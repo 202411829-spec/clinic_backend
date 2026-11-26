@@ -153,10 +153,15 @@ CREATE TABLE "courses" (
 
 -- Canned appointment reasons (was legacy "reason"). Only description + is_active
 -- remain; the ambiguous legacy "status" and "remarks" columns are dropped (Decision H).
+-- uses_dedicated_schedule (added 2026-11-26): TRUE = the reason books against its
+-- OWN clinic_schedules rows (see clinic_schedules.reason_id) instead of the legacy
+-- date-wide general schedule. Default FALSE keeps Consultation / Medical Certificate
+-- on the general schedule.
 CREATE TABLE "appointment_reasons" (
   "reason_id"    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "description"  text NOT NULL UNIQUE,
   "is_active"    boolean NOT NULL DEFAULT TRUE,
+  "uses_dedicated_schedule" boolean NOT NULL DEFAULT FALSE,
   "created_at"   timestamptz NOT NULL DEFAULT now(),
   "updated_at"   timestamptz NOT NULL DEFAULT now()
 );
@@ -180,6 +185,7 @@ CREATE TABLE "students" (
   "student_id"       character varying(32) PRIMARY KEY,   -- school id, e.g. '202411829'
   "first_name"       character varying(200) NOT NULL,
   "middle_initial"   character varying(10),
+  "suffix"           character varying(20),
   "last_name"        character varying(200) NOT NULL,
   "department_id"    bigint REFERENCES "departments"("department_id")
                      ON UPDATE CASCADE ON DELETE SET NULL,
@@ -192,10 +198,17 @@ CREATE TABLE "students" (
   "email"            character varying(320),               -- school email
   "civil_status"     character varying(40),                -- 'Single' | 'Married'
   "present_address"  text,
+  "address_region_code"      character varying(32),
+  "address_province_code"    character varying(32),
+  "address_city_code"        character varying(32),
+  "address_barangay_code"    character varying(32),
+  "address_street"           text,
+  "address_house_number"     text,
   "photo"            text,                                  -- optional 1x1 photo (data URL)
   "is_active"        boolean NOT NULL DEFAULT TRUE,
   "created_at"       timestamptz NOT NULL DEFAULT now(),
   "updated_at"       timestamptz NOT NULL DEFAULT now(),
+  "data_privacy_consented_at" timestamptz,
   CONSTRAINT "chk_students_year_level" CHECK ("year_level" BETWEEN 1 AND 4)
 );
 
@@ -204,9 +217,20 @@ CREATE TABLE "emergency_contacts" (
   "student_id"       character varying(32) NOT NULL REFERENCES "students"("student_id")
                      ON UPDATE CASCADE ON DELETE CASCADE,
   "contact_name"     character varying(200) NOT NULL,
+  "first_name"       character varying(200),
+  "middle_initial"   character varying(10),
+  "last_name"        character varying(200),
+  "suffix"           character varying(20),
   "relationship"     character varying(100),
   "phone_number"     character varying(40),
   "present_address"  text,
+  "address_region_code"      character varying(32),
+  "address_province_code"    character varying(32),
+  "address_city_code"        character varying(32),
+  "address_barangay_code"    character varying(32),
+  "address_street"           text,
+  "address_house_number"     text,
+  "same_as_student_address" boolean NOT NULL DEFAULT FALSE,
   "created_at"       timestamptz NOT NULL DEFAULT now(),
   "updated_at"       timestamptz NOT NULL DEFAULT now()
 );
@@ -244,17 +268,27 @@ CREATE TABLE "medical_histories" (
 );
 
 -- Clinic staff / admin accounts (was legacy "admin"). "firstname" renamed to first_name.
+-- role is an access tier: 'admin' (default) or 'super_admin' (can invite
+-- admins and change roles); see migrations/2026-11-25_admin_access_roles.sql.
 CREATE TABLE "admin_accounts" (
   "admin_id"     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "username"     character varying(100) NOT NULL UNIQUE,
   "first_name"   character varying(200) NOT NULL,
   "last_name"    character varying(200) NOT NULL,
+  "middle_initial" character varying(10),
+  "suffix"       character varying(20),
   "email"        character varying(320) NOT NULL UNIQUE,
   "role"         character varying(50) NOT NULL DEFAULT 'admin',
   "license_no"   character varying(100),
   "is_active"    boolean NOT NULL DEFAULT TRUE,
+  "invite_email_sent_at" timestamptz,
+  "invitation_token" character varying(100),
   "created_at"   timestamptz NOT NULL DEFAULT now(),
-  "updated_at"   timestamptz NOT NULL DEFAULT now()
+  "updated_at"   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT "admin_accounts_role_check"
+    CHECK ("role" IN ('admin', 'super_admin')),
+  CONSTRAINT "admin_accounts_invitation_token_key"
+    UNIQUE ("invitation_token")
 );
 
 -- THE single auth/identity linkage table (Decision A): maps an authenticated Supabase
@@ -297,6 +331,9 @@ CREATE TABLE "clinic_appointment_settings" (
 );
 
 -- Per-date clinic schedule override (was clinic_schedule). "reason" -> closure_reason.
+-- reason_id (added 2026-11-26): NULL = the legacy GENERAL schedule for that date
+-- (existing rows); a value = schedules belonging to that dedicated reason only
+-- (e.g. Dental Service). See migrations/2026-11-26_dental_service_schedule.sql.
 CREATE TABLE "clinic_schedules" (
   "schedule_id"     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "working_date"    date NOT NULL,
@@ -306,9 +343,16 @@ CREATE TABLE "clinic_schedules" (
   "break_end"       time,
   "is_enabled"      boolean NOT NULL DEFAULT TRUE,
   "closure_reason"  text,
+  "reason_id"       bigint REFERENCES "appointment_reasons"("reason_id")
+                    ON UPDATE CASCADE ON DELETE SET NULL,
   "created_at"      timestamptz NOT NULL DEFAULT now(),
   "updated_at"      timestamptz NOT NULL DEFAULT now()
 );
+
+-- Reason-scoped schedule lookups ((working_date, reason_id)) — mirrors the
+-- additive index created by migrations/2026-11-26_dental_service_schedule.sql.
+CREATE INDEX "idx_clinic_schedules_working_date_reason_id"
+  ON "clinic_schedules" ("working_date", "reason_id");
 
 -- Materialized slot instances for a given day (was time_slot).
 CREATE TABLE "time_slots" (
@@ -550,7 +594,15 @@ SELECT
   s."contact_number",
   s."email",
   s."civil_status",
-  s."present_address"
+  s."present_address",
+  s."data_privacy_consented_at",
+  s."suffix",
+  s."address_region_code",
+  s."address_province_code",
+  s."address_city_code",
+  s."address_barangay_code",
+  s."address_street",
+  s."address_house_number"
 FROM "students" s
 LEFT JOIN "departments" d ON d."department_id" = s."department_id"
 LEFT JOIN "courses" c ON c."course_id" = s."course_id";

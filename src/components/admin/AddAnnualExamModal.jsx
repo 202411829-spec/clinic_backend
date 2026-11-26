@@ -3,9 +3,10 @@
 // a portal to <body> (same pattern as src/components/LogoutMenu.jsx). The
 // year label is derived automatically (one past the highest known year); the
 // school year is prefilled from the previous year and editable.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import { useSelfClosingPresence, useTriggerOrigin } from "../../lib/gcMotion";
 
 const SCHOOL_YEAR_RE = /^\d{4}\s*-\s*(\d{4}|\d{2})$/;
 
@@ -18,10 +19,14 @@ export default function AddAnnualExamModal({
   const [schoolYear, setSchoolYear] = useState(initialSchoolYear ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const panelRef = useRef(null);
+  const { mounted, visible, requestClose } = useSelfClosingPresence(onClose);
+  const origin = useTriggerOrigin({ enabled: mounted, panelRef });
 
   useEffect(() => {
+    if (!mounted) return undefined;
     function handleEscape(e) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") requestClose();
     }
     document.addEventListener("keydown", handleEscape);
     document.body.style.overflow = "hidden";
@@ -29,7 +34,7 @@ export default function AddAnnualExamModal({
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [mounted, requestClose]);
 
   const schoolYearValid = SCHOOL_YEAR_RE.test(String(schoolYear).trim());
 
@@ -39,6 +44,7 @@ export default function AddAnnualExamModal({
     setError(null);
     try {
       await onSubmit(nextYearLabel, String(schoolYear).trim());
+      requestClose();
     } catch (e) {
       setError(e?.message || "Failed to add annual examination");
     } finally {
@@ -46,18 +52,26 @@ export default function AddAnnualExamModal({
     }
   }
 
+  if (!mounted) return null;
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-[fadeIn_0.15s_ease-out]"
+      className={`gc-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 ${
+        visible ? "is-open" : "is-close"
+      }`}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Add annual examination"
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-[popIn_0.15s_ease-out]"
+        style={origin.style}
+        className={`gc-modal-panel w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ${
+          visible ? "is-open" : "is-close"
+        } ${origin.className}`}
       >
         <h2 className="text-lg font-bold text-gray-900">Add Annual Examination</h2>
         <p className="mt-1 text-sm leading-relaxed text-gray-500">
@@ -109,7 +123,7 @@ export default function AddAnnualExamModal({
         <div className="mt-6 flex gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
           >
             Cancel
@@ -123,14 +137,6 @@ export default function AddAnnualExamModal({
             {submitting ? "Adding…" : "Add"}
           </button>
         </div>
-
-        <style>{`
-          @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-          @keyframes popIn {
-            from { opacity: 0; transform: scale(0.95) translateY(4px) }
-            to { opacity: 1; transform: scale(1) translateY(0) }
-          }
-        `}</style>
       </div>
     </div>,
     document.body

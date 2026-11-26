@@ -2,19 +2,36 @@
 // Shared "Add Walk-in Visit" form used by both the dashboard Logbook
 // widget (LogbookPanel) and the standalone Logbook page (LogbookFullPanel).
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import { isMedicalCertificateReason } from "../../lib/walkInForm.js";
 
 export default function WalkInVisitForm({
   regId, setRegId,
-  walkInName, setWalkInName,
-  walkInReasonId, setWalkInReasonId,
+  reasonId, reasonRecords = [], handleReasonChange,
+  lastName, setLastName,
+  firstName, setFirstName,
+  middleInitial, setMiddleInitial,
+  suffix, setSuffix,
   complaint, setComplaint,
   medicineInput, setMedicineInput,
   quantity, setQuantity,
   medTags, walkInError, setWalkInError,
   isSubmitting,
   handleAddMedicine, handleAddWalkIn, handleClose,
-  reasonRecords,
 }) {
+  const clearError = () => {
+    if (walkInError) setWalkInError(null);
+  };
+
+  // Medical Certificate visits are administrative only. This is computed on
+  // every render, so changing Reason immediately enables/disables the fields.
+  const clinicalFieldsDisabled = isMedicalCertificateReason(reasonId, reasonRecords);
+
+  const inputClass =
+    "mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent";
+  const disabledClass = clinicalFieldsDisabled
+    ? " disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+    : "";
+
   return (
     <div className="mt-4 pt-4 border-t-2 border-gray-300 print:hidden animate-fade-in-up motion-reduce:animate-none">
       <div className="flex items-center justify-between mb-3">
@@ -32,7 +49,6 @@ export default function WalkInVisitForm({
         <p className="mb-3 text-sm font-semibold text-red-600 animate-fade-in-up">{walkInError}</p>
       )}
 
-      {/* Row 1: the four short text/select fields, evenly spaced. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <label className="text-xs font-semibold text-gray-500">
@@ -40,26 +56,68 @@ export default function WalkInVisitForm({
           </label>
           <input
             value={regId}
-            onChange={(e) => { setRegId(e.target.value); if (walkInError) setWalkInError(null); }}
+            onChange={(e) => { setRegId(e.target.value); clearError(); }}
             placeholder="Student ID"
-            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+            className={inputClass}
           />
         </div>
         <div>
-          <label className="text-xs font-semibold text-gray-500">Patient Name</label>
+          <label className="text-xs font-semibold text-gray-500" aria-required="true">
+            Last Name <span className="text-red-500">*</span>
+          </label>
           <input
-            value={walkInName}
-            onChange={(e) => { setWalkInName(e.target.value); if (walkInError) setWalkInError(null); }}
-            placeholder="Full name (required if not registered)"
-            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+            value={lastName}
+            onChange={(e) => { setLastName(e.target.value); clearError(); }}
+            placeholder="Last Name"
+            aria-required="true"
+            className={inputClass}
           />
         </div>
         <div>
-          <label className="text-xs font-semibold text-gray-500">Reason</label>
+          <label className="text-xs font-semibold text-gray-500" aria-required="true">
+            First Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            value={firstName}
+            onChange={(e) => { setFirstName(e.target.value); clearError(); }}
+            placeholder="First Name"
+            aria-required="true"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500">Middle Initial</label>
+          <input
+            value={middleInitial}
+            onChange={(e) => { setMiddleInitial(e.target.value); clearError(); }}
+            placeholder="Middle Initial"
+            maxLength={1}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-gray-500">Suffix</label>
+          <input
+            value={suffix}
+            onChange={(e) => { setSuffix(e.target.value); clearError(); }}
+            placeholder="Suffix"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500" aria-required="true">
+            Reason <span className="text-red-500">*</span>
+          </label>
           <UniversalDropdown
-            value={walkInReasonId}
-            onChange={setWalkInReasonId}
-            options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
+            value={reasonId}
+            onChange={handleReasonChange}
+            options={reasonRecords.map((r) => ({
+              value: String(r.reason_id),
+              label: r.description,
+            }))}
             placeholder="Select Reason"
             className="mt-1"
           />
@@ -69,30 +127,25 @@ export default function WalkInVisitForm({
           <input
             value={complaint}
             onChange={(e) => setComplaint(e.target.value)}
+            disabled={clinicalFieldsDisabled}
             placeholder="E.g. Headache"
-            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+            className={inputClass + disabledClass}
           />
         </div>
-      </div>
-
-      {/* Row 2: Medicine + Quantity now sit in the same column positions
-          as ID and Patient Name in row 1 above (col 1 and col 2 of the
-          same 4-column grid), so their boxes line up edge-to-edge with
-          those two fields instead of using a different width split. */}
-      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
           <label className="text-xs font-semibold text-gray-500">Medicine</label>
           <input
             value={medicineInput}
             onChange={(e) => setMedicineInput(e.target.value)}
+            disabled={clinicalFieldsDisabled}
             placeholder="E.g. Paracetamol"
-            className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+            className={inputClass + disabledClass}
           />
           {medTags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {medTags.map((tag, i) => (
                 <span
-                  key={i}
+                  key={`${tag.name}-${tag.quantity}-${i}`}
                   className="text-xs font-medium bg-gc-accent/10 text-gc-accent px-3 py-1.5 rounded-full animate-pop-in"
                 >
                   {tag.name} x{tag.quantity}
@@ -101,19 +154,28 @@ export default function WalkInVisitForm({
             </div>
           )}
         </div>
-        <div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="lg:col-start-4">
           <label className="text-xs font-semibold text-gray-500">Quantity</label>
           <div className="mt-1 flex gap-1.5">
             <input
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
+              disabled={clinicalFieldsDisabled}
               type="number"
-              min="0"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent"
+              min="1"
+              placeholder="1"
+              className={
+                "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-gc-accent" +
+                disabledClass
+              }
             />
             <button
               onClick={handleAddMedicine}
-              className="btn-press shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap"
+              disabled={clinicalFieldsDisabled || isSubmitting}
+              className="btn-press shrink-0 text-xs font-semibold bg-gc-accent text-white px-3 py-2 rounded-lg hover:opacity-90 whitespace-nowrap disabled:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-70"
             >
               + Add
             </button>

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
 import './assets/styles/index.css'
+import './assets/styles/gc-rfb-ui.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

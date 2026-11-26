@@ -3,10 +3,36 @@
 // render (the same shape src/data/masterlistSample.js used as a placeholder).
 
 import { yearIndexFromLabel } from "./yearLabel.js";
+import { formatMiddleInitial } from "./format.js";
 
 function joinName(profile = {}) {
-  const middle = profile.middle_initial ? ` ${profile.middle_initial}.` : "";
+  const middleInitial = formatMiddleInitial(profile.middle_initial);
+  const middle = middleInitial ? ` ${middleInitial}` : "";
   return `${profile.last_name ?? ""}, ${profile.first_name ?? ""}${middle}`.trim();
+}
+
+function adaptEmergencyContact(ec = {}) {
+  const hasStructuredName = ["first_name", "middle_initial", "last_name", "suffix"]
+    .some((key) => String(ec[key] ?? "").trim() !== "");
+  const name = ec.contact_name ?? ec.name ?? "-";
+  return {
+    name,
+    firstName: ec.first_name ?? "",
+    middleName: ec.middle_initial ?? "",
+    lastName: ec.last_name ?? "",
+    suffix: ec.suffix ?? "",
+    legacyName: hasStructuredName ? "" : (name === "-" ? "" : name),
+    relationship: ec.relationship ?? "-",
+    contactNumber: ec.contact_number ?? ec.phone ?? "-",
+    presentAddress: ec.present_address ?? "-",
+    legacyAddress: ec.present_address ?? "",
+    addressRegion: ec.address_region_code ?? "",
+    addressProvince: ec.address_province_code ?? "",
+    addressCity: ec.address_city_code ?? "",
+    addressBarangay: ec.address_barangay_code ?? "",
+    addressStreet: ec.address_street ?? "",
+    addressHouseNumber: ec.address_house_number ?? "",
+  };
 }
 
 function formatDate(value) {
@@ -40,8 +66,12 @@ export function adaptStudentProfile(profile, medSummary) {
     id: profile.student_id,
     studentNumber: profile.student_id,
     name: joinName(profile),
+    middleName: profile.middle_initial ?? "",
+    suffix: profile.suffix ?? "",
     dept: profile.department_name ?? "-",
     course: profile.course_name ?? "-",
+    departmentId: profile.department_id ?? "",
+    courseId: profile.course_id ?? "",
     deptCourse: `${profile.course_name ?? "-"} / ${profile.department_name ?? "-"}`,
     yearLevel: profile.year_level ?? "-",
     sex: profile.gender ?? "-",
@@ -49,10 +79,15 @@ export function adaptStudentProfile(profile, medSummary) {
     contactNumber: profile.contact_number ?? "-",
     civilStatus: profile.civil_status ?? "-",
     presentAddress: profile.present_address ?? "-",
+    legacyAddress: profile.present_address ?? "",
+    addressRegion: profile.address_region_code ?? "",
+    addressProvince: profile.address_province_code ?? "",
+    addressCity: profile.address_city_code ?? "",
+    addressBarangay: profile.address_barangay_code ?? "",
+    addressStreet: profile.address_street ?? "",
+    addressHouseNumber: profile.address_house_number ?? "",
     emergencyContact: {
-      name: ec.contact_name ?? ec.name ?? "-",
-      relationship: ec.relationship ?? "-",
-      contactNumber: ec.contact_number ?? ec.phone ?? "-",
+      ...adaptEmergencyContact(ec),
       presentAddress: ec.present_address ?? profile.present_address ?? "-",
     },
     medicalConditions: conditions,

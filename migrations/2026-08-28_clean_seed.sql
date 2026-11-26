@@ -15,8 +15,12 @@
 --     (CAHS, CBA, CCS, CEAS, CHTM, IGS), full names.
 --   - courses: the official Gordon College program list (30 rows),
 --     majors expanded into discrete course rows per department.
---   - appointment_reasons: exactly 2 canonical reasons
---     ('Medical Certificate', 'Consultation'), is_active=TRUE.
+--   - appointment_reasons: exactly 3 canonical reasons
+--     ('Medical Certificate', 'Consultation', 'Dental Service'),
+--     is_active=TRUE. 'Dental Service' has
+--     uses_dedicated_schedule=TRUE (its own reason-scoped
+--     clinic_schedules); the other two stay on the legacy general
+--     schedule (clinic_schedules.reason_id IS NULL).
 --   - medicines: 3 legacy medicines; legacy quantity -> stock_quantity.
 --   - clinic_appointment_settings: ONE row mirroring legacy values
 --     including max_students_per_slot = 8.
@@ -104,10 +108,15 @@ JOIN (VALUES
 ) AS c("department_name", "course_name")
 ON c."department_name" = d."department_name";
 
--- 1.3 appointment_reasons (canonical, exactly 2 reasons)
-INSERT INTO "appointment_reasons" ("description", "is_active") VALUES
-  ('Medical Certificate',  TRUE),
-  ('Consultation',         TRUE);
+-- 1.3 appointment_reasons (canonical, exactly 3 reasons).
+--     'Dental Service' books against its own reason-scoped
+--     clinic_schedules rows (uses_dedicated_schedule=TRUE); no
+--     default schedule/time_slots rows are seeded for it.
+INSERT INTO "appointment_reasons"
+  ("description", "is_active", "uses_dedicated_schedule") VALUES
+  ('Medical Certificate',  TRUE, FALSE),
+  ('Consultation',         TRUE, FALSE),
+  ('Dental Service',       TRUE, TRUE);
 
 -- 1.4 medicines (legacy `medicines`, 3 preserved rows;
 --     legacy quantity -> stock_quantity)
@@ -128,12 +137,15 @@ VALUES
 -- ---------------------------------------------------------------------------
 
 -- 2.1 admin_accounts (legacy `admin`, 3 preserved rows; email carried
---     over EXACTLY from the legacy table)
+--     over EXACTLY from the legacy table). Access roles follow the
+--     admin/super_admin model: admin001 is linked (via app_accounts) to
+--     admin@gordoncollege.edu.ph, so it seeds as super_admin; the other
+--     rows are plain admins.
 INSERT INTO "admin_accounts"
   ("username", "first_name", "last_name", "email", "role", "license_no")
 VALUES
-  ('admin001',  'Mark',          'Alfonso',   'admin@gccas.com',                'admin', NULL),
-  ('nurse001',  'Joseph Daniel', 'B. Ramos',  'nurse001@gordoncollege.edu.ph',  'nurse', 'PRC-1234567'),
+  ('admin001',  'Mark',          'Alfonso',   'admin@gccas.com',                'super_admin', NULL),
+  ('nurse001',  'Joseph Daniel', 'B. Ramos',  'nurse001@gordoncollege.edu.ph',  'admin', 'PRC-1234567'),
   ('admintest', 'Test',          'Admin',     'admintest@gordoncollege.edu.ph', 'admin', NULL);
 
 -- 2.2 students
@@ -170,6 +182,8 @@ INSERT INTO "students" (
 
 -- 3.1 clinic_schedules: a few enabled days mirroring legacy
 --     clinic_schedule entries + one disabled day (closure example).
+--     These are all LEGACY GENERAL schedules (reason_id left NULL);
+--     no Dental Service / reason-scoped schedule rows are seeded.
 INSERT INTO "clinic_schedules" (
   "working_date", "work_start", "work_end",
   "break_start", "break_end", "is_enabled", "closure_reason"

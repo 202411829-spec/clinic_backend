@@ -1,0 +1,17 @@
+- generic [ref=e49]:
+  - generic [ref=e50]:
+    - img "Gordon College seal" [ref=e51]
+    - heading "GORDON COLLEGE" [level=1] [ref=e52]
+    - paragraph [ref=e53]: Clinic Appointment System
+  - generic [ref=e56]:
+    - paragraph [ref=e57]: Admin Portal
+    - heading "Admin Sign Up" [level=1] [ref=e58]
+    - paragraph [ref=e59]: Create a request — an existing admin will review it.
+    - generic [ref=e150]:
+      - heading "Request submitted" [level=2] [ref=e151]
+      - paragraph [ref=e152]: Admin request submitted successfully. Your request is pending approval from an existing administrator.
+      - button "Back to Login" [ref=e153] [cursor=pointer]
+    - paragraph [ref=e77]:
+      - text: Already have an account?
+      - link "Log in" [ref=e78] [cursor=pointer]:
+        - /url: /admin/login

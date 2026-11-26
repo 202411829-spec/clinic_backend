@@ -117,7 +117,7 @@ def test_deactivate_self_blocked():
         # Mock admin lookup returns self admin
         def side_effect(q):
             m = MagicMock()
-            m.data = [{"admin_id": "admin-123", "email": "me@gordoncollege.edu.ph", "role": "nurse", "is_active": True}]
+            m.data = [{"admin_id": "admin-123", "email": "me@gordoncollege.edu.ph", "role": "admin", "is_active": True}]
             m.count = 1
             return m
         mock_exec.side_effect = side_effect

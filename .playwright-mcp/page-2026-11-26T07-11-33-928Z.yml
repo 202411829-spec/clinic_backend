@@ -1,0 +1,19 @@
+- generic [active] [ref=f27e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - main [ref=f27e3]:
+    - generic [ref=f27e6]:
+      - generic [ref=f27e7]:
+        - generic [ref=f27e8]:
+          - button "Open sidebar" [ref=f27e10] [cursor=pointer]
+          - status "Loading projects" [ref=f27e16]
+        - navigation "Breadcrumb" [ref=f27e19]:
+          - generic [ref=f27e20]: Domains
+      - generic [ref=f27e34]:
+        - generic [ref=f27e35]:
+          - button "Filter domains" [ref=f27e36] [cursor=pointer]
+          - searchbox "Search" [ref=f27e42]
+        - generic [ref=f27e46]:
+          - button "Add Existing" [ref=f27e47] [cursor=pointer]
+          - button "Buy" [disabled] [ref=f27e49]
+  - alert [ref=f27e94]

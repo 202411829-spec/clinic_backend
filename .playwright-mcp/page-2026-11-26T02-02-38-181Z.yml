@@ -1,0 +1,51 @@
+- generic [ref=f33e11]:
+  - generic [ref=f33e12]:
+    - img "Gordon College seal" [ref=f33e13]
+    - heading "GORDON COLLEGE" [level=1] [ref=f33e14]
+    - paragraph [ref=f33e15]: Clinic Appointment System
+  - generic [ref=f33e18]:
+    - paragraph [ref=f33e19]: Admin Portal
+    - heading "Reset your password" [level=1] [ref=f33e20]
+    - paragraph [ref=f33e21]: We'll send a code to your Gordon College email to verify it's you.
+    - generic [ref=f33e22]:
+      - list [ref=f33e23]:
+        - listitem [ref=f33e24]:
+          - generic [ref=f33e25]: "1"
+          - generic [ref=f33e26]: Email
+        - listitem [ref=f33e28]:
+          - generic [ref=f33e29]: "2"
+          - generic [ref=f33e30]: Verify
+        - listitem [ref=f33e32]:
+          - generic [ref=f33e33]: "3"
+          - generic [ref=f33e34]: Password
+      - generic [ref=f33e35]:
+        - generic [ref=f33e52]:
+          - generic [ref=f33e53]: New password
+          - generic [ref=f33e54]:
+            - textbox "New password" [ref=f33e55]:
+              - /placeholder: 12+ characters
+            - button "Show password" [ref=f33e56] [cursor=pointer]
+          - generic [ref=f33e60]:
+            - status [ref=f33e66]: "Password strength: Enter a password"
+            - list [ref=f33e67]:
+              - listitem [ref=f33e68]:
+                - generic [ref=f33e70]: At least 12 characters
+              - listitem [ref=f33e71]:
+                - generic [ref=f33e73]: Uppercase letter
+              - listitem [ref=f33e74]:
+                - generic [ref=f33e76]: Number
+              - listitem [ref=f33e77]:
+                - generic [ref=f33e79]: Symbol
+        - generic [ref=f33e80]:
+          - generic [ref=f33e81]: Confirm new password
+          - generic [ref=f33e82]:
+            - textbox "Confirm new password" [ref=f33e83]:
+              - /placeholder: Re-enter your password
+            - button "Show password" [ref=f33e84] [cursor=pointer]
+      - paragraph [ref=f33e49]: If an account exists, a 6-digit code is on its way to tester.request@gordoncollege.edu.ph.
+      - button "Reset password" [active] [ref=f33e88] [cursor=pointer]
+      - button "Back" [ref=f33e51] [cursor=pointer]
+      - paragraph [ref=f33e40]:
+        - text: Remembered it?
+        - link "Log in" [ref=f33e41] [cursor=pointer]:
+          - /url: /admin/login

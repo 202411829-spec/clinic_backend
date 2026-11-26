@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon";
 import AddAnnualExamModal from "./AddAnnualExamModal";
+import RecordDatePicker from "./RecordDatePicker.jsx";
 import {
   academicYears,
   resultOptions,
@@ -19,6 +20,8 @@ import { saveCertificateDefaults } from "../../lib/certificateSync";
 import { recordsApi } from "../../lib/api";
 import { yearIndexFromLabel, formatYearLabel } from "../../lib/yearLabel";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import PortalOverlay from "../ui/PortalOverlay.jsx";
+import AnimatedCheckbox from "../ui/AnimatedCheckbox.jsx";
 import { formatDisplayName, computeBmi } from "../../lib/format.js";
 
 // TODO: replace with the logged-in nurse/admin from your Supabase session
@@ -87,7 +90,21 @@ function initials(name = "") {
 
 const STATUS_STYLES = {
   Cleared: "bg-green-100 text-green-700",
+  Pending: "bg-amber-100 text-amber-700",
   "No Record": "bg-gray-100 text-gray-500",
+};
+
+const EXAM_STATUS_LABELS = {
+  no_record: "No Record",
+  pending: "Pending",
+  cleared: "Cleared",
+};
+const EXAM_STATUS_OPTIONS = Object.entries(EXAM_STATUS_LABELS).map(([value, label]) => ({ value, label }));
+const EXAM_STATUS_VALUES = Object.keys(EXAM_STATUS_LABELS);
+const LEGACY_STATUS_VALUES = {
+  "No Record": "no_record",
+  Pending: "pending",
+  Cleared: "cleared",
 };
 
 const RESULT_STYLES = {
@@ -113,14 +130,14 @@ function TextInput({ label, ...props }) {
   );
 }
 
-function DateInput({ label, ...props }) {
+function DateInput({ label, value, onChange }) {
   return (
     <div>
       {label && <FieldLabel>{label}</FieldLabel>}
-      <input
-        type="date"
-        {...props}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:border-gc-accent focus:ring-2 focus:ring-gc-accent/20"
+      <RecordDatePicker
+        value={value}
+        onChange={(nextValue) => onChange?.(nextValue)}
+        label={label || "date"}
       />
     </div>
   );
@@ -159,7 +176,7 @@ function LabOtherDynamicFields({ examType, details, onChange }) {
           <SelectInput
             key={f.key}
             label={f.label}
-            placeholder="Select"
+            placeholder="Choose an option"
             options={f.options}
             value={details?.[f.key] ?? ""}
             onChange={(v) => onChange({ [f.key]: v })}
@@ -238,20 +255,12 @@ function SaveButton({ children, onClick, saved, saving, disabled }) {
 
 function HistoryActionMenu({ year, disabled, onSelectYear }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  const buttonRef = useRef(null);
 
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className="relative inline-block">
       <button
+        ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
         aria-label={`Actions for ${year.label}`}
         aria-haspopup="menu"
@@ -262,9 +271,17 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
       </button>
 
       {open && (
-        <div
+        <PortalOverlay
+          triggerRef={buttonRef}
+          enabled={open}
+          align="right"
+          preferredWidth={160}
+          estimatedHeight={80}
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-300 bg-white py-1.5 shadow-lg origin-top-right animate-pop-in motion-reduce:animate-none"
+          ariaLabel={`Actions for ${year.label}`}
+          className="overflow-hidden rounded-xl border border-gray-300 bg-white py-1.5 shadow-lg"
+          onOutside={() => setOpen(false)}
+          onEscape={() => setOpen(false)}
         >
           <button
             role="menuitem"
@@ -276,7 +293,7 @@ function HistoryActionMenu({ year, disabled, onSelectYear }) {
           >
             {disabled ? "Add Record" : "View / Edit Record"}
           </button>
-        </div>
+        </PortalOverlay>
       )}
     </div>
   );
@@ -338,6 +355,7 @@ function buildDiagnosisPayload(rec) {
     final_remark: rec.finalRemark || null,
     essentially_normal: !!rec.diagnosisNormalFindingsChecked,
     examined_by: rec.diagnosisExaminedBy || currentExaminer,
+    license_no: rec.diagnosisLicenseNo || null,
   };
 }
 
@@ -352,14 +370,24 @@ export default function StudentRecordPanel({ student }) {
   const [savingSection, setSavingSection] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [annualExamIds, setAnnualExamIds] = useState({});
+  const [examStatuses, setExamStatuses] = useState({});
+  const [statusSavingYear, setStatusSavingYear] = useState(null);
   const [hydrated, setHydrated] = useState({});
   const [addModalOpen, setAddModalOpen] = useState(false);
   const physicalExamRef = useRef(null);
 
-  const history = useMemo(
-    () => getHistorySummary(records, `${currentExaminer} (Nurse)`),
-    [records]
-  );
+  const history = useMemo(() => {
+    const baseRows = getHistorySummary(records, `${currentExaminer} (Nurse)`);
+    return baseRows.map((row) => {
+      const statusValue =
+        examStatuses[row.key] ?? LEGACY_STATUS_VALUES[row.status] ?? "no_record";
+      return {
+        ...row,
+        statusValue,
+        status: EXAM_STATUS_LABELS[statusValue] ?? row.status,
+      };
+    });
+  }, [records, examStatuses]);
 
   const rec = records[activeYear];
   const age = computeAge(student.birthday);
@@ -386,15 +414,26 @@ export default function StudentRecordPanel({ student }) {
           // label outside the fixed Year I-IV set (e.g. "Year V") is kept.
           const nextIds = {};
           const nextYears = [];
+          const nextStatuses = {};
           const seenLabels = new Set();
           const patch = {};
           hist.forEach((row) => {
             const yrLabel = row.year_label;
             if (!yrLabel) return;
             if (row.annual_exam_id) nextIds[yrLabel] = row.annual_exam_id;
+            if (EXAM_STATUS_VALUES.includes(row.exam_status)) {
+              nextStatuses[yrLabel] = row.exam_status;
+            }
             if (!seenLabels.has(yrLabel)) {
               seenLabels.add(yrLabel);
-              nextYears.push({ key: yrLabel, label: yrLabel, schoolYear: row.school_year ?? null });
+              // Header rows for years that have not been saved yet are generated
+              // by the backend with school_year=null. Keep the form's default
+              // academic year so the annual-exam INSERT satisfies NOT NULL.
+              nextYears.push({
+                key: yrLabel,
+                label: yrLabel,
+                schoolYear: row.school_year ?? DEFAULT_YEAR_SCHOOL_YEAR[yrLabel] ?? null,
+              });
             }
             // use backend date_examined to hydrate history status even before physical fetch
             if (row.date_examined) {
@@ -407,9 +446,11 @@ export default function StudentRecordPanel({ student }) {
             if (!seenLabels.has(label)) {
               seenLabels.add(label);
               nextYears.push({ key: label, label, schoolYear: DEFAULT_YEAR_SCHOOL_YEAR[label] ?? null });
+              nextStatuses[label] = "no_record";
             }
           });
           setAnnualExamIds(nextIds);
+          setExamStatuses(nextStatuses);
           setYearsList(nextYears);
           setRecords((prev) => {
             const next = { ...prev };
@@ -440,11 +481,13 @@ export default function StudentRecordPanel({ student }) {
     let cancelled = false;
     async function hydrate() {
       try {
-        const [phys, lab, diag] = await Promise.all([
+        const [phys, diag] = await Promise.all([
           recordsApi.physicalExam(examId).catch(() => null),
-          recordsApi.labResults(examId).catch(() => null),
           recordsApi.diagnosis(examId).catch(() => null),
         ]);
+        // Lab results have a FK to the physical exam. Don't request them (and
+        // generate a harmless 409) before that physical row exists.
+        const lab = phys ? await recordsApi.labResults(examId).catch(() => null) : null;
         if (cancelled) return;
         setRecords((prev) => {
           const cur = prev[activeYear];
@@ -453,7 +496,11 @@ export default function StudentRecordPanel({ student }) {
           if (phys && typeof phys === "object" && !Array.isArray(phys) && Object.keys(phys).length) {
             next = {
               ...next,
-              dateExamined: phys.examined_at ? String(phys.examined_at).slice(0, 10) : next.dateExamined,
+              dateExamined: phys.date_examined
+                ? String(phys.date_examined).slice(0, 10)
+                : phys.examined_at
+                  ? String(phys.examined_at).slice(0, 10)
+                  : next.dateExamined,
               bp: phys.blood_pressure ?? next.bp,
               cr: phys.cardiac_rate != null ? String(phys.cardiac_rate) : next.cr,
               rr: phys.respiratory_rate != null ? String(phys.respiratory_rate) : next.rr,
@@ -481,8 +528,8 @@ export default function StudentRecordPanel({ student }) {
                 others: phys.other_findings_remarks ?? next.findingsRemarks.others,
               },
             };
-            if (phys.examined_at) {
-              next.dateExamined = String(phys.examined_at).slice(0, 10);
+            if (phys.date_examined || phys.examined_at) {
+              next.dateExamined = String(phys.date_examined || phys.examined_at).slice(0, 10);
             }
           }
 
@@ -530,8 +577,10 @@ export default function StudentRecordPanel({ student }) {
             next = {
               ...next,
               diagnosis: diag.diagnosis ?? next.diagnosis,
-              finalRemark: diag.final_remark ?? next.finalRemark,
+              finalRemark: diag.final_remark ?? diag.finalRemark ?? next.finalRemark,
               diagnosisNormalFindingsChecked: diag.is_essentially_normal ?? next.diagnosisNormalFindingsChecked,
+              diagnosisExaminedBy: diag.examined_by ?? next.diagnosisExaminedBy,
+              diagnosisLicenseNo: diag.license_no ?? next.diagnosisLicenseNo,
             };
           }
 
@@ -628,19 +677,67 @@ export default function StudentRecordPanel({ student }) {
     updateRecord({ urinalysis: { ...rec.urinalysis, ...patch } });
   }
 
+  // The header is authoritative for which annual_exam_id belongs to a year.
+  // Re-reading it avoids using a stale local ID when the user switches year
+  // before the initial header fetch finishes, and recovers from a duplicate
+  // INSERT without ever creating a second row for the same year.
+  async function resolveExistingAnnualExamId(yearLabel) {
+    const data = await recordsApi.header(student.id);
+    const row = (data?.annual_exam_history || []).find(
+      (item) => item?.year_label === yearLabel && item.annual_exam_id
+    );
+    if (!row) return null;
+    setAnnualExamIds((prev) => ({ ...prev, [yearLabel]: row.annual_exam_id }));
+    if (EXAM_STATUS_VALUES.includes(row.exam_status)) {
+      setExamStatuses((prev) => ({ ...prev, [yearLabel]: row.exam_status }));
+    }
+    if (row.school_year) {
+      setYearsList((prev) =>
+        prev.map((y) =>
+          y.key === yearLabel && !y.schoolYear ? { ...y, schoolYear: row.school_year } : y
+        )
+      );
+    }
+    return row.annual_exam_id;
+  }
+
+  function isDuplicateAnnualExamError(error) {
+    return /already exists/i.test(String(error?.message || ""));
+  }
+
   async function ensureAnnualExamId(yearLabel) {
     const existing = annualExamIds[yearLabel];
     if (existing) return existing;
+    const reconciled = await resolveExistingAnnualExamId(yearLabel).catch(() => null);
+    if (reconciled) return reconciled;
+
     const yearObj = yearsList.find((y) => y.key === yearLabel);
-    const school_year = yearObj?.schoolYear ?? null;
-    const created = await recordsApi.addAnnualExam(student.id, {
-      year_label: yearLabel,
-      school_year,
-      date_examined: records[yearLabel]?.dateExamined || null,
-    });
+    const school_year =
+      yearObj?.schoolYear ?? DEFAULT_YEAR_SCHOOL_YEAR[yearLabel] ?? null;
+    let created;
+    try {
+      created = await recordsApi.addAnnualExam(student.id, {
+        year_label: yearLabel,
+        school_year,
+        date_examined: records[yearLabel]?.dateExamined || null,
+      });
+    } catch (error) {
+      // A concurrent save may have created the row after our header read.
+      // Resolve the existing ID instead of showing a 409 or creating a duplicate.
+      if (isDuplicateAnnualExamError(error)) {
+        const recovered = await resolveExistingAnnualExamId(yearLabel).catch(() => null);
+        if (recovered) return recovered;
+      }
+      throw error;
+    }
     const newId = created?.annual_exam_id ?? created?.annualExamId ?? created?.id;
     if (!newId) throw new Error("Failed to create annual examination");
     setAnnualExamIds((prev) => ({ ...prev, [yearLabel]: newId }));
+    const createdStatus = created?.exam_status ?? "pending";
+    setExamStatuses((prev) => ({
+      ...prev,
+      [yearLabel]: EXAM_STATUS_VALUES.includes(createdStatus) ? createdStatus : "pending",
+    }));
     return newId;
   }
 
@@ -658,6 +755,7 @@ export default function StudentRecordPanel({ student }) {
       await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(records[activeYear]));
       // lab requires physical first — keep hydrated so lab fetch works next time
       setHydrated((p) => ({ ...p, [activeYear]: true }));
+      setExamStatuses((prev) => ({ ...prev, [activeYear]: "pending" }));
       // ensure header reflects new exam
       flashSaved("physical");
     } catch (e) {
@@ -672,8 +770,9 @@ export default function StudentRecordPanel({ student }) {
     setSavingSection("lab");
     try {
       const examId = await ensureAnnualExamId(activeYear);
-      // lab endpoint requires physical_examinations to exist first
-      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(records[activeYear])).catch(() => {});
+      // lab endpoint requires physical_examinations to exist first; surface any
+      // physical-save error instead of masking it behind a confusing lab 409.
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(records[activeYear]));
       await recordsApi.saveLabResults(examId, buildLabPayload(records[activeYear]));
       flashSaved("lab");
     } catch (e) {
@@ -696,17 +795,91 @@ export default function StudentRecordPanel({ student }) {
         yearLabel,
       });
       const examId = await ensureAnnualExamId(activeYear);
-      // ensure physical exists for lab/diagnosis flow — no-op if already there
-      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(cur)).catch(() => {});
+      // ensure physical exists for the certificate chain — no-op if already there
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(cur));
       await recordsApi.saveDiagnosis(examId, buildDiagnosisPayload(cur));
       // reflect cleared-ish status locally by ensuring dateExamined is set
       if (!cur.dateExamined) {
         const today = new Date().toISOString().slice(0, 10);
         setRecords((prev) => ({ ...prev, [activeYear]: { ...prev[activeYear], dateExamined: today } }));
       }
+      setExamStatuses((prev) => ({ ...prev, [activeYear]: "cleared" }));
       flashSaved("diagnosis");
     } catch (e) {
       setSaveError(e.message || "Failed to save diagnosis");
+    } finally {
+      setSavingSection(null);
+    }
+  }
+
+  async function handleStatusChange(yearLabel, nextStatusValue) {
+    if (!EXAM_STATUS_VALUES.includes(nextStatusValue)) {
+      setSaveError("Unknown examination status");
+      return;
+    }
+    const currentValue =
+      examStatuses[yearLabel] ??
+      LEGACY_STATUS_VALUES[history.find((row) => row.key === yearLabel)?.status] ??
+      "no_record";
+    if (currentValue === nextStatusValue) return;
+
+    setSaveError(null);
+    setStatusSavingYear(yearLabel);
+    try {
+      let examId = annualExamIds[yearLabel];
+      if (!examId && nextStatusValue === "no_record") {
+        setExamStatuses((prev) => ({ ...prev, [yearLabel]: "no_record" }));
+        return;
+      }
+      if (!examId) examId = await ensureAnnualExamId(yearLabel);
+
+      const updated = await recordsApi.updateAnnualExamStatus(examId, {
+        exam_status: nextStatusValue,
+      });
+      const persisted = updated?.exam_status ?? updated?.status ?? nextStatusValue;
+      setExamStatuses((prev) => ({
+        ...prev,
+        [yearLabel]: EXAM_STATUS_VALUES.includes(persisted) ? persisted : nextStatusValue,
+      }));
+    } catch (e) {
+      setSaveError(e.message || "Failed to update examination status");
+    } finally {
+      setStatusSavingYear(null);
+    }
+  }
+
+  async function handleCreateMedicalCertificate() {
+    setSaveError(null);
+    setSavingSection("certificate");
+    try {
+      const yearLabel = activeYear;
+      const cur = records[yearLabel] ?? createEmptyYearRecord();
+      saveCertificateDefaults(student.id, {
+        diagnosis: cur.diagnosis,
+        finalRemark: cur.finalRemark,
+        normalFindingsChecked: cur.diagnosisNormalFindingsChecked,
+        yearLabel,
+      });
+      const examId = await ensureAnnualExamId(yearLabel);
+      await recordsApi.savePhysicalExam(examId, buildPhysicalPayload(cur));
+      await recordsApi.saveLabResults(examId, buildLabPayload(cur));
+      await recordsApi.saveDiagnosis(examId, buildDiagnosisPayload(cur));
+      setHydrated((prev) => ({ ...prev, [yearLabel]: true }));
+      setExamStatuses((prev) => ({ ...prev, [yearLabel]: "cleared" }));
+      setRecords((prev) => {
+        if (prev[yearLabel]?.dateExamined) return prev;
+        const today = new Date().toISOString().slice(0, 10);
+        return {
+          ...prev,
+          [yearLabel]: { ...prev[yearLabel], dateExamined: today },
+        };
+      });
+      navigate(
+        `/admin/masterlist/${student.id}/medical-certificate?year=${encodeURIComponent(yearLabel)}`,
+        { state: { year: yearLabel, annualExamId: examId } }
+      );
+    } catch (e) {
+      setSaveError(e.message || "Failed to save the record before opening the medical certificate");
     } finally {
       setSavingSection(null);
     }
@@ -725,6 +898,11 @@ export default function StudentRecordPanel({ student }) {
     const newId = created?.annual_exam_id ?? created?.annualExamId ?? created?.id;
     if (!newId) throw new Error("Failed to create annual examination");
     setAnnualExamIds((prev) => ({ ...prev, [yearLabel]: newId }));
+    const createdStatus = created?.exam_status ?? "pending";
+    setExamStatuses((prev) => ({
+      ...prev,
+      [yearLabel]: EXAM_STATUS_VALUES.includes(createdStatus) ? createdStatus : "pending",
+    }));
     setYearsList((prev) =>
       prev.some((y) => y.key === yearLabel)
         ? prev
@@ -735,7 +913,6 @@ export default function StudentRecordPanel({ student }) {
       [yearLabel]: { ...createEmptyYearRecord(), schoolYear },
     }));
     setActiveYear(yearLabel);
-    setAddModalOpen(false);
     physicalExamRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -814,13 +991,24 @@ export default function StudentRecordPanel({ student }) {
                     <td className="whitespace-nowrap">{row.dateExamined}</td>
                     <td className="cell-wrap min-w-[140px]">{row.examinedBy}</td>
                     <td>
-                      <span
-                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                          STATUS_STYLES[row.status]
-                        }`}
-                      >
-                        {row.status}
-                      </span>
+                      {statusSavingYear === row.key ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 whitespace-nowrap">
+                          <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+                          Saving…
+                        </span>
+                      ) : (
+                        <UniversalDropdown
+                          value={row.statusValue}
+                          onChange={(value) => handleStatusChange(row.key, value)}
+                          options={EXAM_STATUS_OPTIONS}
+                          placeholder="Choose status"
+                          ariaLabel={`Status for ${row.label}`}
+                          className="w-32"
+                          buttonClassName={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            STATUS_STYLES[row.status] ?? ""
+                          }`}
+                        />
+                      )}
                     </td>
                     <td className="text-right">
                       <HistoryActionMenu
@@ -839,13 +1027,7 @@ export default function StudentRecordPanel({ student }) {
           </div>
         </section>
 
-        <div className="grid grid-cols-2 md:flex md:flex-col gap-2 md:w-52 shrink-0">
-          <button
-            onClick={() => navigate(`/admin/masterlist/${student.id}/medical-certificate?year=${activeYear}`, { state: { year: activeYear } })}
-            className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            Medical Certificate
-          </button>
+        <div className="md:flex md:flex-col gap-2 md:w-52 shrink-0">
           <button
             onClick={() => navigate(`/admin/masterlist/${student.id}/medical-summary`)}
             className="btn-press text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
@@ -893,7 +1075,7 @@ export default function StudentRecordPanel({ student }) {
               <DateInput
                 label="Date Examined"
                 value={rec.dateExamined}
-                onChange={(e) => updateRecord({ dateExamined: e.target.value })}
+                onChange={(date) => updateRecord({ dateExamined: date })}
               />
               <TextInput
                 label="BP (mmHg)"
@@ -1081,7 +1263,7 @@ export default function StudentRecordPanel({ student }) {
           <div>
             <GroupBar>Chest X-Ray</GroupBar>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <DateInput label="Date" value={rec.chestXray.date} onChange={(e) => updateChestXray({ date: e.target.value })} />
+              <DateInput label="Chest X-ray date" value={rec.chestXray.date} onChange={(date) => updateChestXray({ date })} />
               <div>
                 <FieldLabel>Result</FieldLabel>
                 <ResultSelect value={rec.chestXray.result} onChange={(v) => updateChestXray({ result: v })} />
@@ -1097,7 +1279,7 @@ export default function StudentRecordPanel({ student }) {
           <div>
             <GroupBar>CBC</GroupBar>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              <DateInput label="Date" value={rec.cbc.date} onChange={(e) => updateCbc({ date: e.target.value })} />
+              <DateInput label="CBC date" value={rec.cbc.date} onChange={(date) => updateCbc({ date })} />
               <TextInput
                 label="Hemoglobin (g/dL)"
                 value={rec.cbc.hemoglobin}
@@ -1116,7 +1298,7 @@ export default function StudentRecordPanel({ student }) {
               />
               <SelectInput
                 label="Blood Type"
-                placeholder="Select"
+                placeholder="Choose an option"
                 options={bloodTypeOptions}
                 value={rec.cbc.bloodType}
                 onChange={(v) => updateCbc({ bloodType: v })}
@@ -1130,18 +1312,18 @@ export default function StudentRecordPanel({ student }) {
               <DateInput
                 label="Date"
                 value={rec.urinalysis.date}
-                onChange={(e) => updateUrinalysis({ date: e.target.value })}
+                onChange={(date) => updateUrinalysis({ date })}
               />
               <SelectInput
                 label="Glucose / Sugar"
-                placeholder="Select"
+                placeholder="Choose an option"
                 options={glucoseOptions}
                 value={rec.urinalysis.glucose}
                 onChange={(v) => updateUrinalysis({ glucose: v })}
               />
               <SelectInput
                 label="Protein"
-                placeholder="Select"
+                placeholder="Choose an option"
                 options={proteinOptions}
                 value={rec.urinalysis.protein}
                 onChange={(v) => updateUrinalysis({ protein: v })}
@@ -1155,7 +1337,7 @@ export default function StudentRecordPanel({ student }) {
             <div className="max-w-xs">
               <SelectInput
                 label="Examination Type"
-                placeholder="Select"
+                placeholder="Choose an option"
                 options={labExamTypeOptions}
                 value={rec.otherLabType}
                 onChange={(v) => updateOtherLabType(v)}
@@ -1173,7 +1355,7 @@ export default function StudentRecordPanel({ student }) {
                   <div className="flex-1">
                     <SelectInput
                       label="Examination Type"
-                      placeholder="Select"
+                      placeholder="Choose an option"
                       options={labExamTypeOptions}
                       value={row.examType}
                       onChange={(v) => updateExtraLabOther(row.id, v)}
@@ -1244,17 +1426,23 @@ export default function StudentRecordPanel({ student }) {
 
         <div className="mt-4">
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
+            <AnimatedCheckbox
               checked={rec.diagnosisNormalFindingsChecked}
               onChange={(e) => updateRecord({ diagnosisNormalFindingsChecked: e.target.checked })}
-              className="w-4 h-4 rounded border-gray-300 text-gc-green focus:ring-gc-accent"
+              style={{ "--gc-cb-size": "16px" }}
             />
             Essentially normal physical findings at the time of evaluation
           </label>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-wrap justify-end gap-3">
+          <button
+            onClick={handleCreateMedicalCertificate}
+            disabled={savingSection !== null}
+            className="btn-press text-sm font-semibold border border-gc-green text-gc-green bg-white px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+          >
+            {savingSection === "certificate" ? "Saving…" : "Medical Certificate"}
+          </button>
           <SaveButton
             onClick={handleSaveDiagnosis}
             saved={savedSection === "diagnosis"}

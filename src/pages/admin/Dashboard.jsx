@@ -4,6 +4,7 @@ import LogbookPanel from "../../components/admin/LogbookPanel.jsx";
 import AppointmentsPanel from "../../components/admin/AppointmentsPanel.jsx";
 import { referenceApi } from "../../lib/api.js";
 import Reveal from "../../components/ui/Reveal.jsx";
+import { PageHeader } from "../../components/ui/primitives.jsx";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -43,17 +44,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-3 animate-fade-up">
-        <div>
-          <p className="text-2xs font-semibold uppercase tracking-[0.22em] text-brand-600">
-            {todayLabel}
-          </p>
-          <h1 className="mt-1 font-serif text-3xl font-semibold text-ink-900">
-            {greeting()}
-          </h1>
-          <p className="mt-1 text-base text-ink-500">Overview of today's clinic activity.</p>
-        </div>
-      </header>
+      <PageHeader
+        className="animate-fade-up"
+        eyebrow={todayLabel}
+        title={greeting()}
+        subtitle="Overview of today's clinic activity."
+      />
 
       <Reveal delay={0}>
         <LogbookPanel

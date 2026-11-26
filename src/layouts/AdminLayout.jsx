@@ -5,6 +5,7 @@ import TopBar from '../components/navigation/TopBar.jsx'
 import MobileSidebarOverlay from '../components/navigation/MobileSidebarOverlay.jsx'
 import MobileMenuHandle from '../components/navigation/MobileMenuHandle.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { AdminAccessProvider } from '../context/AdminAccessContext.jsx'
 import { adminsApi } from '../lib/api.js'
 import Pending from '../pages/admin/Pending.jsx'
 import AgentBubble from '../components/agent/AgentBubble.jsx'
@@ -23,6 +24,9 @@ export default function AdminLayout() {
   const { email, loading: authLoading } = useAuth()
   const [checkingPending, setCheckingPending] = useState(true)
   const [isPending, setIsPending] = useState(false)
+  // Authoritative role from the same adminsApi.me() call below — stays null
+  // (fail closed, non-super) until a record with a known role arrives.
+  const [adminRole, setAdminRole] = useState(null)
   const [agentOpen, setAgentOpen] = useState(false)
   const [agentHistory, setAgentHistory] = useState([])
   const [agentPreview, setAgentPreview] = useState(null)
@@ -84,11 +88,13 @@ export default function AdminLayout() {
 
   // After login, fetch own admin record to check is_active. Inactive admins
   // (is_active === false or status !== 'active') see the Pending page instead.
+  // The same response carries the authoritative role stored for AdminAccessProvider.
   useEffect(() => {
     if (authLoading) return
     if (!email) {
       setCheckingPending(false)
       setIsPending(false)
+      setAdminRole(null)
       return
     }
 
@@ -100,6 +106,7 @@ export default function AdminLayout() {
         const res = await adminsApi.me()
         const record = res?.admin || res
         if (!cancelled && record) {
+          setAdminRole(record.role === 'admin' || record.role === 'super_admin' ? record.role : null)
           const hasIsActive = Object.prototype.hasOwnProperty.call(record, 'is_active')
           if (hasIsActive) {
             setIsPending(record.is_active === false)
@@ -111,10 +118,14 @@ export default function AdminLayout() {
             setIsPending(false)
           }
         } else if (!cancelled) {
+          setAdminRole(null)
           setIsPending(false)
         }
       } catch {
-        if (!cancelled) setIsPending(false)
+        if (!cancelled) {
+          setAdminRole(null)
+          setIsPending(false)
+        }
       } finally {
         if (!cancelled) setCheckingPending(false)
       }
@@ -128,67 +139,69 @@ export default function AdminLayout() {
   }, [email, authLoading])
 
   return (
-    <div className="app-shell app-shell--flat flex h-screen overflow-hidden print:h-auto print:overflow-visible print:bg-white">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gc-green-700 focus:shadow-lg focus:ring-2 focus:ring-gc-green-700">Skip to content</a>
-      <Sidebar />
+    <AdminAccessProvider role={adminRole}>
+      <div className="app-shell app-shell--flat flex h-screen overflow-hidden print:h-auto print:overflow-visible print:bg-white">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gc-green-700 focus:shadow-lg focus:ring-2 focus:ring-gc-green-700">Skip to content</a>
+        <Sidebar />
 
-      {!hideMobileNav && (
-        <>
-          <MobileSidebarOverlay
-            open={mobileNavOpen}
-            onClose={() => setMobileNavOpen(false)}
-          />
-          <MobileMenuHandle onClick={() => setMobileNavOpen(true)} />
-        </>
-      )}
+        {!hideMobileNav && (
+          <>
+            <MobileSidebarOverlay
+              open={mobileNavOpen}
+              onClose={() => setMobileNavOpen(false)}
+            />
+            <MobileMenuHandle onClick={() => setMobileNavOpen(true)} />
+          </>
+        )}
 
-      <div className="app-main flex flex-1 flex-col overflow-y-auto lg:my-3 lg:mr-3 lg:rounded-shell print:m-0 print:overflow-visible print:rounded-none">
-        <TopBar />
-        <main id="main-content" tabIndex={-1} className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
-          {checkingPending ? (
-            // Only this content area shows the loading state — Sidebar and
-            // TopBar above are already mounted and visible, so switching
-            // admins/reloading never blanks out the whole screen anymore.
-            <div className="flex min-h-[60vh] items-center justify-center animate-fade-in">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-gc-green-100 border-t-gc-green-700" />
-                <p className="text-sm font-medium text-gray-500">Loading…</p>
+        <div className="app-main flex flex-1 flex-col overflow-y-auto lg:my-3 lg:mr-3 lg:rounded-shell print:m-0 print:overflow-visible print:rounded-none">
+          <TopBar />
+          <main id="main-content" tabIndex={-1} className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
+            {checkingPending ? (
+              // Only this content area shows the loading state — Sidebar and
+              // TopBar above are already mounted and visible, so switching
+              // admins/reloading never blanks out the whole screen anymore.
+              <div className="flex min-h-[60vh] items-center justify-center animate-fade-in">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-gc-green-100 border-t-gc-green-700" />
+                  <p className="text-sm font-medium text-gray-500">Loading…</p>
+                </div>
               </div>
-            </div>
-          ) : isPending ? (
-            <Pending />
-          ) : (
-            // key={pathname} forces React to remount this wrapper on every
-            // route change, which restarts the fade-in-up animation — so
-            // every admin page (Dashboard, Appointments, Logbook, etc.) gets
-            // the same subtle "settle in" transition automatically, without
-            // each page needing its own animation code. Transform/opacity
-            // only, so it stays smooth and doesn't slow navigation down.
-            <div key={location.pathname} className="animate-fade-up print:animate-none">
-              <Suspense fallback={<ContentLoader />}>
-                <Outlet />
-              </Suspense>
-            </div>
-          )}
-        </main>
+            ) : isPending ? (
+              <Pending />
+            ) : (
+              // key={pathname} forces React to remount this wrapper on every
+              // route change, which restarts the fade-in-up animation — so
+              // every admin page (Dashboard, Appointments, Logbook, etc.) gets
+              // the same subtle "settle in" transition automatically, without
+              // each page needing its own animation code. Transform/opacity
+              // only, so it stays smooth and doesn't slow navigation down.
+              <div key={location.pathname} className="animate-fade-up print:animate-none">
+                <Suspense fallback={<ContentLoader />}>
+                  <Outlet />
+                </Suspense>
+              </div>
+            )}
+          </main>
+        </div>
+        {!isPending && !checkingPending && (
+          <>
+            <AgentBubble isPending={isPending} open={agentOpen} onClick={() => setAgentOpen((v) => !v)} />
+            <AgentPanel
+              open={agentOpen}
+              onClose={() => setAgentOpen(false)}
+              onClear={handleAgentClear}
+              history={agentHistory}
+              preview={agentPreview}
+              onSend={handleAgentSend}
+              onConfirm={handleAgentConfirm}
+              onDismissPreview={handleAgentDismissPreview}
+              error={agentError}
+              loading={agentLoading}
+            />
+          </>
+        )}
       </div>
-      {!isPending && !checkingPending && (
-        <>
-          <AgentBubble isPending={isPending} open={agentOpen} onClick={() => setAgentOpen((v) => !v)} />
-          <AgentPanel
-            open={agentOpen}
-            onClose={() => setAgentOpen(false)}
-            onClear={handleAgentClear}
-            history={agentHistory}
-            preview={agentPreview}
-            onSend={handleAgentSend}
-            onConfirm={handleAgentConfirm}
-            onDismissPreview={handleAgentDismissPreview}
-            error={agentError}
-            loading={agentLoading}
-          />
-        </>
-      )}
-    </div>
+    </AdminAccessProvider>
   )
 }

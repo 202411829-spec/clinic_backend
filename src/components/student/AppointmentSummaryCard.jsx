@@ -1,5 +1,6 @@
 // src/components/student/AppointmentSummaryCard.jsx
 import { formatMDY } from "../../lib/calendar";
+import { formatTimeRange } from "../../lib/timeFormat";
 
 function SummaryRow({ label, value }) {
   return (
@@ -49,7 +50,7 @@ export default function AppointmentSummaryCard({
 
       <div className="divide-y divide-ink-100">
         <SummaryRow label="Date" value={date ? formatMDY(date) : ""} />
-        <SummaryRow label="Time" value={time} />
+        <SummaryRow label="Time" value={formatTimeRange(time)} />
         <SummaryRow label="Reason" value={reason} />
       </div>
 

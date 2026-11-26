@@ -3,9 +3,19 @@ import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 
+try:
+    from postgrest import APIError as PostgrestAPIError
+except Exception:  # pragma: no cover - import shape varies by client version
+    PostgrestAPIError = None
+
 from database import supabase
 from routers.auth_guard import require_auth, require_admin
-from routers.helpers import execute_with_retry, handle_errors
+from routers.helpers import (
+    execute_with_retry,
+    handle_errors,
+    build_reason_lookup,
+    reason_uses_dedicated_schedule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +30,46 @@ SCHEDULE_TABLE = "clinic_schedules"
 # Defaults used when the global settings row lacks a value.
 DEFAULT_SLOT_INTERVAL_MINUTES = 30
 DEFAULT_MAX_STUDENTS_PER_SLOT = 10
+
+SCHEDULE_MIGRATION_MESSAGE = (
+    "Clinic schedule schema is missing required reason-scope columns. "
+    "Apply migrations/2026-11-26_dental_service_schedule.sql, then reload the schema cache."
+)
+
+
+def _is_missing_reason_scope_column_error(error):
+    """True when PostgREST rejects a query because clinic_schedules.reason_id is absent."""
+    if PostgrestAPIError is not None and isinstance(error, PostgrestAPIError):
+        code = str(getattr(error, "code", "") or "")
+        message = str(getattr(error, "message", "") or str(error))
+        details = str(getattr(error, "details", "") or "")
+        hint = str(getattr(error, "hint", "") or "")
+        haystack = " ".join([message, details, hint]).lower()
+        if code in {"42703", "PGRST204"} and "reason_id" in haystack:
+            return True
+        if "reason_id" in haystack and ("does not exist" in haystack or "schema cache" in haystack):
+            return True
+
+    # Defensive fallback for wrapped/normalized errors.
+    haystack = str(error).lower()
+    return "reason_id" in haystack and (
+        "42703" in haystack
+        or "pgrst204" in haystack
+        or "does not exist" in haystack
+        or "schema cache" in haystack
+    )
+
+
+def _missing_schedule_migration_response():
+    logger.error(
+        "Clinic schedule schema mismatch: clinic_schedules.reason_id missing. "
+        "Required migration: migrations/2026-11-26_dental_service_schedule.sql"
+    )
+    return jsonify({
+        "success": False,
+        "error": SCHEDULE_MIGRATION_MESSAGE,
+        "migration_required": "migrations/2026-11-26_dental_service_schedule.sql",
+    }), 503
 
 
 # ============================================================
@@ -60,20 +110,145 @@ def get_default_settings():
     return rows[0] if rows else None
 
 
-def get_schedule_for_date(working_date):
+def resolve_reason_scope(reason_id, reasons_by_id=None):
+    """
+    Map a request-supplied appointment reason to a clinic_schedules
+    scope. This is THE single place the reason -> schedule-scope rule
+    lives (slots endpoint, booking, schedule CRUD, preview).
+
+    Returns:
+      None  -> legacy GENERAL schedule scope (clinic_schedules.reason_id
+               IS NULL). Used when no reason was supplied, when the
+               supplied value is blank, or when the supplied reason is
+               NOT dedicated (Consultation / Medical Certificate) —
+               preserving the original date-wide schedule behaviour.
+       int   -> that dedicated reason's scope: callers must use ONLY
+                clinic_schedules rows with this reason_id and must never
+                fall back to the general schedule or default availability.
+                The database flag is authoritative; the Dental Service
+                description is also recognized on partially migrated
+                schemas where that flag is absent.
+
+    Raises ValueError when the supplied reason_id is malformed or not a
+    known appointment reason; callers surface that as HTTP 400.
+    """
+    if reason_id is None:
+        return None
+
+    if isinstance(reason_id, str) and not reason_id.strip():
+        return None
+
+    try:
+        parsed = int(str(reason_id).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid reason_id: {reason_id!r}")
+
+    if parsed <= 0:
+        raise ValueError(f"Invalid reason_id: {reason_id!r}")
+
+    lookup = reasons_by_id if reasons_by_id is not None else build_reason_lookup()
+
+    row = lookup.get(parsed)
+    if row is None:
+        row = lookup.get(str(parsed))
+    if row is None:
+        raise ValueError(f"Unknown reason_id: {parsed}")
+
+    if reason_uses_dedicated_schedule(row):
+        return parsed
+
+    return None
+
+
+def resolve_schedule_admin_scope(reason_id, reasons_by_id=None):
+    """
+    Resolve the REASON FILTER used by the admin Clinic Schedule panel.
+
+    This deliberately differs from resolve_reason_scope(): the admin panel
+    must be able to configure any appointment reason's own
+    clinic_schedules.reason_id rows, even when that reason is not marked
+    dedicated for student booking. Student slots/bookings keep the legacy
+    dedicated-only rule; only schedule administration uses this literal
+    scope.
+
+      None / blank -> legacy GENERAL schedule (reason_id IS NULL).
+      int          -> that exact reason_id, after verifying the reason exists.
+
+    Raises ValueError for malformed or unknown reason ids so callers can
+    return 400.
+    """
+    if reason_id is None:
+        return None
+
+    if isinstance(reason_id, str) and not reason_id.strip():
+        return None
+
+    try:
+        parsed = int(str(reason_id).strip())
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid reason_id: {reason_id!r}")
+
+    if parsed <= 0:
+        raise ValueError(f"Invalid reason_id: {reason_id!r}")
+
+    lookup = reasons_by_id if reasons_by_id is not None else build_reason_lookup()
+    row = lookup.get(parsed)
+    if row is None:
+        row = lookup.get(str(parsed))
+    if row is None:
+        raise ValueError(f"Unknown reason_id: {parsed}")
+
+    return parsed
+
+
+def schedule_row_matches_reason_scope(row, reason_scope):
+    """
+    Match a clinic_schedules row against a resolved reason scope WITHOUT
+    asking PostgREST to filter on clinic_schedules.reason_id.
+
+    The reason-scoped schedule migration is additive and has not necessarily
+    been applied in every environment yet. A live 42703 probe confirmed the
+    current production table has no reason_id column, so putting that column
+    in the PostgREST query makes /appointments/slots fail with a 500. Reading
+    the row with select('*') and filtering here gives the same semantics:
+
+      * column absent  -> every row is the legacy GENERAL schedule, so a
+                          dedicated scope simply has no availability;
+      * column present -> normal general/dedicated isolation as before.
+    """
+    value = row.get("reason_id")
+    if reason_scope is None:
+        return value is None or value == "" or value == "null"
+    return value is not None and str(value) == str(reason_scope)
+
+
+def get_schedule_for_date(working_date, reason_id=None):
     """
     Fetch a clinic_schedule override row for a specific date,
     if one exists.
+
+    reason_id is a RESOLVED scope (see resolve_reason_scope):
+      None  -> the legacy GENERAL schedule (reason_id IS NULL when the
+               column exists) — this is what get_schedule_for_date(date)
+               has always meant, so existing callers keep their behaviour.
+      int   -> ONLY that dedicated reason's schedule row for the date
+               (never the general row).
+
+    The scope filter is applied in Python, not in the PostgREST query, so
+    this also works against databases where the additive reason_id column
+    has not been applied yet. See schedule_row_matches_reason_scope().
     """
     response = execute_with_retry(
         supabase
         .table(SCHEDULE_TABLE)
         .select("*")
         .eq("working_date", working_date)
-        .limit(1)
     )
 
-    rows = response.data or []
+    rows = [
+        row for row in (response.data or [])
+        if schedule_row_matches_reason_scope(row, reason_id)
+    ]
 
     return rows[0] if rows else None
 
@@ -439,6 +614,7 @@ def update_clinic_settings():
 #
 # Optional:
 # GET /clinic-schedule?start=2026-08-01&end=2026-08-31
+# GET /clinic-schedule?reason_id=<id>   (null/omitted = general)
 # ============================================================
 
 @clinic_schedule_bp.route(
@@ -451,6 +627,18 @@ def get_clinic_schedule():
 
     start_date = request.args.get("start")
     end_date = request.args.get("end")
+
+    # Admin schedule filter: omitted/null -> legacy general schedules;
+    # any known reason id -> ONLY that reason's schedule rows. This is
+    # intentionally literal so the Clinic Schedule panel can configure
+    # every reason. Student availability still uses resolve_reason_scope().
+    try:
+        reason_scope = resolve_schedule_admin_scope(request.args.get("reason_id"))
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "error": "Invalid reason_id"
+        }), 400
 
     query = (
         supabase
@@ -469,7 +657,12 @@ def get_clinic_schedule():
         .order("working_date", desc=False)
     )
 
-    schedule = response.data or []
+    # Scope in Python so this read still works when the additive reason_id
+    # column has not been applied to clinic_schedules yet.
+    schedule = [
+        row for row in (response.data or [])
+        if schedule_row_matches_reason_scope(row, reason_scope)
+    ]
 
     return jsonify({
         "success": True,
@@ -484,6 +677,8 @@ def get_clinic_schedule():
 # GET /clinic-schedule/<date>
 #
 # Example: GET /clinic-schedule/2026-08-17
+# Optional: GET /clinic-schedule/2026-08-17?reason_id=<id>
+#           (null/omitted = general schedule for that date)
 # ============================================================
 
 @clinic_schedule_bp.route(
@@ -494,7 +689,15 @@ def get_clinic_schedule():
 @handle_errors("Get schedule by date error")
 def get_clinic_schedule_by_date(working_date):
 
-    schedule = get_schedule_for_date(working_date)
+    try:
+        reason_scope = resolve_schedule_admin_scope(request.args.get("reason_id"))
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "error": "Invalid reason_id"
+        }), 400
+
+    schedule = get_schedule_for_date(working_date, reason_id=reason_scope)
 
     if not schedule:
 
@@ -522,11 +725,17 @@ def get_clinic_schedule_by_date(working_date):
 #     "break_start": "12:00",
 #     "break_end": "13:00",
 #     "is_enabled": false,
-#     "closure_reason": "Christmas Day - Clinic Closed"
+#     "closure_reason": "Christmas Day - Clinic Closed",
+#     "reason_id": 3            // optional; null/omitted = general
 # }
 #
 # Use is_enabled: false + closure_reason to mark the clinic closed
 # for that date (holiday, event, etc).
+#
+# reason_id scopes BOTH the duplicate collapse and the created row:
+# rows for different reasons never collapse into each other, and a
+# reason-scoped schedule never collapses into the general one for the
+# same date.
 # ============================================================
 
 @clinic_schedule_bp.route(
@@ -567,6 +776,16 @@ def create_clinic_schedule():
             "error": f"Missing required fields: {', '.join(missing)}"
         }), 400
 
+    # Admin schedule scope (null/omitted = general). Any known reason id
+    # is stored literally; malformed/unknown reason_id -> 400.
+    try:
+        reason_scope = resolve_schedule_admin_scope(data.get("reason_id"))
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "error": "Invalid reason_id"
+        }), 400
+
     schedule_data = {
         "working_date": working_date,
         "work_start": slot_start,
@@ -574,55 +793,69 @@ def create_clinic_schedule():
         "break_start": data.get("break_start"),
         "break_end": data.get("break_end"),
         "is_enabled": data.get("is_enabled", True),
-        "closure_reason": data.get("closure_reason")
+        "closure_reason": data.get("closure_reason"),
+        "reason_id": reason_scope
     }
 
     # ----------------------------------------------------
-    # UPSERT by working_date: if clinic_schedule rows already
-    # exist for this date, UPDATE the oldest and COLLAPSE any
-    # duplicates (legacy saves stacked multiple childless
-    # overrides per date; resolution then picked a childless
-    # one and students saw zero slots). Children of removed
-    # duplicates are purged too.
+    # UPSERT within the SAME reason scope: if clinic_schedule
+    # rows already exist for this date AND scope, UPDATE the
+    # oldest and COLLAPSE any duplicates (legacy saves stacked
+    # multiple childless overrides per date; resolution then
+    # picked a childless one and students saw zero slots).
+    # Children of removed duplicates are purged too. Rows from
+    # the OTHER scope (general vs dedicated) are never touched.
     # ----------------------------------------------------
 
-    existing_rows = (
-        execute_with_retry(
+    try:
+        existing_query = (
             supabase
             .table(SCHEDULE_TABLE)
             .select("schedule_id")
             .eq("working_date", working_date)
             .order("schedule_id", desc=False)
-        ).data
-        or []
-    )
-
-    if existing_rows:
-
-        target = existing_rows[0]
-
-        response = execute_with_retry(
-            supabase
-            .table(SCHEDULE_TABLE)
-            .update(schedule_data)
-            .eq("schedule_id", target["schedule_id"])
         )
 
-        for duplicate in existing_rows[1:]:
-            delete_time_slot_children(duplicate["schedule_id"])
+        if reason_scope is None:
+            existing_query = existing_query.is_("reason_id", None)
+        else:
+            existing_query = existing_query.eq("reason_id", reason_scope)
 
-            execute_with_retry(
-                supabase.table(SCHEDULE_TABLE).delete().eq(
-                    "schedule_id", duplicate["schedule_id"]
-                )
+        existing_rows = (
+            execute_with_retry(existing_query).data
+            or []
+        )
+
+        if existing_rows:
+
+            target = existing_rows[0]
+
+            response = execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .update(schedule_data)
+                .eq("schedule_id", target["schedule_id"])
             )
 
-    else:
-        response = execute_with_retry(
-            supabase
-            .table(SCHEDULE_TABLE)
-            .insert(schedule_data)
-        )
+            for duplicate in existing_rows[1:]:
+                delete_time_slot_children(duplicate["schedule_id"])
+
+                execute_with_retry(
+                    supabase.table(SCHEDULE_TABLE).delete().eq(
+                        "schedule_id", duplicate["schedule_id"]
+                    )
+                )
+
+        else:
+            response = execute_with_retry(
+                supabase
+                .table(SCHEDULE_TABLE)
+                .insert(schedule_data)
+            )
+    except Exception as e:
+        if _is_missing_reason_scope_column_error(e):
+            return _missing_schedule_migration_response()
+        raise
 
     if not response.data:
 
@@ -658,8 +891,15 @@ def create_clinic_schedule():
 #     "break_start": "12:00",
 #     "break_end": "13:00",
 #     "is_enabled": true,
-#     "closure_reason": null
+#     "closure_reason": null,
+#     "reason_id": 3          // optional scope guard; null/omitted = general
 # }
+#
+# The optional reason_id scopes WHICH row may be updated: omitted/null
+# may only update general schedules (reason_id IS NULL); a supplied
+# reason may only update that reason's schedules. Editing a schedule
+# therefore never crosses scopes (a stale general-panel edit cannot
+# overwrite a reason-specific row and vice versa).
 # ============================================================
 
 @clinic_schedule_bp.route(
@@ -677,6 +917,14 @@ def update_clinic_schedule(schedule_id):
         return jsonify({
             "success": False,
             "error": "Request body is required"
+        }), 400
+
+    try:
+        reason_scope = resolve_schedule_admin_scope(data.get("reason_id"))
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "error": "Invalid reason_id"
         }), 400
 
     allowed_fields = [
@@ -702,12 +950,27 @@ def update_clinic_schedule(schedule_id):
             "error": "No valid fields provided to update"
         }), 400
 
-    response = execute_with_retry(
-        supabase
-        .table(SCHEDULE_TABLE)
-        .update(update_data)
-        .eq("schedule_id", schedule_id)
-    )
+    try:
+        update_query = (
+            supabase
+            .table(SCHEDULE_TABLE)
+            .update(update_data)
+            .eq("schedule_id", schedule_id)
+        )
+
+        # Scope guard: only rows in the supplied (or default general)
+        # reason scope are updatable; a mismatch yields no matched row
+        # and surfaces as the existing 404 below.
+        if reason_scope is None:
+            update_query = update_query.is_("reason_id", None)
+        else:
+            update_query = update_query.eq("reason_id", reason_scope)
+
+        response = execute_with_retry(update_query)
+    except Exception as e:
+        if _is_missing_reason_scope_column_error(e):
+            return _missing_schedule_migration_response()
+        raise
 
     if not response.data:
 
@@ -716,10 +979,17 @@ def update_clinic_schedule(schedule_id):
             "error": "Schedule entry not found"
         }), 404
 
+    schedule_row = response.data[0]
+
+    # Keep bookable slots in sync with the edited hours/enabled state.
+    # Without this, an override can report new times while students still
+    # see the old time_slot children (or none at all).
+    materialize_time_slots(schedule_row)
+
     return jsonify({
         "success": True,
         "message": "Schedule entry updated",
-        "schedule": response.data[0]
+        "schedule": schedule_row
     })
 
 
@@ -761,10 +1031,16 @@ def delete_clinic_schedule(schedule_id):
 # TIME-BLOCK PREVIEW LIST
 #
 # GET /clinic-schedule/preview?date=2026-08-17
+# GET /clinic-schedule/preview?date=2026-08-17&reason_id=3
 #
 # Generates the actual list of time blocks for a given date,
 # using that date's override (clinic_schedules) if one exists,
 # otherwise falling back to the global default settings.
+#
+# reason_id scopes which override is used (null/omitted = the
+# legacy general schedule). For a dedicated reason with NO
+# configured schedule the preview returns empty blocks — it never
+# falls back to the general schedule or the default availability.
 # ============================================================
 
 @clinic_schedule_bp.route(
@@ -784,7 +1060,15 @@ def preview_time_blocks():
             "error": "date parameter is required"
         }), 400
 
-    override = get_schedule_for_date(requested_date)
+    try:
+        reason_scope = resolve_reason_scope(request.args.get("reason_id"))
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "error": "Invalid reason_id"
+        }), 400
+
+    override = get_schedule_for_date(requested_date, reason_id=reason_scope)
 
     # ----------------------------------------------------
     # If clinic is explicitly disabled for this date
@@ -797,6 +1081,23 @@ def preview_time_blocks():
             "date": requested_date,
             "is_enabled": False,
             "reason": override.get("closure_reason"),
+            "blocks": []
+        })
+
+    # ----------------------------------------------------
+    # Dedicated reason with no configured schedule: empty
+    # preview — no fallback to the general schedule or the
+    # default settings (availability must be configured per
+    # reason first).
+    # ----------------------------------------------------
+
+    if reason_scope is not None and not override:
+
+        return jsonify({
+            "success": True,
+            "date": requested_date,
+            "is_enabled": True,
+            "reason_id": reason_scope,
             "blocks": []
         })
 

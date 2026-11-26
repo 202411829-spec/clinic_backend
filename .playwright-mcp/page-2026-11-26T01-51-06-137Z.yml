@@ -1,0 +1,47 @@
+- generic [ref=f17e89]:
+  - complementary [ref=f17e90]:
+    - generic [ref=f17e91]:
+      - generic [ref=f17e92]:
+        - generic [ref=f17e93]:
+          - img "Gordon College seal" [ref=f17e94]
+          - img "Health Service Unit seal" [ref=f17e95]
+        - generic [ref=f17e96]:
+          - paragraph [ref=f17e97]: GORDON COLLEGE
+          - paragraph [ref=f17e98]: Clinic Appointment System
+          - paragraph [ref=f17e99]: STUDENT PORTAL
+      - navigation [ref=f17e101]:
+        - paragraph [ref=f17e102]: Main
+        - list
+      - button "Logout" [ref=f17e105] [cursor=pointer]
+      - link "About" [ref=f17e111] [cursor=pointer]:
+        - /url: /student/about
+  - generic [ref=f17e116]:
+    - banner [ref=f17e117]:
+      - button "Back" [ref=f17e119] [cursor=pointer]
+      - generic [ref=f17e122]:
+        - generic [ref=f17e123]:
+          - paragraph [ref=f17e124]: Juan B. Dela Cruz
+          - paragraph [ref=f17e125]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f17e126]: JB
+    - main [ref=f17e127]:
+      - generic [ref=f17e131]:
+        - generic [ref=f17e132]:
+          - heading "Edit student information" [level=1] [ref=f17e133]
+          - paragraph [ref=f17e134]: Step 3 of 3
+        - generic [ref=f17e137]:
+          - generic [ref=f17e138]: Personal Information
+          - generic [ref=f17e143]: Medical History
+          - generic [ref=f17e149]:
+            - generic [ref=f17e150]: "3"
+            - generic [ref=f17e151]: Data Privacy
+        - generic [ref=f17e409]:
+          - heading "Data Privacy Consent Waiver" [level=3] [ref=f17e414]
+          - generic [ref=f17e415]:
+            - paragraph [ref=f17e416]: "Republic Act No. 10173 (Data Privacy Act of 2012):"
+            - paragraph [ref=f17e417]: I am willing to disclose my personal information with the Gordon College Health Services Unit (Clinic). I have the right to access my personal data in a timely manner upon official request. The clinic respects patient privacy and is accountable to protect my personal information in strict accordance with healthcare privacy standards.
+          - generic [ref=f17e418] [cursor=pointer]:
+            - checkbox "I have read and agree to the data privacy waiver above, and I confirm that all the information provided in this student record is true, complete, and accurate." [ref=f17e420]
+            - generic [ref=f17e421]: I have read and agree to the data privacy waiver above, and I confirm that all the information provided in this student record is true, complete, and accurate.
+          - generic [ref=f17e422]:
+            - button "Back" [ref=f17e423] [cursor=pointer]
+            - button "Submit" [disabled] [ref=f17e426]

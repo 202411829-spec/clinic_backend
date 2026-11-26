@@ -1,0 +1,33 @@
+- generic [ref=f7e5]:
+  - generic [ref=f7e6]:
+    - img "Gordon College seal" [ref=f7e7]
+    - heading "GORDON COLLEGE" [level=1] [ref=f7e8]
+    - paragraph [ref=f7e9]: Clinic Appointment System
+  - generic [ref=f7e12]:
+    - paragraph [ref=f7e13]: Student Portal
+    - heading "Welcome" [level=1] [ref=f7e14]
+    - paragraph [ref=f7e15]: Book, reschedule, or check the status of your clinic appointments.
+    - generic [ref=f7e16]:
+      - generic [ref=f7e17]:
+        - generic [ref=f7e18]: Student ID or Email
+        - textbox "Email/ Student ID" [ref=f7e20]
+      - generic [ref=f7e21]:
+        - generic [ref=f7e22]: Password
+        - generic [ref=f7e23]:
+          - textbox "Your password" [ref=f7e24]
+          - button "Show password" [ref=f7e25] [cursor=pointer]
+        - generic [ref=f7e29]:
+          - generic [ref=f7e30] [cursor=pointer]:
+            - checkbox [ref=f7e31]
+            - text: Remember me
+          - link "Forgot password?" [ref=f7e32] [cursor=pointer]:
+            - /url: /student/forgot-password
+      - button "Login" [ref=f7e33] [cursor=pointer]
+      - generic [ref=f7e34]:
+        - generic [ref=f7e35]: or continue with
+        - button "Continue with Google (Coming soon)" [disabled] [ref=f7e39]
+      - paragraph [ref=f7e45]: By clicking the login button, you recognize the authority of Gordon College to process your personal and sensitive information, pursuant to the Gordon College Privacy Notice and Applicable laws
+    - paragraph [ref=f7e46]:
+      - text: No account yet?
+      - link "Sign up" [ref=f7e47] [cursor=pointer]:
+        - /url: /student/signup

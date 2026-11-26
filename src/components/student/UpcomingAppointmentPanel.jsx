@@ -6,21 +6,14 @@ import { useAppointment } from "../../context/AppointmentContext";
 import { appointmentsApi } from "../../lib/api.js";
 import { useAuth } from "../../context/AuthContext";
 import { toYMD } from "../../lib/calendar";
+import { formatTimeRange } from "../../lib/timeFormat";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import PortalOverlay from "../ui/PortalOverlay.jsx";
 import StatusPill from "./StatusPill.jsx";
 
 // Map the card badge text back onto a pill tone (context bookings say
 // "Today"/"Upcoming", backend rows say Pending/Completed/…).
 const BADGE_TONE = { Completed: "completed", Cancelled: "cancelled", "No Show": "no_show" };
-
-function formatTime(value) {
-  if (!value) return "-";
-  const [h, m] = String(value).slice(0, 5).split(":");
-  const hour = Number(h);
-  const period = hour < 12 ? "AM" : "PM";
-  const h12 = hour % 12 || 12;
-  return `${h12}:${m} ${period}`;
-}
 
 const STATUS_LABELS = { pending: "Pending", completed: "Completed", no_show: "No Show", cancelled: "Cancelled" };
 
@@ -32,7 +25,7 @@ function mapAppointment(a) {
     month: d.toLocaleString("en-US", { month: "short" }).toUpperCase(),
     day: String(d.getDate()),
     weekday: d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase(),
-    time: formatTime(a.appointment_time),
+    time: formatTimeRange(a.appointment_time) || "-",
     reason: a.appointment_purpose ?? "-",
     badge: STATUS_LABELS[a.current_status] ?? "Pending",
   };
@@ -95,16 +88,7 @@ export default function UpcomingAppointmentPanel() {
       }
     : upcoming;
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
-
-function handleReschedule() {
+  function handleReschedule() {
     setMenuOpen(false);
     // Book page reads this to pre-fill the date/time/reason and switch
     // its copy/behavior into "reschedule" mode.
@@ -152,8 +136,9 @@ function handleReschedule() {
         </div>
 
         {appt && (
-          <div className="relative shrink-0" ref={menuRef}>
+          <div className="relative shrink-0">
             <button
+              ref={menuRef}
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Appointment actions"
               aria-haspopup="menu"
@@ -164,9 +149,17 @@ function handleReschedule() {
             </button>
 
             {menuOpen && (
-              <div
+              <PortalOverlay
+                triggerRef={menuRef}
+                enabled={menuOpen}
+                align="right"
+                preferredWidth={160}
+                estimatedHeight={112}
                 role="menu"
-                className="absolute right-0 top-full z-20 mt-1 w-40 origin-top-right animate-pop-in overflow-hidden rounded-card bg-white shadow-e3"
+                ariaLabel="Appointment actions"
+                className="overflow-hidden rounded-card bg-white shadow-e3"
+                onOutside={() => setMenuOpen(false)}
+                onEscape={() => setMenuOpen(false)}
               >
                 <button
                   role="menuitem"
@@ -182,7 +175,7 @@ function handleReschedule() {
                 >
                   Cancel
                 </button>
-              </div>
+              </PortalOverlay>
             )}
           </div>
         )}
@@ -206,7 +199,7 @@ function handleReschedule() {
             <div className="flex items-start gap-2 text-ink-900">
               <NavIcon name="clock" className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
               <span className="cell-wrap text-base font-semibold md:text-lg">
-                {appt.time}
+                {formatTimeRange(appt.time)}
               </span>
             </div>
             <p className="cell-wrap mt-1 text-sm text-ink-500 md:text-base">{appt.reason}</p>
@@ -233,12 +226,6 @@ function handleReschedule() {
           <p className="text-sm text-ink-500 md:text-base">
             You don't have an upcoming appointment yet.
           </p>
-          <button
-            onClick={() => navigate("/student/book")}
-            className="btn-primary btn-press btn-shine mt-4"
-          >
-            Book an Appointment
-          </button>
         </div>
       )}
       <ConfirmDialog

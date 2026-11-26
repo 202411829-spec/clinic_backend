@@ -1,0 +1,111 @@
+- generic [ref=f17e89]:
+  - complementary [ref=f17e90]:
+    - generic [ref=f17e91]:
+      - generic [ref=f17e92]:
+        - generic [ref=f17e93]:
+          - img "Gordon College seal" [ref=f17e94]
+          - img "Health Service Unit seal" [ref=f17e95]
+        - generic [ref=f17e96]:
+          - paragraph [ref=f17e97]: GORDON COLLEGE
+          - paragraph [ref=f17e98]: Clinic Appointment System
+          - paragraph [ref=f17e99]: STUDENT PORTAL
+      - navigation [ref=f17e101]:
+        - paragraph [ref=f17e102]: Main
+        - list
+      - button "Logout" [ref=f17e105] [cursor=pointer]
+      - link "About" [ref=f17e111] [cursor=pointer]:
+        - /url: /student/about
+  - generic [ref=f17e116]:
+    - banner [ref=f17e117]:
+      - button "Back" [ref=f17e119] [cursor=pointer]
+      - generic [ref=f17e122]:
+        - generic [ref=f17e123]:
+          - paragraph [ref=f17e124]: Juan B. Dela Cruz
+          - paragraph [ref=f17e125]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f17e126]: JB
+    - main [ref=f17e127]:
+      - generic [ref=f17e131]:
+        - generic [ref=f17e132]:
+          - heading "Edit student information" [level=1] [ref=f17e133]
+          - paragraph [ref=f17e134]: Step 2 of 3
+        - generic [ref=f17e137]:
+          - generic [ref=f17e138]: Personal Information
+          - generic [ref=f17e144]:
+            - generic [ref=f17e145]: "2"
+            - generic [ref=f17e146]: Medical History
+          - generic [ref=f17e149]:
+            - generic [ref=f17e150]: "3"
+            - generic [ref=f17e151]: Data Privacy
+        - generic [ref=f17e311]:
+          - generic [ref=f17e312]: Please check (✓) if you have or had any of the following medical conditions. This assists clinic nurses in keeping your medical profile accurate.
+          - generic [ref=f17e313]:
+            - generic [ref=f17e314] [cursor=pointer]:
+              - checkbox "Allergy" [ref=f17e316]
+              - generic [ref=f17e317]: Allergy
+            - generic [ref=f17e318] [cursor=pointer]:
+              - checkbox "Asthma" [ref=f17e320]
+              - generic [ref=f17e321]: Asthma
+            - generic [ref=f17e322] [cursor=pointer]:
+              - checkbox "Chicken Pox" [ref=f17e324]
+              - generic [ref=f17e325]: Chicken Pox
+            - generic [ref=f17e326] [cursor=pointer]:
+              - checkbox "COVID-19" [ref=f17e328]
+              - generic [ref=f17e329]: COVID-19
+            - generic [ref=f17e330] [cursor=pointer]:
+              - checkbox "Diabetes" [ref=f17e332]
+              - generic [ref=f17e333]: Diabetes
+            - generic [ref=f17e334] [cursor=pointer]:
+              - checkbox "Dysmenorrhea" [ref=f17e336]
+              - generic [ref=f17e337]: Dysmenorrhea
+            - generic [ref=f17e338] [cursor=pointer]:
+              - checkbox "Epilepsy / Seizure" [ref=f17e340]
+              - generic [ref=f17e341]: Epilepsy / Seizure
+            - generic [ref=f17e342] [cursor=pointer]:
+              - checkbox "Heart Disorder" [ref=f17e344]
+              - generic [ref=f17e345]: Heart Disorder
+            - generic [ref=f17e346] [cursor=pointer]:
+              - checkbox "Hepatitis" [ref=f17e348]
+              - generic [ref=f17e349]: Hepatitis
+            - generic [ref=f17e350] [cursor=pointer]:
+              - checkbox "Hypertension" [ref=f17e352]
+              - generic [ref=f17e353]: Hypertension
+            - generic [ref=f17e354] [cursor=pointer]:
+              - checkbox "Measles" [ref=f17e356]
+              - generic [ref=f17e357]: Measles
+            - generic [ref=f17e358] [cursor=pointer]:
+              - checkbox "Mumps" [ref=f17e360]
+              - generic [ref=f17e361]: Mumps
+            - generic [ref=f17e362] [cursor=pointer]:
+              - checkbox "Anxiety Disorder" [ref=f17e364]
+              - generic [ref=f17e365]: Anxiety Disorder
+            - generic [ref=f17e366] [cursor=pointer]:
+              - checkbox "Panic Attack / Hyperventilation" [ref=f17e368]
+              - generic [ref=f17e369]: Panic Attack / Hyperventilation
+            - generic [ref=f17e370] [cursor=pointer]:
+              - checkbox "Pneumonia" [ref=f17e372]
+              - generic [ref=f17e373]: Pneumonia
+            - generic [ref=f17e374] [cursor=pointer]:
+              - checkbox "PTB / Primary Complex" [ref=f17e376]
+              - generic [ref=f17e377]: PTB / Primary Complex
+            - generic [ref=f17e378] [cursor=pointer]:
+              - checkbox "Typhoid Fever" [ref=f17e380]
+              - generic [ref=f17e381]: Typhoid Fever
+            - generic [ref=f17e382] [cursor=pointer]:
+              - checkbox "Urinary Tract Infection (UTI)" [ref=f17e384]
+              - generic [ref=f17e385]: Urinary Tract Infection (UTI)
+          - generic [ref=f17e386]:
+            - generic [ref=f17e387]:
+              - generic [ref=f17e388]: Have you had any operations in the past? *
+              - generic [ref=f17e391]:
+                - button "Yes" [ref=f17e392] [cursor=pointer]
+                - button "No" [ref=f17e393] [cursor=pointer]
+            - generic [ref=f17e394]:
+              - generic [ref=f17e395]:
+                - generic [ref=f17e396]: Nature of Operation *
+                - textbox "e.g. Appendectomy" [ref=f17e397]
+              - generic [ref=f17e398]:
+                - generic [ref=f17e399]: Date of Operation *
+                - textbox [ref=f17e400]
+          - generic [ref=f17e401]:
+            - button "Back" [ref=f17e402] [cursor=pointer]
+            - 'button "Next: Data Privacy" [ref=f17e405] [cursor=pointer]'

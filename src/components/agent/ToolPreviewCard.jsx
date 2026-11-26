@@ -1,3 +1,5 @@
+import { formatTimeRange } from "../../lib/timeFormat";
+
 export default function ToolPreviewCard({ preview, onYes, onNo, busy }) {
   if (!preview) return null
   const found = preview.found
@@ -26,7 +28,7 @@ export default function ToolPreviewCard({ preview, onYes, onNo, busy }) {
               key={r.appointment_id || r.id || Math.random()}
               className="rounded-lg bg-white px-2 py-1 text-xs text-gray-700"
             >
-              {r.appointment_date || ""} {r.appointment_time || ""} — {r.student_id || ""} (
+              {r.appointment_date || ""} {formatTimeRange(r.appointment_time)} — {r.student_id || ""} (
               {r.current_status || "pending"})
             </li>
           ))}

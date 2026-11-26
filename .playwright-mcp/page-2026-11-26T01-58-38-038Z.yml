@@ -1,0 +1,63 @@
+- generic [ref=f30e4]:
+  - complementary [ref=f30e5]:
+    - generic [ref=f30e6]:
+      - generic [ref=f30e7]:
+        - generic [ref=f30e8]:
+          - img "Gordon College seal" [ref=f30e9]
+          - img "Health Service Unit seal" [ref=f30e10]
+        - generic [ref=f30e11]:
+          - paragraph [ref=f30e12]: GORDON COLLEGE
+          - paragraph [ref=f30e13]: Clinic Appointment System
+          - paragraph [ref=f30e14]: STUDENT PORTAL
+      - navigation [ref=f30e16]:
+        - paragraph [ref=f30e17]: Main
+        - list [ref=f30e18]:
+          - listitem [ref=f30e19]:
+            - link "Dashboard" [ref=f30e20] [cursor=pointer]:
+              - /url: /student/dashboard
+          - listitem [ref=f30e27]:
+            - link "Book" [ref=f30e28] [cursor=pointer]:
+              - /url: /student/book
+          - listitem [ref=f30e33]:
+            - link "Profile" [ref=f30e34] [cursor=pointer]:
+              - /url: /student/profile
+      - button "Logout" [ref=f30e41] [cursor=pointer]
+      - generic [ref=f30e46]:
+        - link "Feedback" [ref=f30e47] [cursor=pointer]:
+          - /url: /student/feedback
+        - link "About" [ref=f30e52] [cursor=pointer]:
+          - /url: /student/about
+  - generic [ref=f30e57]:
+    - banner [ref=f30e58]:
+      - button "Back" [ref=f30e60] [cursor=pointer]
+      - generic [ref=f30e63]:
+        - generic [ref=f30e64]:
+          - paragraph [ref=f30e65]: Juan B. Dela Cruz
+          - paragraph [ref=f30e66]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f30e67]: JB
+    - main [ref=f30e68]:
+      - generic [ref=f30e70]:
+        - generic [ref=f30e77]:
+          - heading "Feedback" [level=1] [ref=f30e78]
+          - paragraph [ref=f30e79]: Tell us about your clinic visit — it helps us serve you better.
+        - generic [ref=f30e80]:
+          - paragraph [ref=f30e120]: Salamat! Your feedback has been submitted.
+          - generic [ref=f30e81]:
+            - generic [ref=f30e82]:
+              - paragraph [ref=f30e83]: Please Rate Your Experience
+              - radiogroup "0 out of 5 stars" [ref=f30e121]:
+                - button "1 star" [ref=f30e85] [cursor=pointer]
+                - button "2 stars" [ref=f30e88] [cursor=pointer]
+                - button "3 stars" [ref=f30e91] [cursor=pointer]
+                - button "4 stars" [ref=f30e94] [cursor=pointer]
+                - button "5 stars" [ref=f30e97] [cursor=pointer]
+              - paragraph [ref=f30e100]: Tap a star to rate your visit
+            - generic [ref=f30e101]:
+              - generic [ref=f30e102]:
+                - generic [ref=f30e103]: Your message (optional)
+                - generic [ref=f30e104]: 0/400
+              - textbox "Share any details that could help the clinic improve..." [ref=f30e105]
+            - button "Submit Feedback" [ref=f30e106] [cursor=pointer]
+        - generic [ref=f30e107]:
+          - heading "Your previous feedback" [level=2] [ref=f30e108]
+          - paragraph [ref=f30e114]: You haven't submitted any feedback yet.

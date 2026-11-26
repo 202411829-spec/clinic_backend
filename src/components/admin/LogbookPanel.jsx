@@ -2,13 +2,21 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
-import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
+import LogbookRangePicker from "./LogbookRangePicker.jsx";
+import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import Pagination from "../ui/Pagination.jsx";
-import WalkInVisitForm from "./WalkInVisitForm.jsx";
+import WalkInVisitModal from "./WalkInVisitModal.jsx";
 import useWalkInForm from "./useWalkInForm.js";
-import { logbookApi } from "../../lib/api.js";
+import { logbookApi, masterlistApi } from "../../lib/api.js";
 import { getWeekRangeYMD, isoToMDY } from "../../lib/calendar.js";
+import { clampPage, getPageCount } from "../../lib/pagination.js";
+import { buildLogbookQueryParams } from "../../lib/logbookQuery.js";
+import {
+  formatFilterSelectionLabel,
+  isFilterSelected,
+} from "../../lib/filterMultiSelect.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
 
 // Backend dateTime is formatted as "MM/DD/YYYY h:mm AM" (or "MM/DD/YYYY HH:MM"
@@ -78,47 +86,86 @@ export default function LogbookPanel({
   const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
   const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
 
-  // Recent visits for the dashboard widget. Reasons/medicines are provided
-  // by the parent Dashboard via props (fetched once, shared).
-  useEffect(() => {
-    logbookApi
-      .list()
-      .then((res) => setEntries((res?.logbook || []).slice(0, 5).map(mapEntry)))
-      .catch((err) => console.error("Failed to load logbook:", err));
-  }, []);
-
   // Walk-in form — shared hook encapsulates all walk-in state + handlers
   const walkIn = useWalkInForm({
     reasonRecords,
     medicineRecords,
     onSubmit: async (payload) => {
       await logbookApi.createWalkIn(payload);
-      const res = await logbookApi.list();
+      const res = await logbookApi.list(buildLogbookQueryParams({ dateFrom, dateTo }));
       setEntries((res?.logbook || []).slice(0, 5).map(mapEntry));
     },
   });
 
-  // Search and filter state
+  // Search and filter state — categorical filters are multi-select arrays;
+  // an empty array always means "All" for that category.
   const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("All Departments");
-  const [course, setCourse] = useState("All Course");
-  const [reasonFilter, setReasonFilter] = useState("All Reason");
+  const [department, setDepartment] = useState([]);
+  const [course, setCourse] = useState([]);
+  const [reasonFilter, setReasonFilter] = useState([]);
   // Default to the current week (Monday – Sunday); the admin can still change or clear it.
   const [dateFrom, setDateFrom] = useState(() => getWeekRangeYMD().from);
   const [dateTo, setDateTo] = useState(() => getWeekRangeYMD().to);
+  const [datePeriod, setDatePeriod] = useState("Week");
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Derive departments and courses from entries
+  // Reference department/course names from the masterlist so the multi-select
+  // options are complete — the widget only ever holds five rows, which used to
+  // starve the old single-value dropdowns of options.
+  const [referenceDepartments, setReferenceDepartments] = useState([]);
+  const [referenceCourses, setReferenceCourses] = useState([]);
+
+  useEffect(() => {
+    masterlistApi
+      .listDepartments()
+      .then((res) =>
+        setReferenceDepartments(
+          (res?.departments || res || [])
+            .map((d) => d.department_name)
+            .filter((name) => name && name !== "-")
+        )
+      )
+      .catch(() => {});
+    masterlistApi
+      .listCourses()
+      .then((res) =>
+        setReferenceCourses(
+          (res?.courses || res || [])
+            .map((c) => c.course_name)
+            .filter((name) => name && name !== "-")
+        )
+      )
+      .catch(() => {});
+  }, []);
+
+  // The widget keeps only the first five rows, but asks the backend for the
+  // selected Regular Time range instead of applying a second local date logic.
+  useEffect(() => {
+    logbookApi
+      .list(buildLogbookQueryParams({ dateFrom, dateTo }))
+      .then((res) => setEntries((res?.logbook || []).slice(0, 5).map(mapEntry)))
+      .catch((err) => console.error("Failed to load logbook:", err));
+  }, [dateFrom, dateTo]);
+
+  // Multi-select options: masterlist reference names (complete) unioned with
+  // whatever the five loaded rows happen to show, so a row can never be
+  // unfilterable even if the reference fetch failed.
   const departments = useMemo(() => {
-    const set = new Set(entries.map((e) => e.dept).filter((d) => d && d !== "-"));
-    return ["All Departments", ...Array.from(set)];
-  }, [entries]);
+    const set = new Set(referenceDepartments);
+    entries.forEach((e) => {
+      if (e.dept && e.dept !== "-") set.add(e.dept);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [referenceDepartments, entries]);
 
   const courses = useMemo(() => {
-    const set = new Set(entries.map((e) => e.course).filter((c) => c && c !== "-"));
-    return ["All Course", ...Array.from(set)];
-  }, [entries]);
+    const set = new Set(referenceCourses);
+    entries.forEach((e) => {
+      if (e.course && e.course !== "-") set.add(e.course);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [referenceCourses, entries]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -132,9 +179,10 @@ export default function LogbookPanel({
         (e.reason || "").toLowerCase().includes(q) ||
         (e.complaint || "").toLowerCase().includes(q) ||
         (e.medicine || "").toLowerCase().includes(q);
-      const matchesDept = department === "All Departments" || e.dept === department;
-      const matchesCourse = course === "All Course" || e.course === course;
-      const matchesReason = reasonFilter === "All Reason" || e.reason === reasonFilter;
+      // OR within each category (isFilterSelected), AND across categories.
+      const matchesDept = isFilterSelected(e.dept, department);
+      const matchesCourse = isFilterSelected(e.course, course);
+      const matchesReason = isFilterSelected(e.reason, reasonFilter);
       const matchesDate =
         (!dateFrom || (e.dateISO && e.dateISO >= dateFrom)) &&
         (!dateTo || (e.dateISO && e.dateISO <= dateTo));
@@ -143,24 +191,54 @@ export default function LogbookPanel({
   }, [entries, search, department, course, reasonFilter, dateFrom, dateTo]);
 
   // Summary of the active filters, shown on the printed page + PDF (mirrors
-  // Reports' "period — department" metadata line).
+  // Reports' "period — department" metadata line). Empty selections render as
+  // the classic "All …" labels; multiple picks render as "N … selected".
   const dateSummary = dateFrom || dateTo ? `${isoToMDY(dateFrom)} to ${isoToMDY(dateTo)}` : "All Dates";
-  const printSummary = `${dateSummary} — ${department} — ${course} — ${reasonFilter}${search ? ` — Search: "${search}"` : ""} — Total: ${filtered.length} entries`;
+  const departmentLabel = formatFilterSelectionLabel({
+    selected: department,
+    options: departments,
+    allLabel: "All Departments",
+    pluralLabel: "Departments",
+  });
+  const courseLabel = formatFilterSelectionLabel({
+    selected: course,
+    options: courses,
+    allLabel: "All Course",
+    pluralLabel: "Courses",
+  });
+  const reasonLabel = formatFilterSelectionLabel({
+    selected: reasonFilter,
+    options: reasons,
+    allLabel: "All Reason",
+    pluralLabel: "Reasons",
+  });
+  const printSummary = `${dateSummary} — ${departmentLabel} — ${courseLabel} — ${reasonLabel}${search ? ` — Search: "${search}"` : ""} — Total: ${filtered.length} entries`;
 
   const PAGE_SIZE = 5;
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageCount = getPageCount(filtered.length, PAGE_SIZE);
   const [page, setPage] = useState(1);
-  const currentPage = Math.min(page, pageCount);
+  const currentPage = clampPage(page, pageCount);
   const pageRows = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   function updateFilter(setter) {
     return (e) => {
       setter(e.target.value);
       setPage(1);
     };
+  }
+
+  function changeDateRange({ from, to, period }) {
+    setDateFrom(from);
+    setDateTo(to);
+    setDatePeriod(period ?? "All Time");
+    setPage(1);
   }
 
   function handlePrint() {
@@ -197,11 +275,11 @@ export default function LogbookPanel({
       doc.setTextColor("#000000");
       doc.text(`Date: ${isoToMDY(dateFrom)} to ${isoToMDY(dateTo)}`, 14, y);
       y += 5;
-      doc.text(`Department: ${department}`, 14, y);
+      doc.text(`Department: ${departmentLabel}`, 14, y);
       y += 5;
-      doc.text(`Course: ${course}`, 14, y);
+      doc.text(`Course: ${courseLabel}`, 14, y);
       y += 5;
-      doc.text(`Reason: ${reasonFilter}`, 14, y);
+      doc.text(`Reason: ${reasonLabel}`, 14, y);
       if (search) {
         y += 5;
         doc.text(`Search: ${search}`, 14, y);
@@ -368,45 +446,51 @@ export default function LogbookPanel({
               className="w-full outline-none placeholder:text-gray-400 text-gray-900"
             />
           </div>
-          <UniversalDropdown value={department} onChange={(v) => { setDepartment(v); setPage(1); }} options={departments} />
-          <UniversalDropdown value={course} onChange={(v) => { setCourse(v); setPage(1); }} options={courses} />
-          <UniversalDropdown value={reasonFilter} onChange={(v) => { setReasonFilter(v); setPage(1); }} options={["All Reason", ...reasons]} />
+          <FilterMultiSelect
+            value={department}
+            onChange={(v) => { setDepartment(v); setPage(1); }}
+            options={departments}
+            allLabel="All Departments"
+            pluralLabel="Departments"
+            ariaLabel="Filter by department"
+            triggerTestId="logbook-department-filter"
+          />
+          <FilterMultiSelect
+            value={course}
+            onChange={(v) => { setCourse(v); setPage(1); }}
+            options={courses}
+            allLabel="All Course"
+            pluralLabel="Courses"
+            ariaLabel="Filter by course"
+            triggerTestId="logbook-course-filter"
+          />
+          <FilterMultiSelect
+            value={reasonFilter}
+            onChange={(v) => { setReasonFilter(v); setPage(1); }}
+            options={reasons}
+            allLabel="All Reason"
+            pluralLabel="Reasons"
+            ariaLabel="Filter by reason"
+            triggerTestId="logbook-reason-filter"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-            From
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={updateFilter(setDateFrom)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-            To
-            <input
-              type="date"
-              value={dateTo}
-              onChange={updateFilter(setDateTo)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
-            />
-          </label>
+          <LogbookRangePicker
+            value={{ from: dateFrom, to: dateTo, period: datePeriod }}
+            onChange={changeDateRange}
+            ariaLabel="Filter by date range"
+            className="w-full md:flex-1"
+            buttonClassName="min-w-0 md:min-w-[13rem]"
+            triggerTestId="logbook-date-range"
+            compact
+          />
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50"
-            >
-              <NavIcon name="printer" className="w-4 h-4" />
-              Print
-            </button>
-            <button
+            <PrintButton onClick={handlePrint} />
+            <DownloadPdfButton
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <NavIcon name="download" className="w-4 h-4" />
-              {downloading ? "Preparing…" : "Download PDF"}
-            </button>
+              loading={downloading}
+            />
           </div>
         </div>
       </div>
@@ -485,49 +569,29 @@ export default function LogbookPanel({
 
       {/* pagination */}
       <Pagination
-        page={page}
+        page={currentPage}
         pageCount={pageCount}
         onChange={setPage}
         label={`${filtered.length} search result${filtered.length === 1 ? "" : "s"}`}
         className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 print:hidden"
       />
 
-      {/* bottom trigger — hidden once the form is open */}
-      {!walkIn.showWalkInForm && (
-        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
-          <button
-            onClick={() => walkIn.setShowWalkInForm(true)}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            + Add Walk-in Visit
-          </button>
-        </div>
-      )}
+      {/* bottom trigger — the shared full-Logbook modal keeps this widget compact. */}
+      <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
+        <button
+          onClick={() => walkIn.setShowWalkInForm(true)}
+          className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+        >
+          + Add Walk-in Visit
+        </button>
+      </div>
 
-      {/* walk-in visit form — wrapped with the same px-5 side padding every
-          other block in this widget uses; the shared WalkInVisitForm
-          component has no horizontal padding of its own (LogbookFullPanel
-          gives it padding via its own p-4/p-5 section wrapper), so without
-          this it rendered flush against this panel's edges. */}
-      {walkIn.showWalkInForm && (
-        <div className="px-5 pb-5 print:hidden">
-          <WalkInVisitForm
-            regId={walkIn.regId} setRegId={walkIn.setRegId}
-            walkInName={walkIn.walkInName} setWalkInName={walkIn.setWalkInName}
-            walkInReasonId={walkIn.walkInReasonId} setWalkInReasonId={walkIn.setWalkInReasonId}
-            complaint={walkIn.complaint} setComplaint={walkIn.setComplaint}
-            medicineInput={walkIn.medicineInput} setMedicineInput={walkIn.setMedicineInput}
-            quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
-            medTags={walkIn.medTags}
-            walkInError={walkIn.walkInError}
-            isSubmitting={walkIn.isSubmitting}
-            handleAddMedicine={walkIn.handleAddMedicine}
-            handleAddWalkIn={walkIn.handleAddWalkIn}
-            handleClose={walkIn.handleClose}
-            reasonRecords={reasonRecords}
-          />
-        </div>
-      )}
+      <WalkInVisitModal
+        open={walkIn.showWalkInForm}
+        walkIn={walkIn}
+        reasonRecords={reasonRecords}
+        onClose={walkIn.handleClose}
+      />
     </section>
   );
 }

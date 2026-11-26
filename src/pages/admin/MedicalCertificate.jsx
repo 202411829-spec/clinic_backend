@@ -55,6 +55,7 @@ export default function MedicalCertificate() {
   const [error, setError] = useState(null);
 
   const rawYear = searchParams.get("year") || location.state?.year || null;
+  const selectedExamId = location.state?.annualExamId ?? null;
   const { yearKey, yearLabel } = resolveYearParam(rawYear);
 
   useEffect(() => {
@@ -81,7 +82,12 @@ export default function MedicalCertificate() {
         // Fall back to the most recent year that has an annual exam.
         let examId = null;
         let resolvedLabel = yearLabel;
-        if (yearLabel || yearKey) {
+        // Prefer the exact annual exam the Student Record page just saved.
+        // Fallbacks below are for direct/bookmarked links without router state.
+        if (selectedExamId) {
+          examId = selectedExamId;
+        }
+        if (!examId && (yearLabel || yearKey)) {
           examId = examIdForYear(medSummary, yearLabel, yearKey);
         }
         if (!examId) {
@@ -112,7 +118,7 @@ export default function MedicalCertificate() {
     return () => {
       cancelled = true;
     };
-  }, [studentId, rawYear]);
+  }, [studentId, rawYear, selectedExamId]);
 
   if (error) {
     return (

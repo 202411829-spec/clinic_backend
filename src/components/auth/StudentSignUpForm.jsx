@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EyeIcon, EyeOffIcon } from '../ui/icons.jsx'
 import { authApi } from '../../lib/api.js'
-
-const EMAIL_DOMAIN = '@gordoncollege.edu.ph'
-const EMAIL_RE = /^[^\s@]+@gordoncollege\.edu\.ph$/i
+import { friendlyPasswordError } from '../../lib/authPasswordErrors.js'
+import {
+  normalizeEmail,
+  validateStudentEmail,
+} from '../../lib/signupValidation.js'
+import { validatePassword } from '../../lib/passwordPolicy.js'
+import PasswordStrengthMeter from './PasswordStrengthMeter.jsx'
 
 const STEPS = [
   { id: 1, label: 'Email' },
@@ -11,57 +15,70 @@ const STEPS = [
   { id: 3, label: 'Password' },
 ]
 
-/**
- * Multi-step student sign-up form.
- *
- * Step 1: collect the Gordon College email and confirm it is available
- *         (POST /api/auth/check-email).
- * Step 2: trigger a 6-digit code email (POST /api/auth/send-code) and let the
- *         student paste the code they received.
- * Step 3: collect + confirm a password, then create the account
- *         (POST /api/auth/signup). On success the parent performs the
- *         auto-login (Supabase) and redirects.
- *
- * `onSignupSuccess({ email, password })` is called only after the backend
- * confirms the account was created, so the page can sign the student in and
- * route them into the first-login "complete your record" gate.
- */
-export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loading = false, error = '' }) {
+const RESEND_COOLDOWN_SECONDS = 60
+
+const inputClass =
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20'
+
+const primaryBtnClass =
+  'btn-press w-full rounded-xl bg-gc-green-700 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-800 focus:outline-none focus:ring-2 focus:ring-gc-green-700/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100'
+
+export default function StudentSignUpForm({ onSignupSuccess, loading = false, error = '' }) {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [busy, setBusy] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
   const [fieldError, setFieldError] = useState('')
   const [info, setInfo] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const sendInFlightRef = useRef(false)
 
-  const isCentered = align === 'center'
   const isBusy = busy || loading
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined
+    const timer = window.setTimeout(() => setResendCooldown((s) => s - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [resendCooldown])
 
   function validateEmail() {
     if (!email.trim()) return 'Please enter your email address.'
-    if (!EMAIL_RE.test(email.trim())) {
-      return `Use your Gordon College email (ending in ${EMAIL_DOMAIN}).`
-    }
-    return ''
+    return validateStudentEmail(email)
+  }
+
+  function beginCodeSend() {
+    if (sendInFlightRef.current) return false
+    sendInFlightRef.current = true
+    setSendingCode(true)
+    setBusy(true)
+    return true
+  }
+
+  function finishCodeSend() {
+    sendInFlightRef.current = false
+    setSendingCode(false)
+    setBusy(false)
   }
 
   async function handleEmailSubmit(e) {
     e.preventDefault()
-    const emailError = validateEmail()
-    if (emailError) {
-      setFieldError(emailError)
+    const validationError = validateEmail()
+    if (validationError) {
+      setFieldError(validationError)
       return
     }
+    const normalizedEmail = normalizeEmail(email)
+    setEmail(normalizedEmail)
     setFieldError('')
-    setBusy(true)
+    if (!beginCodeSend()) return
     try {
-      const result = await authApi.checkEmail(email.trim())
-      // A 200 with no error means the email is usable. Some responses may
-      // explicitly flag availability/conflict — honor those when present.
+      const result = await authApi.checkEmail(normalizedEmail)
       if (result && result.available === false) {
         setFieldError('That email is already registered. Try logging in instead.')
         return
@@ -70,26 +87,31 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
         setFieldError('That email is already registered. Try logging in instead.')
         return
       }
-      await authApi.sendCode(email.trim())
-      setInfo(`We sent a 6-digit code to ${email.trim()}.`)
+      await authApi.sendCode(normalizedEmail)
+      setInfo(`We sent a 6-digit code to ${normalizedEmail}. It may take a minute to arrive; check spam if needed.`)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
       setStep(2)
     } catch (err) {
       setFieldError(err?.message || 'Could not verify this email. Please try again.')
     } finally {
-      setBusy(false)
+      finishCodeSend()
     }
   }
 
   async function handleResend() {
+    if (resendCooldown > 0 || isBusy || sendInFlightRef.current) return
+    const normalizedEmail = normalizeEmail(email)
+    setEmail(normalizedEmail)
     setFieldError('')
-    setBusy(true)
+    if (!beginCodeSend()) return
     try {
-      await authApi.sendCode(email.trim())
-      setInfo(`We resent a 6-digit code to ${email.trim()}.`)
+      await authApi.sendCode(normalizedEmail)
+      setInfo(`We resent a 6-digit code to ${normalizedEmail}. It may take a minute to arrive; check spam if needed.`)
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (err) {
       setFieldError(err?.message || 'Could not resend the code. Please try again.')
     } finally {
-      setBusy(false)
+      finishCodeSend()
     }
   }
 
@@ -108,33 +130,36 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
     setStep(3)
   }
 
-  function validatePassword() {
-    if (!password) return 'Please enter a password.'
-    if (password.length < 8) return 'Password must be at least 8 characters.'
+  // Shared policy (12 chars, 3 of 4 groups, denylist, no email/username
+  // substring…). Email context lets the validator reject personal passwords;
+  // the local part is derived inside passwordPolicy.js.
+  const passwordCheck = validatePassword(password, { email })
+
+  function validatePasswordFields() {
+    if (!passwordCheck.valid) return passwordCheck.message
     if (password !== confirmPassword) return 'Passwords do not match.'
     return ''
   }
 
   async function handlePasswordSubmit(e) {
     e.preventDefault()
-    const pwError = validatePassword()
-    if (pwError) {
-      setFieldError(pwError)
+    const passwordError = validatePasswordFields()
+    if (passwordError) {
+      setFieldError(passwordError)
       return
     }
     setFieldError('')
     setBusy(true)
     try {
       await authApi.signup({
-        email: email.trim(),
+        email: normalizeEmail(email),
         code,
         password,
         confirmPassword,
       })
-      onSignupSuccess?.({ email: email.trim(), password })
+      onSignupSuccess?.({ email: normalizeEmail(email), password })
     } catch (err) {
-      const message = err?.message || 'Could not create your account. Please try again.'
-      // If the backend rejected the code, send the student back to re-enter it.
+      const message = friendlyPasswordError(err, 'Could not create your account. Please try again.')
       if (/code/i.test(message)) {
         setFieldError(message)
         setCode('')
@@ -150,20 +175,7 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
   const message = fieldError || error
 
   return (
-    <form onSubmit={step === 1 ? handleEmailSubmit : step === 2 ? handleCodeSubmit : handlePasswordSubmit} className="w-full">
-      <div className={isCentered ? 'text-center' : 'text-left'}>
-        <p className="text-xs font-bold tracking-[0.15em] text-gc-accent uppercase">
-          Student Portal
-        </p>
-        <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-gc-green-700">
-          Create your account
-        </h1>
-        <p className="mt-3 text-[15px] leading-relaxed text-gray-600">
-          Sign up with your Gordon College email to book clinic appointments.
-        </p>
-      </div>
-
-      {/* Step indicator */}
+    <>
       <ol className="mt-6 flex items-center gap-2">
         {STEPS.map((s, idx) => {
           const active = s.id === step
@@ -172,45 +184,55 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
             <li key={s.id} className="flex flex-1 items-center gap-2">
               <span
                 className={[
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-300',
-                  active ? 'bg-gc-accent text-white animate-scale-in' : done ? 'bg-gc-accent text-white' : 'bg-gray-100 text-gray-400',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors duration-200',
+                  active || done ? 'bg-gc-green-700 text-white' : 'bg-gray-100 text-gray-400',
                 ].join(' ')}
               >
                 {s.id}
               </span>
-              <span className={`text-xs font-semibold transition-colors duration-300 ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>
-                {s.label}
-              </span>
-              {idx < STEPS.length - 1 && (
-                <span className={`h-0.5 flex-1 transition-colors duration-300 ${done ? 'bg-gc-accent' : 'bg-gray-100'}`} />
-              )}
+              <span className={`text-xs font-semibold transition-colors duration-200 ${active || done ? 'text-gc-green-700' : 'text-gray-400'}`}>{s.label}</span>
+              {idx < STEPS.length - 1 && <span className={`h-0.5 flex-1 transition-colors duration-300 ${done ? 'bg-gc-green-700' : 'bg-gray-100'}`} />}
             </li>
           )
         })}
       </ol>
 
-      {/* key={step} remounts this wrapper on every step change so switching
-          Email -> Verify -> Password replays a quick settle-in transition —
-          transform/opacity only, so it stays cheap. */}
-      <div key={step} className="mt-7 space-y-5 animate-fade-in-up motion-reduce:animate-none">
+      {info && !message ? <p className="mt-4 text-sm font-medium text-gc-green-700 animate-fade-in-up">{info}</p> : null}
+      {message ? (
+        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
+          {message}
+        </p>
+      ) : null}
+
+      <form
+        key={step}
+        noValidate
+        onSubmit={step === 1 ? handleEmailSubmit : step === 2 ? handleCodeSubmit : handlePasswordSubmit}
+        className="mt-6 space-y-4 animate-fade-in-up motion-reduce:animate-none"
+      >
         {step === 1 && (
           <div>
             <label htmlFor="signup-email" className="block text-sm font-semibold text-gray-900 mb-1.5">
-              Gordon College email
+              Gordon College email <span className="text-red-500">*</span>
             </label>
             <input
               id="signup-email"
               name="email"
               type="email"
               autoComplete="email"
+              required
+              aria-required="true"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
                 setFieldError('')
               }}
-              placeholder={`name${EMAIL_DOMAIN}`}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+              placeholder="@gordoncollege.edu.ph"
+              className={inputClass}
             />
+            <button type="submit" disabled={isBusy} className={`mt-4 ${primaryBtnClass}`}>
+              {sendingCode ? 'Sending code…' : 'Continue'}
+            </button>
           </div>
         )}
 
@@ -218,7 +240,7 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor="signup-code" className="block text-sm font-semibold text-gray-900 mb-1.5">
-                6-digit code
+                6-digit code <span className="text-red-500">*</span>
               </label>
               <button
                 type="button"
@@ -227,7 +249,7 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
                   setFieldError('')
                   setInfo('')
                 }}
-                className="mb-1.5 text-xs font-semibold text-gc-accent hover:text-gc-green-600"
+                className="mb-1.5 text-xs font-semibold text-gc-green-700 hover:text-gc-green-800"
               >
                 Change email
               </button>
@@ -238,18 +260,27 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
+              required
+              aria-required="true"
               value={code}
               onChange={(e) => handleCodeChange(e.target.value)}
               placeholder="••••••"
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-center text-[22px] tracking-[0.5em] text-gray-900 shadow-sm placeholder:text-gray-300 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+              className={`${inputClass} text-center text-xl tracking-[0.5em]`}
             />
             <button
               type="button"
               onClick={handleResend}
-              disabled={isBusy}
-              className="mt-2 text-xs font-semibold text-gc-accent hover:text-gc-green-600 disabled:opacity-60"
+              disabled={isBusy || resendCooldown > 0}
+              className="btn-press mt-2 text-xs font-semibold text-gc-green-700 hover:text-gc-green-800 disabled:opacity-60"
             >
-              Resend code
+              {sendingCode
+                ? 'Sending code…'
+                : resendCooldown > 0
+                  ? `Resend code in ${resendCooldown}s`
+                  : 'Resend code'}
+            </button>
+            <button type="submit" disabled={isBusy} className={`mt-4 ${primaryBtnClass}`}>
+              {isBusy ? 'Verifying…' : 'Verify code'}
             </button>
           </div>
         )}
@@ -258,7 +289,7 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
           <>
             <div>
               <label htmlFor="signup-password" className="block text-sm font-semibold text-gray-900 mb-1.5">
-                Password
+                Password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -266,13 +297,16 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
+                  required
+                  aria-required="true"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
                     setFieldError('')
                   }}
-                  placeholder="At least 8 characters"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
+                  placeholder="12+ characters"
+                  aria-describedby="signup-password-strength"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-11 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-green-700 focus:outline-none focus:ring-2 focus:ring-gc-green-700/20"
                 />
                 <button
                   type="button"
@@ -283,80 +317,61 @@ export default function StudentSignUpForm({ align = 'left', onSignupSuccess, loa
                   {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
+              <PasswordStrengthMeter id="signup-password-strength" check={passwordCheck} password={password} />
             </div>
 
             <div>
               <label htmlFor="signup-confirm" className="block text-sm font-semibold text-gray-900 mb-1.5">
-                Confirm password
+                Confirm password <span className="text-red-500">*</span>
               </label>
-              <input
-                id="signup-confirm"
-                name="confirmPassword"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value)
-                  setFieldError('')
-                }}
-                placeholder="Re-enter your password"
-                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-gc-accent focus:outline-none focus:ring-2 focus:ring-gc-accent/20"
-              />
+              <div className="relative">
+                <input
+                  id="signup-confirm"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  required
+                  aria-required="true"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value)
+                    setFieldError('')
+                  }}
+                  placeholder="Re-enter your password"
+                  className={`${inputClass} pr-11`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
+
+            <button type="submit" disabled={isBusy} className={primaryBtnClass}>
+              {isBusy ? 'Creating account…' : 'Create account'}
+            </button>
           </>
         )}
-      </div>
 
-      {info && !message ? (
-        <p className="mt-4 text-sm font-medium text-gc-green-700 animate-fade-in-up">{info}</p>
-      ) : null}
-
-      {message ? (
-        <p role="alert" className="mt-4 text-sm font-medium text-red-600 animate-fade-in-up">
-          {message}
-        </p>
-      ) : null}
-
-      <button
-        type="submit"
-        disabled={isBusy}
-        className="btn-press mt-7 w-full rounded-xl bg-gc-accent py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-gc-green-600 focus:outline-none focus:ring-2 focus:ring-gc-accent/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
-      >
-        {isBusy ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            Please wait…
-          </span>
-        ) : step === 1 ? (
-          'Continue'
-        ) : step === 2 ? (
-          'Verify code'
-        ) : (
-          'Create account'
+        {step > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              setStep((s) => s - 1)
+              setFieldError('')
+              setInfo('')
+            }}
+            disabled={isBusy}
+            className="btn-press w-full text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
+          >
+            Back
+          </button>
         )}
-      </button>
-
-      {step > 1 && (
-        <button
-          type="button"
-          onClick={() => {
-            setStep((s) => s - 1)
-            setFieldError('')
-            setInfo('')
-          }}
-          disabled={isBusy}
-          className="btn-press mt-3 w-full text-center text-sm font-semibold text-gray-500 hover:text-gc-green-700 disabled:opacity-60"
-        >
-          Back
-        </button>
-      )}
-
-      <p className="mt-5 text-center text-sm text-gray-600">
-        Already have an account?{' '}
-        <a href="/student/login" className="font-semibold text-gc-accent hover:text-gc-green-600">
-          Log in
-        </a>
-      </p>
-    </form>
+      </form>
+    </>
   )
 }

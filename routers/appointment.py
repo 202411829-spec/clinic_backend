@@ -9,6 +9,8 @@ from routers.clinic_schedule import (
     get_default_settings,
     materialize_time_slots,
     generate_time_blocks,
+    resolve_reason_scope,
+    schedule_row_matches_reason_scope,
     DEFAULT_SLOT_INTERVAL_MINUTES,
     DEFAULT_MAX_STUDENTS_PER_SLOT,
 )
@@ -20,6 +22,7 @@ from routers.helpers import (
     format_date_time,
     get_latest_status_for_appointments,
     handle_errors,
+    reason_uses_dedicated_schedule,
 )
 from routers.auth_guard import require_auth, require_admin, resolve_student_id
 
@@ -140,6 +143,16 @@ _STATUS_LABELS = {
 _APPOINTMENTS_DEFAULT_LIMIT = 50
 
 
+def _parse_positive_int(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 def _normalize_status(status):
     """
     Coerce a client-supplied status to the canonical lowercase enum value.
@@ -162,7 +175,35 @@ def _normalize_status(status):
     return _TITLE_CASE_TO_ENUM.get(raw) or _TITLE_CASE_TO_ENUM.get(lowered)
 
 
-def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
+def _slot_belongs_to_reason_scope(slot_row, reason_scope):
+    """
+    True when a real time_slot row belongs to the resolved reason
+    scope's schedule (clinic_schedules.reason_id). reason_scope is
+    None only for the general scope — callers handle that case
+    without this check (legacy behaviour: any resolvable slot).
+    """
+    schedule_id = slot_row.get("schedule_id")
+    if schedule_id is None:
+        return False
+
+    # Read the whole row and scope in Python: the additive reason_id column
+    # is not present in every environment yet, and selecting/filtering it
+    # here would make booking fail with PostgREST 42703.
+    response = execute_with_retry(
+        supabase
+        .table("clinic_schedules")
+        .select("*")
+        .eq("schedule_id", schedule_id)
+        .limit(1)
+    )
+    rows = response.data or []
+    if not rows:
+        return False
+
+    return schedule_row_matches_reason_scope(rows[0], reason_scope)
+
+
+def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None, reason_scope=None):
     """
     Resolve the target time_slot row for a booking, mirroring how
     GET /appointments/slots relates bookings to time_slot rows.
@@ -172,18 +213,33 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
     auto-materializes a real schedule + time_slots for that date so
     virtual bookings can succeed.
 
+    reason_scope is the RESOLVED schedule scope (see
+    clinic_schedule.resolve_reason_scope): None = legacy general
+    schedule, an int = that dedicated reason's schedules ONLY. A
+    dedicated reason never resolves against the general schedule,
+    never auto-materializes a general schedule, and never matches a
+    slot from another scope.
+
     Logic:
-      1) If slot_id > 0, lookup by slot_id as before. If found return it
-         (don't 400 just for schedule/date mismatch).
+      1) If slot_id > 0, lookup by slot_id as before. If found return
+         it — unless reason_scope is dedicated and the slot belongs
+         to a different scope's schedule, in which case return None
+         (a Consultation/general slot must never be reused for e.g.
+         Dental Service).
       2) If slot_id is negative/virtual or not found, and appointment_date
-         is provided: look up clinic_schedules for that date. If no row
-         exists, CREATE one on-demand from get_default_settings() and
+         is provided: look up clinic_schedules for that date within the
+         scope. If no row exists and the scope is the general one,
+         CREATE one on-demand from get_default_settings() and
          materialize_time_slots(), then find slot by appointment_time.
          If override exists but has no time_slots, materialize if enabled
-         else return None (clinic closed).
-      3) Fallback to matching by appointment_time across all slots.
-         Returns None when no slot matches.
+         else return None (clinic closed). A dedicated scope with no
+         configured schedule returns None — no auto-materialization.
+      3) Fallback to matching by appointment_time across all slots —
+         general scope only (legacy behavior). Returns None when no
+         slot matches.
     """
+    dedicated_scope = reason_scope is not None
+
     # 1) Real slot_id path
     if slot_id is not None:
         try:
@@ -199,7 +255,14 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
             )
             rows = response.data or []
             if rows:
-                return rows[0]
+                if not dedicated_scope:
+                    return rows[0]
+                # Dedicated reason: the slot must belong to THIS
+                # reason's schedule — reject cross-scope reuse
+                # (e.g. a Consultation slot passed for Dental).
+                if _slot_belongs_to_reason_scope(rows[0], reason_scope):
+                    return rows[0]
+                return None
             # not found -> fall through to date-aware handling
         elif sid_int is not None and sid_int < 0:
             # virtual slot -> must resolve via date
@@ -211,7 +274,7 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
 
     # 2) Date-aware virtual / missing slot handling
     if appointment_date:
-        override = get_schedule_for_date(appointment_date)
+        override = get_schedule_for_date(appointment_date, reason_id=reason_scope)
 
         # Clinic explicitly closed -> let caller surface "Clinic is closed"
         if override and override.get("is_enabled") is False:
@@ -252,7 +315,13 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
                             return slot
             # still not found -> will fall through to generic search / None
         else:
-            # No override -> auto-materialize a real schedule for this date
+            # No override for this scope.
+            if dedicated_scope:
+                # A dedicated reason with no configured schedule has no
+                # availability: never auto-materialize a general
+                # schedule and never fall back to default slots.
+                return None
+            # General scope -> auto-materialize a real schedule for this date
             settings = get_default_settings()
             if settings:
                 new_row_data = {
@@ -274,7 +343,7 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
                     new_rows = []
                 # Race: another request may have created it concurrently
                 if not new_rows:
-                    override_retry = get_schedule_for_date(appointment_date)
+                    override_retry = get_schedule_for_date(appointment_date, reason_id=reason_scope)
                     if override_retry:
                         new_rows = [override_retry]
                 if new_rows:
@@ -296,7 +365,12 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
                                 return slot
             # if settings missing, cannot materialize -> fall through
 
-    # 3) Fallback: match by appointment_time across all slots (legacy behavior)
+    # 3) Fallback: match by appointment_time across all slots (legacy
+    #    behavior). Skipped for dedicated scopes so a slot from the
+    #    general/other schedule can never satisfy a dedicated booking.
+    if dedicated_scope:
+        return None
+
     if not appointment_time:
         return None
 
@@ -316,20 +390,32 @@ def resolve_slot_for_booking(slot_id, appointment_time, appointment_date=None):
     return None
 
 
-def is_slot_closed_for_date(appointment_date):
+def is_slot_closed_for_date(appointment_date, reason_scope=None):
     """
     True when a clinic_schedule override marks the given date as
     closed/disabled (is_enabled is False).
+
+    reason_scope is the RESOLVED schedule scope: None checks the
+    legacy general schedule (reason_id IS NULL) — what this always
+    did — and an int checks only that dedicated reason's schedule
+    row, so a Dental closure never blocks Consultation bookings and
+    a general closure never blocks Dental (and vice versa).
     """
-    response = execute_with_retry(
+    # Do not filter on reason_id in PostgREST — see
+    # schedule_row_matches_reason_scope() for the schema-compatibility reason.
+    query = (
         supabase
         .table("clinic_schedules")
-        .select("is_enabled, closure_reason")
+        .select("*")
         .eq("working_date", appointment_date)
-        .limit(1)
     )
 
-    rows = response.data or []
+    response = execute_with_retry(query)
+
+    rows = [
+        row for row in (response.data or [])
+        if schedule_row_matches_reason_scope(row, reason_scope)
+    ]
 
     if not rows:
         return False
@@ -633,6 +719,31 @@ def get_time_slots():
         }), 400
 
     # ----------------------------------------------------
+    # Optional reason scope: omitted/null -> legacy general
+    # schedules + existing virtual/default behaviour; a dedicated
+    # reason -> ONLY that reason's schedules (empty when none is
+    # configured — no virtual defaults, no auto-materialization);
+    # a non-dedicated reason -> the general scope (unchanged).
+    # Malformed/unknown reason_id -> 400. The reason lookup is
+    # passed explicitly so this module's (patchable) import is
+    # used rather than a second copy elsewhere — and only when a
+    # reason_id was actually supplied.
+    # ----------------------------------------------------
+    raw_reason_id = request.args.get("reason_id")
+    reason_scope = None
+    if raw_reason_id is not None and str(raw_reason_id).strip() != "":
+        try:
+            reason_scope = resolve_reason_scope(
+                raw_reason_id,
+                reasons_by_id=build_reason_lookup()
+            )
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid reason_id"
+            }), 400
+
+    # ----------------------------------------------------
     # Booking window defense-in-depth: students may only query
     # slots starting tomorrow (>= tomorrow). Today and past are
     # blocked; any future date >= tomorrow is allowed. Admins are
@@ -653,10 +764,21 @@ def get_time_slots():
     # schedules' slots with duplicate times).
     # ----------------------------------------------------
     if requested_date:
-        override = get_schedule_for_date(requested_date)
+        override = get_schedule_for_date(requested_date, reason_id=reason_scope)
 
         # Closed day → empty
         if override and override.get("is_enabled") is False:
+            return jsonify({
+                "success": True,
+                "count": 0,
+                "slots": []
+            })
+
+        # Dedicated reason with no configured schedule → empty.
+        # No virtual default slots and no on-demand materialization:
+        # availability for a dedicated reason must be configured
+        # explicitly through the schedule CRUD first.
+        if reason_scope is not None and not override and not schedule_id:
             return jsonify({
                 "success": True,
                 "count": 0,
@@ -718,9 +840,19 @@ def get_time_slots():
                 )
                 reasons_fut = executor.submit(build_reason_lookup)
 
-                appointment_response = appointment_fut.result()
-                reasons_by_id = reasons_fut.result()
+            appointment_response = appointment_fut.result()
+            reasons_by_id = reasons_fut.result()
             appointments = appointment_response.data or []
+            # General/legacy virtual slots must not be consumed by bookings
+            # for reasons that use their own dedicated schedule (e.g. Dental
+            # Service has a separate dentist/room/capacity).
+            if reason_scope is None:
+                appointments = [
+                    a for a in appointments
+                    if not reason_uses_dedicated_schedule(
+                        reasons_by_id.get(a.get("reason_id"))
+                    )
+                ]
             appointment_ids = [a["appointment_id"] for a in appointments]
             # Scope the student lookup to this date's appointment
             # student ids instead of the old whole-table TTL dict
@@ -761,6 +893,7 @@ def get_time_slots():
                         else "-"
                     ),
                     "dept": student.get("dept", "-"),
+                    "course": student.get("course", "-"),
                     "sex": student.get("sex", "-"),
                     "reason": reason_row.get("description") or "-",
                     "status": (_STATUS_LABELS.get(status_row.get("new_status"))
@@ -816,9 +949,11 @@ def get_time_slots():
             schedule_id
         )
     elif requested_date:
-        # requested_date provided without schedule_id: filter to that date's schedule
-        # (already handled closed/virtual cases above; if override exists, filter)
-        override = get_schedule_for_date(requested_date)
+        # requested_date provided without schedule_id: filter to that date's
+        # schedule within the resolved reason scope (already handled
+        # closed/virtual/dedicated-empty cases above; if override exists,
+        # filter)
+        override = get_schedule_for_date(requested_date, reason_id=reason_scope)
         if override:
             slot_query = slot_query.eq(
                 "schedule_id",
@@ -861,6 +996,12 @@ def get_time_slots():
             .select("*")
             .eq("appointment_date", requested_date)
         )
+        # Dedicated scope: only that reason's bookings may appear on
+        # its slots (a general walk-in with a NULL time_slot_id must
+        # not be time-matched onto a Dental slot). The general scope
+        # keeps the existing unfiltered date read.
+        if reason_scope is not None:
+            appointment_query = appointment_query.eq("reason_id", reason_scope)
     else:
         slot_ids = [
             s.get("slot_id")
@@ -884,6 +1025,16 @@ def get_time_slots():
     appointment_response = execute_with_retry(appointment_query)
 
     appointments = appointment_response.data or []
+    # General-scope, date-scoped slots must ignore bookings that belong to
+    # reasons with dedicated schedules (separate dentist/room/capacity).
+    # Dedicated scopes are already filtered by reason_id above.
+    if requested_date and reason_scope is None:
+        appointments = [
+            a for a in appointments
+            if not reason_uses_dedicated_schedule(
+                reasons_by_id.get(a.get("reason_id"))
+            )
+        ]
 
     appointment_ids = [
         a["appointment_id"] for a in appointments
@@ -915,7 +1066,7 @@ def get_time_slots():
     resolved_override = None
     resolved_schedule_id = None
     if requested_date:
-        resolved_override = get_schedule_for_date(requested_date)
+        resolved_override = get_schedule_for_date(requested_date, reason_id=reason_scope)
         if resolved_override:
             resolved_schedule_id = resolved_override.get("schedule_id")
     slot_time_to_id = {}
@@ -975,6 +1126,7 @@ def get_time_slots():
                 else "-"
             ),
             "dept": student.get("dept", "-"),
+            "course": student.get("course", "-"),
             "sex": student.get("sex", "-"),
             "reason": reason_row.get("description") or "-",
             # Display label from the lowercase enum ("pending" -> "Pending").
@@ -1278,10 +1430,15 @@ def update_appointment_status(appointment_id):
 #
 # Server-side validations (all return the standard
 # {"success": false, "error": ...} envelope):
+#   - 400 when a supplied reason_id is not a known appointment
+#     reason (resolved schedule scope: dedicated reasons such as
+#     Dental Service book ONLY against their own schedule rows)
 #   - 400 when no matching time_slot exists for slot_id /
-#     appointment_time
+#     appointment_time (a dedicated reason's slot must belong to
+#     that reason's schedule — a Consultation/general slot is
+#     never reused)
 #   - 400 when a clinic_schedule override marks the date
-#     closed (is_enabled = false)
+#     closed (is_enabled = false) within the booking's reason scope
 #   - 409 when the slot is at capacity
 #     (clinic_appointment_settings.max_students_per_slot)
 #   - 409 when the same student already holds an ACTIVE
@@ -1324,6 +1481,99 @@ def create_appointment():
         }), 400
 
     # ----------------------------------------------------
+    # Reason validation + schedule scope resolution.
+    # A supplied reason_id must exist in appointment_reasons
+    # (400 otherwise — including non-reschedule bookings, which
+    # previously only failed later at the FK). The resolved
+    # scope (None = legacy general schedule; int = dedicated
+    # reason's own schedules only) is threaded into the
+    # closed-date check and slot resolution below. The lookup
+    # is passed explicitly so this module's (patchable) import
+    # is used.
+    # ----------------------------------------------------
+    reason_scope = None
+    supplied_reason_id = data.get("reason_id")
+    if supplied_reason_id is not None and str(supplied_reason_id).strip() != "":
+        try:
+            reason_scope = resolve_reason_scope(
+                supplied_reason_id,
+                reasons_by_id=build_reason_lookup()
+            )
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "Invalid appointment reason"
+            }), 400
+
+    normalized_student_id = normalize_student_id(student_id)
+    token_student_id = resolve_student_id(g.user)
+    caller_student_id = normalize_student_id(token_student_id) if token_student_id else None
+    effective_student_id = caller_student_id or normalized_student_id
+    rescheduled_raw = (
+        data.get("rescheduled_id")
+        or data.get("rescheduled_appointment_id")
+        or data.get("reschedule_from_id")
+        or data.get("previous_appointment_id")
+    )
+    needs_reschedule = rescheduled_raw is not None
+    parsed_rescheduled_id = None
+    reschedule_changed_by = None
+
+    if needs_reschedule:
+        parsed_rescheduled_id = _parse_positive_int(rescheduled_raw)
+        if parsed_rescheduled_id is None:
+            return jsonify({
+                "success": False,
+                "error": "Invalid rescheduled appointment id"
+            }), 400
+
+        parsed_reason_id = _parse_positive_int(data.get("reason_id"))
+        reason_lookup = build_reason_lookup()
+        valid_reason_ids = {str(key) for key in reason_lookup}
+        if parsed_reason_id is None or str(parsed_reason_id) not in valid_reason_ids:
+            return jsonify({
+                "success": False,
+                "error": "Valid appointment reason is required"
+            }), 400
+
+        old_response = execute_with_retry(
+            supabase
+            .table("appointments")
+            .select("appointment_id, student_id")
+            .eq("appointment_id", parsed_rescheduled_id)
+            .limit(1)
+        )
+        old_rows = old_response.data or []
+        if not old_rows:
+            return jsonify({
+                "success": False,
+                "error": "Appointment to reschedule was not found"
+            }), 404
+
+        old_appointment = old_rows[0]
+        if normalize_student_id(old_appointment.get("student_id")) != effective_student_id:
+            return jsonify({
+                "success": False,
+                "error": "You can only reschedule your own appointments"
+            }), 403
+
+        old_status_rows = get_latest_status_for_appointments([parsed_rescheduled_id])
+        old_status_row = old_status_rows.get(parsed_rescheduled_id) or {}
+        old_status = str(old_status_row.get("new_status") or "pending").strip().lower()
+        if old_status != "pending":
+            return jsonify({
+                "success": False,
+                "error": "Appointment to reschedule is no longer active"
+            }), 409
+
+        reschedule_changed_by = resolve_changed_by_admin_id(g.user)
+        if not reschedule_changed_by:
+            return jsonify({
+                "success": False,
+                "error": "Unable to determine admin identity (changed_by)"
+            }), 400
+
+    # ----------------------------------------------------
     # SERVER-SIDE SLOT VALIDATION
     #
     # GET /appointments/slots already computes full/slotsLeft,
@@ -1355,7 +1605,7 @@ def create_appointment():
                 "error": "Booking is allowed starting tomorrow."
             }), 400
 
-    if is_slot_closed_for_date(appointment_date):
+    if is_slot_closed_for_date(appointment_date, reason_scope):
         return jsonify({
             "success": False,
             "error": "Clinic is closed on the requested date"
@@ -1364,7 +1614,8 @@ def create_appointment():
     slot = resolve_slot_for_booking(
         data.get("slot_id"),
         appointment_time,
-        appointment_date
+        appointment_date,
+        reason_scope
     )
 
     if not slot:
@@ -1408,10 +1659,15 @@ def create_appointment():
         return str(latest_status).strip().lower() != "cancelled"
 
     active_appointments = [
-        row for row in existing_appointments if _is_active(row)
+        row for row in existing_appointments
+        if _is_active(row) and row.get("appointment_id") != parsed_rescheduled_id
     ]
 
-    normalized_student_id = normalize_student_id(student_id)
+    # Validation, pending checks, and the final INSERT must all agree on the
+    # same student. For authenticated students the verified token identity is
+    # authoritative; admins/bookings without a resolved student identity keep
+    # the submitted ID.
+    normalized_student_id = effective_student_id
 
     duplicate = any(
         normalize_student_id(row.get("student_id"))
@@ -1449,34 +1705,14 @@ def create_appointment():
     # proper fix if strict atomicity is required.
     # ----------------------------------------------------
     if not _caller_is_admin():
-        # Resolve the requesting student's id authoritatively from JWT
-        token_sid = resolve_student_id(g.user)
-        effective_sid = normalize_student_id(token_sid) if token_sid else None
-        # Fallback to the payload's student_id when JWT resolution fails
-        if not effective_sid:
-            effective_sid = normalized_student_id
-        if effective_sid:
-            # Support reschedule replacement: exclude the old appointment
-            rescheduled_raw = (
-                data.get("rescheduled_id")
-                or data.get("rescheduled_appointment_id")
-                or data.get("reschedule_from_id")
-                or data.get("previous_appointment_id")
-            )
-            parsed_rescheduled_id = None
-            if rescheduled_raw is not None:
-                try:
-                    parsed_rescheduled_id = int(rescheduled_raw)
-                except (TypeError, ValueError):
-                    parsed_rescheduled_id = None
+        if effective_student_id:
             try:
-                pending_q = supabase.table("appointments").select("appointment_id, student_id").eq("student_id", effective_sid)
+                pending_q = supabase.table("appointments").select("appointment_id, student_id").eq("student_id", effective_student_id)
                 pending_resp = execute_with_retry(pending_q)
                 candidate_rows = pending_resp.data or []
-                # Normalize filter in Python for legacy case differences
                 candidate_rows = [
                     r for r in candidate_rows
-                    if normalize_student_id(r.get("student_id")) == effective_sid
+                    if normalize_student_id(r.get("student_id")) == effective_student_id
                 ]
                 if parsed_rescheduled_id is not None:
                     candidate_rows = [
@@ -1516,7 +1752,7 @@ def create_appointment():
         "time_slot_id": slot_id,
         "appointment_date": appointment_date,
         "appointment_time": appointment_time,
-        "reason_id": data.get("reason_id"),
+        "reason_id": parsed_reason_id if needs_reschedule else data.get("reason_id"),
         "appointment_purpose": data.get("purpose")
     }
 
@@ -1534,25 +1770,58 @@ def create_appointment():
         }), 500
 
     new_appointment = dict(response.data[0])
+    new_appointment_id = new_appointment.get("appointment_id")
+    status_changed_by = reschedule_changed_by if needs_reschedule else data.get("changed_by")
 
-    # Seed the initial status so it shows up for staff. The db stores the
-    # lowercase enum value "pending" — never title-case "Pending".
     _write_status(
-        new_appointment.get("appointment_id"),
+        new_appointment_id,
         None,  # NULL on first insert
         "pending",
         "Booked by student",
-        data.get("changed_by"),
+        status_changed_by,
     )
 
-    # The row captured from the INSERT predates the sync update, so it
-    # still holds current_status = NULL. Reflect the just-seeded status
-    # in the response payload as well.
+    if needs_reschedule:
+        try:
+            cancel_response = _write_status(
+                parsed_rescheduled_id,
+                old_status,
+                "cancelled",
+                "Rescheduled by student",
+                reschedule_changed_by,
+            )
+            if not cancel_response or not cancel_response.data:
+                raise RuntimeError("Failed to cancel rescheduled appointment")
+        except Exception as reschedule_error:
+            logger.error("Reschedule rollback: %r", reschedule_error)
+            try:
+                execute_with_retry(
+                    supabase
+                    .table("appointment_status_history")
+                    .delete()
+                    .eq("appointment_id", new_appointment_id)
+                )
+            except Exception as cleanup_error:
+                logger.error("Reschedule status cleanup error: %r", cleanup_error)
+            try:
+                execute_with_retry(
+                    supabase
+                    .table("appointments")
+                    .delete()
+                    .eq("appointment_id", new_appointment_id)
+                )
+            except Exception as cleanup_error:
+                logger.error("Reschedule appointment cleanup error: %r", cleanup_error)
+            return jsonify({
+                "success": False,
+                "error": "Unable to complete reschedule; original appointment was preserved"
+            }), 500
+
     new_appointment["current_status"] = "pending"
 
     return jsonify({
         "success": True,
-        "message": "Appointment booked",
+        "message": "Appointment rescheduled" if needs_reschedule else "Appointment booked",
         "appointment": new_appointment
     }), 201
 

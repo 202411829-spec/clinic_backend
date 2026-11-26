@@ -36,41 +36,48 @@ function loadSeals() {
  * @param {number} startY - the y position to start drawing from
  * @returns {Promise<number>} the y position after the letterhead block
  */
-export async function pdfLetterhead(doc, startY = 18) {
+export async function pdfLetterhead(doc, startY = 18, options = {}) {
   let y = startY;
   const seals = await loadSeals();
 
+  // Portrait callers keep the historical values: 210mm page, 14mm margins,
+  // center x=105 and right edge x=196. Landscape callers pass their own margin.
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = Number(options.margin ?? 14);
+  const center = pageWidth / 2;
+  const rightEdge = pageWidth - margin;
+  const sealSize = Number(options.sealSize ?? 14);
+
   if (seals) {
     const [gcSeal, osws, health] = seals;
-    const size = 14; // mm, roughly matches the on-screen w-14 h-14 seals
     const sealY = y - 10;
-    doc.addImage(gcSeal, "PNG", 14, sealY, size, size);
-    doc.addImage(osws, "PNG", 30, sealY, size, size);
-    doc.addImage(health, "PNG", 196 - size, sealY, size, size);
+    doc.addImage(gcSeal, "PNG", margin, sealY, sealSize, sealSize);
+    doc.addImage(osws, "PNG", margin + 16, sealY, sealSize, sealSize);
+    doc.addImage(health, "PNG", rightEdge - sealSize, sealY, sealSize, sealSize);
   }
 
   doc.setFontSize(14);
   doc.setFont(undefined, "bold");
   doc.setTextColor("#044B0E"); // gc-green
-  doc.text("GORDON COLLEGE", 105, y, { align: "center" });
+  doc.text("GORDON COLLEGE", center, y, { align: "center" });
   y += 4.5;
 
   doc.setFontSize(8);
   doc.setFont(undefined, "normal");
   doc.setTextColor("#4b5563");
-  doc.text("Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City", 105, y, { align: "center" });
+  doc.text("Olongapo City Sports Complex, Donor Street, East Tapinac, Olongapo City", center, y, { align: "center" });
   y += 3.5;
-  doc.text("Tel. No.: (047) 222-4080", 105, y, { align: "center" });
+  doc.text("Tel. No.: (047) 222-4080", center, y, { align: "center" });
   y += 4.5;
 
   doc.setFontSize(9);
   doc.setFont(undefined, "bold");
   doc.setTextColor("#044B0E");
-  doc.text("Office of Student Welfare and Service — Health Services Unit", 105, y, { align: "center" });
+  doc.text("Office of Student Welfare and Service — Health Services Unit", center, y, { align: "center" });
   y += 4;
 
   doc.setDrawColor(180);
-  doc.line(14, y, 196, y);
+  doc.line(margin, y, rightEdge, y);
   y += 6;
 
   doc.setTextColor("#000000");

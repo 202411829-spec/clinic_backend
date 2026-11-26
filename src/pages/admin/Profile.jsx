@@ -1,18 +1,36 @@
 import { useEffect, useState } from 'react'
 import { adminsApi } from '../../lib/api.js'
 import { supabase } from '../../lib/supabaseClient.js'
+import { formatAdminFormalName } from '../../lib/format.js'
+import {
+  ADMIN_PROFILE_SUFFIX_MAX,
+  buildAdminProfilePatch,
+  validateAdminProfile,
+} from '../../lib/adminProfile.js'
+
+const ROLE_LABELS = { admin: 'Admin', super_admin: 'Super Admin' }
 
 function RoleBadge({ role }) {
   return (
     <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-      {role || '—'}
+      {ROLE_LABELS[role] || role || '—'}
     </span>
   )
 }
 
+function formFromAdmin(admin) {
+  return {
+    last_name: admin?.last_name || '',
+    first_name: admin?.first_name || '',
+    middle_initial: admin?.middle_initial || '',
+    suffix: admin?.suffix || '',
+    license_no: admin?.license_no || '',
+  }
+}
+
 export default function AdminProfile() {
   const [admin, setAdmin] = useState(null)
-  const [form, setForm] = useState({ first_name: '', last_name: '', license_no: '' })
+  const [form, setForm] = useState(formFromAdmin(null))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -40,11 +58,7 @@ export default function AdminProfile() {
         }
         if (!cancelled) {
           setAdmin(match)
-          setForm({
-            first_name: match.first_name || '',
-            last_name: match.last_name || '',
-            license_no: match.license_no || '',
-          })
+          setForm(formFromAdmin(match))
         }
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load profile')
@@ -65,20 +79,18 @@ export default function AdminProfile() {
 
   async function handleSave() {
     if (!admin) return
+    const validationError = validateAdminProfile(form)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setSaving(true)
     setError('')
     try {
-      const res = await adminsApi.updateProfile(admin.admin_id, {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        license_no: form.license_no,
-      })
+      const patch = buildAdminProfilePatch(form, admin)
+      const res = await adminsApi.updateProfile(admin.admin_id, patch)
       setAdmin(res.admin)
-      setForm({
-        first_name: res.admin.first_name || '',
-        last_name: res.admin.last_name || '',
-        license_no: res.admin.license_no || '',
-      })
+      setForm(formFromAdmin(res.admin))
       setSaved(true)
     } catch (err) {
       setError(err?.message || 'Failed to save profile')
@@ -135,28 +147,80 @@ export default function AdminProfile() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="text-sm font-medium text-gray-700">First name</span>
+                <span className="text-sm font-medium text-gray-700">
+                  Last Name <span className="text-red-500">*</span>
+                </span>
                 <input
-                  value={form.first_name}
-                  onChange={(e) => updateField('first_name', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-                  placeholder="First name"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">Last name</span>
-                <input
+                  id="admin-profile-last-name"
+                  name="last_name"
+                  autoComplete="family-name"
+                  required
+                  aria-required="true"
                   value={form.last_name}
                   onChange={(e) => updateField('last_name', e.target.value)}
                   className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
-                  placeholder="Last name"
+                  placeholder="Last Name"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  First Name <span className="text-red-500">*</span>
+                </span>
+                <input
+                  id="admin-profile-first-name"
+                  name="first_name"
+                  autoComplete="given-name"
+                  required
+                  aria-required="true"
+                  value={form.first_name}
+                  onChange={(e) => updateField('first_name', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+                  placeholder="First Name"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Middle Initial <span className="text-xs font-normal text-gray-400">(optional)</span>
+                </span>
+                <input
+                  id="admin-profile-middle-initial"
+                  name="middle_initial"
+                  autoComplete="additional-name"
+                  maxLength={2}
+                  value={form.middle_initial}
+                  onChange={(e) => updateField('middle_initial', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+                  placeholder="Middle Initial"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Suffix <span className="text-xs font-normal text-gray-400">(optional)</span>
+                </span>
+                <input
+                  id="admin-profile-suffix"
+                  name="suffix"
+                  maxLength={ADMIN_PROFILE_SUFFIX_MAX}
+                  value={form.suffix}
+                  onChange={(e) => updateField('suffix', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"
+                  placeholder="Suffix"
                 />
               </label>
             </div>
 
+            <p className="text-xs text-ink-500">
+              Display name:{' '}
+              <span className="font-medium text-ink-700">
+                {formatAdminFormalName(form) || '—'}
+              </span>
+            </p>
+
             <label className="block">
               <span className="text-sm font-medium text-gray-700">License No.</span>
               <input
+                id="admin-profile-license"
+                name="license_no"
                 value={form.license_no}
                 onChange={(e) => updateField('license_no', e.target.value)}
                 className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm"

@@ -38,11 +38,10 @@ WHAT IT DOES
  e. Feedback entry                -> TEST001 rating 5.
         NOTE: the `feedback` table does not exist in this database and
         the script cannot run DDL through the Supabase REST client.
-        The clean `feedback` table is created by the standalone clean
-        schema DDL (docs/superpowers/specs/2026-08-28-final-clean-schema.md),
-        not by this script. If seeding feedback fails with "table not
-        found", apply that DDL first, then re-run this script (or with
-        --feedback-only).
+        The clean `feedback` table is created by the active clean rebuild DDL
+        (migrations/2026-08-28_clean_rebuild_ddl.sql), not by this script.
+        If seeding feedback fails with "table not found", apply that DDL first,
+        then re-run this script (or with --feedback-only).
 
 USAGE
 =====

@@ -13,6 +13,11 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
+      // The generated PSGC dataset with full correspondence codes is >4 MB;
+      // allow PWA precache so the offline shell still includes every address.
+      workbox: {
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024
+      },
       manifest: {
         name: 'Gordon College Clinic Appointment System',
         short_name: 'GC Clinic',

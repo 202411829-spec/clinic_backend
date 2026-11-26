@@ -1,0 +1,110 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e4]:
+    - link "Skip to content" [ref=f1e5] [cursor=pointer]:
+      - /url: "#main-content"
+    - button "Open menu" [ref=f1e6] [cursor=pointer]
+    - generic [ref=f1e8]:
+      - generic [ref=f1e9]:
+        - button "Back" [ref=f1e10] [cursor=pointer]
+        - generic [ref=f1e13]:
+          - generic [ref=f1e14]:
+            - paragraph [ref=f1e15]: admin@gordoncollege.edu.ph
+            - paragraph [ref=f1e16]: Super Admin
+          - generic [ref=f1e17]: A
+      - main [ref=f1e18]:
+        - generic [ref=f1e20]:
+          - generic [ref=f1e21]:
+            - generic [ref=f1e27]:
+              - heading "Admins" [level=1] [ref=f1e28]
+              - paragraph [ref=f1e29]: Admin and super-admin accounts for the Health Services portal.
+            - generic [ref=f1e30]:
+              - button "Requests 1" [ref=f1e31] [cursor=pointer]:
+                - text: Requests
+                - generic [ref=f1e34]: "1"
+              - button "New Admin" [ref=f1e35] [cursor=pointer]
+          - generic [ref=f1e38]:
+            - generic [ref=f1e39]:
+              - paragraph [ref=f1e40]: Active staff
+              - paragraph [ref=f1e41]: "0"
+            - generic [ref=f1e42]:
+              - paragraph [ref=f1e43]: Pending requests
+              - paragraph [ref=f1e44]: "0"
+            - generic [ref=f1e45]:
+              - paragraph [ref=f1e46]: Total on record
+              - paragraph [ref=f1e47]: "0"
+          - generic [ref=f1e48]:
+            - generic [ref=f1e49]:
+              - generic [ref=f1e50]:
+                - heading "Staff roster" [level=2] [ref=f1e51]
+                - paragraph [ref=f1e52]: 2 accounts
+              - textbox "Search name, email, or role" [ref=f1e54]
+            - table [ref=f1e56]:
+              - rowgroup [ref=f1e57]:
+                - row [ref=f1e58]:
+                  - columnheader "Name" [ref=f1e59]
+                  - columnheader "Email" [ref=f1e60]
+                  - columnheader "Role" [ref=f1e61]
+                  - columnheader "License no." [ref=f1e62]
+                  - columnheader "Status" [ref=f1e63]
+                  - columnheader "Actions" [ref=f1e64]
+              - rowgroup [ref=f1e65]:
+                - row [ref=f1e66]:
+                  - cell "AA Admin, Ava, M.You" [ref=f1e67]:
+                    - generic [ref=f1e68]:
+                      - generic [ref=f1e150]: AA
+                      - generic [ref=f1e151]: Admin, Ava, M.You
+                  - cell "admin@gordoncollege.edu.ph" [ref=f1e152]
+                  - cell "Super Admin" [ref=f1e153]
+                  - cell "LIC-0001" [ref=f1e155]
+                  - cell "Active" [ref=f1e156]
+                  - cell [ref=f1e159]:
+                    - generic [ref=f1e160]:
+                      - button "Deactivate" [disabled] [ref=f1e161]
+                      - button "Cannot delete yourself" [disabled] [ref=f1e164]
+                - row [ref=f1e167]:
+                  - cell "RT Tester, Request, Q., Jr." [ref=f1e168]:
+                    - generic [ref=f1e169]:
+                      - generic [ref=f1e170]: RT
+                      - generic [ref=f1e171]: Tester, Request, Q., Jr.
+                  - cell "request.tester@gordoncollege.edu.ph" [ref=f1e172]
+                  - cell [ref=f1e173]:
+                    - button "Change role for Tester, Request, Q., Jr." [ref=f1e175] [cursor=pointer]: Admin
+                  - cell "LIC-TEST-1" [ref=f1e178]
+                  - cell "Pending" [ref=f1e179]
+                  - cell [ref=f1e182]:
+                    - generic [ref=f1e183]:
+                      - button "Deactivate" [ref=f1e184] [cursor=pointer]
+                      - button "Delete" [ref=f1e187] [cursor=pointer]
+          - paragraph [ref=f1e110]: Page 1 of 1 · 2 total
+    - button "Open Clinic Assistant" [ref=f1e111] [cursor=pointer]
+  - dialog "Pending Requests 1" [ref=f1e116]:
+    - generic [ref=f1e117]:
+      - heading "Pending Requests 1" [level=3] [ref=f1e118]:
+        - text: Pending Requests
+        - generic [ref=f1e119]: "1"
+      - button "Close" [ref=f1e120] [cursor=pointer]: ✕
+    - table [ref=f1e190]:
+      - rowgroup [ref=f1e191]:
+        - row [ref=f1e192]:
+          - columnheader "Name" [ref=f1e193]
+          - columnheader "Email" [ref=f1e194]
+          - columnheader "Role" [ref=f1e195]
+          - columnheader "License no." [ref=f1e196]
+          - columnheader "Status" [ref=f1e197]
+          - columnheader "Actions" [ref=f1e198]
+      - rowgroup [ref=f1e199]:
+        - row [ref=f1e200]:
+          - cell "RT Tester, Request, Q., Jr." [ref=f1e201]:
+            - generic [ref=f1e202]:
+              - generic [ref=f1e203]: RT
+              - generic [ref=f1e204]: Tester, Request, Q., Jr.
+          - cell "request.tester@gordoncollege.edu.ph" [ref=f1e205]
+          - cell "Admin" [ref=f1e206]
+          - cell "LIC-TEST-1" [ref=f1e208]
+          - cell "Pending approval" [ref=f1e209]
+          - cell [ref=f1e210]:
+            - generic [ref=f1e211]:
+              - button "Resend invite" [ref=f1e212] [cursor=pointer]
+              - button "Accept" [ref=f1e213] [cursor=pointer]
+              - button "Reject" [ref=f1e214] [cursor=pointer]
+    - button "Close" [ref=f1e149] [cursor=pointer]

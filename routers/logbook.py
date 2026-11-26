@@ -17,6 +17,7 @@ from routers.helpers import (
     normalize_student_id,
     build_student_lookup,
     build_reason_lookup,
+    reason_uses_dedicated_schedule,
     build_medicine_lookup,
     get_medicines_for_log,
     format_date_time,
@@ -24,6 +25,7 @@ from routers.helpers import (
     _SEARCH_SCAN_CAP,
 )
 from routers.auth_guard import require_auth, require_admin
+from routers.query_params import get_filter_list
 
 logger = logging.getLogger(__name__)
 
@@ -227,9 +229,12 @@ def get_all_reference_data(appointment_ids, visit_log_ids):
 # logged. Filtering and pagination now happen in Postgres:
 #
 #   * date_from/date_to  -> prefixed gte/lte on appointments (relationship)
-#   * reason_id          -> prefixed eq on appointments (relationship)
-#   * department/course  -> prefixed eq on appointments.students (FK join —
-#                           never a student_id IN list)
+#   * reason_id          -> prefixed IN on appointments (relationship) —
+#                           repeated keys / legacy CSV give a list; OR
+#                           within the category, AND across categories
+#   * department/course  -> prefixed IN on appointments.students (FK join —
+#                           never a student_id IN list; same OR-within /
+#                           AND-across semantics as reason_id)
 #   * search             -> bounded ilike legs (capped scans) that resolve
 #                           to a bounded appointment_id IN list
 #   * page/page_size     -> .range() offset/limit, with count='exact'
@@ -346,8 +351,8 @@ def _search_appointment_ids(search):
     return list(matched)
 
 
-def _logbook_page_query_params(date_from, date_to, reason_id,
-                               department_id, course_id):
+def _logbook_page_query_params(date_from, date_to, reason_ids,
+                               department_ids, course_ids):
     """
     Build (select_string, embedded_filters) for the logbook page query.
 
@@ -361,13 +366,21 @@ def _logbook_page_query_params(date_from, date_to, reason_id,
     the form this deployment's PostgREST serves with an exact count, and
     which keeps raw query values out of the select string.
 
+    reason_ids / department_ids / course_ids are LISTS (multi-select
+    filters: repeated query keys or legacy scalar/CSV, parsed by
+    routers.query_params.get_filter_list). A non-empty list becomes an
+    IN filter — OR within that category — while each category stays its
+    own filter entry, so PostgREST ANDs the categories together. An
+    empty list means "All" for that category (no filter entry). Dates
+    remain gte/lte.
+
     Returns a plain "*" select (plus the per-page medicines embed) with
     no filters when no scope is requested — the page then reads every
     log, exactly like the unfiltered default.
     """
     has_scope = bool(
-        date_from or date_to or reason_id
-        or department_id is not None or course_id is not None
+        date_from or date_to
+        or reason_ids or department_ids or course_ids
     )
     meds_embed = "visit_log_medicines(visit_log_id,medicine_id,medicine_name,quantity_dispensed)"
     if not has_scope:
@@ -383,19 +396,26 @@ def _logbook_page_query_params(date_from, date_to, reason_id,
         filters.append(("appointments.appointment_date", "gte", date_from))
     if date_to:
         filters.append(("appointments.appointment_date", "lte", date_to))
-    if reason_id:
-        filters.append(("appointments.reason_id", "eq", reason_id))
-    if department_id is not None:
-        filters.append(("appointments.students.department_id", "eq", department_id))
-    if course_id is not None:
-        filters.append(("appointments.students.course_id", "eq", course_id))
+    if reason_ids:
+        filters.append(("appointments.reason_id", "in", list(reason_ids)))
+    if department_ids:
+        filters.append(("appointments.students.department_id", "in", list(department_ids)))
+    if course_ids:
+        filters.append(("appointments.students.course_id", "in", list(course_ids)))
 
     return select_str, filters
 
 
 def _apply_logbook_filters(query, embedded_filters):
     for column, operator, criteria in embedded_filters:
-        query = query.filter(column, operator, criteria)
+        if operator == "in":
+            # Multi-value filter: criteria is a list of validated values
+            # (positive ints from get_filter_list). .in_() URL-encodes
+            # them through postgrest's sanitizer — never a raw SQL
+            # string built from user input.
+            query = query.in_(column, criteria)
+        else:
+            query = query.filter(column, operator, criteria)
     return query
 
 
@@ -471,9 +491,13 @@ def _count_scoped_logs(select_str, embedded_filters, appointment_ids):
 #   search          - text search across name, student_id, dept, course, complaint, medicine
 #   date_from       - filter logs on/after this date (YYYY-MM-DD)
 #   date_to         - filter logs on/before this date (YYYY-MM-DD)
-#   reason_id       - filter by reason ID
-#   department_id   - filter by the student's department ID
-#   course_id       - filter by the student's course ID
+#   reason_id       - filter by reason ID; repeatable for multi-select
+#                     (reason_id=1&reason_id=2, or legacy CSV 1,2) —
+#                     OR within reason, AND with the other categories
+#   department_id   - filter by the student's department ID (same
+#                     repeated/CSV multi-value contract as reason_id)
+#   course_id       - filter by the student's course ID (same
+#                     repeated/CSV multi-value contract as reason_id)
 #   page            - page number (default 1)
 #   page_size       - items per page (default 20, max 100)
 # ============================================================
@@ -483,13 +507,15 @@ def _count_scoped_logs(select_str, embedded_filters, appointment_ids):
 @handle_errors("Logbook error")
 def get_logbook():
 
-    # --- Parse query params (same contract as before) ---
+    # --- Parse query params (same contract as before, plus repeated
+    # keys for multi-select: each category arrives as a list; an empty
+    # list means "All" for that category) ---
     search = request.args.get("search", "").strip()
     date_from = request.args.get("date_from")
     date_to = request.args.get("date_to")
-    reason_id = request.args.get("reason_id", type=int)
-    department_id = request.args.get("department_id", type=int)
-    course_id = request.args.get("course_id", type=int)
+    reason_ids = get_filter_list("reason_id")
+    department_ids = get_filter_list("department_id")
+    course_ids = get_filter_list("course_id")
     page = max(1, request.args.get("page", default=1, type=int))
     page_size = min(100, max(1, request.args.get("page_size", default=20, type=int)))
 
@@ -517,7 +543,7 @@ def get_logbook():
     # IN list, no full-table ilike), and this same query embeds the
     # page's visit_log_medicines rows so no extra round-trip is needed.
     select_str, embedded_filters = _logbook_page_query_params(
-        date_from, date_to, reason_id, department_id, course_id
+        date_from, date_to, reason_ids, department_ids, course_ids
     )
 
     start = (page - 1) * page_size
@@ -1045,6 +1071,11 @@ def add_medicine_to_log(log_id):
 # LIST REASONS (for the walk-in form dropdown)
 #
 # GET /reasons
+#
+# Each reason: {reason_id, description, uses_dedicated_schedule}
+# (uses_dedicated_schedule: TRUE = the reason books against its own
+# reason-scoped clinic_schedules instead of the legacy general
+# schedule; additive flag, default FALSE).
 # ============================================================
 
 @logbook_bp.route("/reasons", methods=["GET"])
@@ -1058,6 +1089,7 @@ def get_reasons():
         {
             "reason_id": reason_id,
             "description": row.get("description") or "-",
+            "uses_dedicated_schedule": reason_uses_dedicated_schedule(row),
         }
         for reason_id, row in sorted(
             reasons_by_id.items(),

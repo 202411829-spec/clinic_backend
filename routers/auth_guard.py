@@ -17,6 +17,12 @@ user to flask.g for downstream handlers:
 consulting the single clean `app_accounts` table (account_type='admin'
 with an admin_id), which links the authenticated auth user to their
 admin identity (Blockers B/C).
+
+`require_super_admin` stacks under `require_admin` and additionally
+requires the caller's `admin_accounts.role` to be `super_admin`. The
+role is always read from the database for the caller resolved out of
+the verified token — never from the request body, JWT metadata, or any
+client-provided value.
 """
 
 import logging
@@ -63,6 +69,18 @@ def sanitize_search(value):
     cleaned = cleaned.strip()
 
     return cleaned or None
+
+
+# ============================================================
+# ADMIN ACCESS ROLES
+#
+# The only two values admin_accounts.role may hold after the
+# admin access-role migration. Kept here (not derived from any
+# request) so every guard compares against the same constants.
+# ============================================================
+
+ADMIN_ROLE = "admin"
+SUPER_ADMIN_ROLE = "super_admin"
 
 
 # ============================================================
@@ -115,17 +133,33 @@ def _verify_token(token):
     return user if user else None
 
 
-def is_admin_user(user):
-    """
-    Check whether the verified auth user is an admin.
+def _is_active_admin(admin_id: str) -> bool:
+    """Return True only when the linked admin_accounts row is active."""
+    if not admin_id:
+        return False
 
-    Identity is resolved through the single clean `app_accounts` table
-    (Blockers B): an admin user is one whose app_accounts row has
-    account_type='admin' AND admin_id IS NOT NULL. app_accounts has no
-    `username` column, so matching is by auth_user_id first (the verified
-    token subject — more robust than email), then by the verified email
-    (the key, `<username>@gordoncollege.edu.ph`). Values come from the
-    verified Supabase Auth user, never raw client input.
+    response = execute_with_retry(
+        supabase
+        .table("admin_accounts")
+        .select("is_active")
+        .eq("admin_id", admin_id)
+        .limit(1)
+    )
+    return bool(response.data and response.data[0].get("is_active"))
+
+
+def resolve_admin_id(user):
+    """
+    Resolve the verified auth user to their admin_accounts.admin_id via
+    the single clean `app_accounts` table (Blockers B): an admin is the
+    row with account_type='admin' AND admin_id IS NOT NULL. app_accounts
+    has no `username` column, so matching is by auth_user_id first (the
+    verified token subject — more robust than email), then by the
+    verified email (the key, `<username>@gordoncollege.edu.ph`). Values
+    come from the verified Supabase Auth user, never raw client input.
+
+    Returns the admin_id, or None when the user is not linked to an
+    admin (or on a lookup error).
     """
     auth_user_id = getattr(user, "id", None)
     email = (getattr(user, "email", "") or "").strip().lower()
@@ -140,8 +174,8 @@ def is_admin_user(user):
                 .eq("account_type", "admin")
                 .limit(1)
             )
-            if response.data:
-                return bool(response.data[0].get("admin_id"))
+            if response.data and response.data[0].get("admin_id"):
+                return response.data[0]["admin_id"]
 
         if email:
             response = execute_with_retry(
@@ -152,14 +186,63 @@ def is_admin_user(user):
                 .eq("account_type", "admin")
                 .limit(1)
             )
-            if response.data:
-                return bool(response.data[0].get("admin_id"))
-
-        return False
+            if response.data and response.data[0].get("admin_id"):
+                return response.data[0]["admin_id"]
 
     except Exception as e:
-        logger.error("Admin check error: %r", e)
+        logger.error("Admin id resolution error: %r", e)
+
+    return None
+
+
+def is_admin_user(user):
+    """
+    Check whether the verified auth user is an active admin.
+
+    Identity is resolved through `resolve_admin_id` (app_accounts by
+    auth_user_id, then verified email), and the linked
+    admin_accounts row must be active. See resolve_admin_id for why
+    the verified token — not client input — is the source of identity.
+    """
+    admin_id = resolve_admin_id(user)
+    if not admin_id:
         return False
+    return _is_active_admin(admin_id)
+
+
+def get_admin_role(admin_id):
+    """Return admin_accounts.role for the given admin_id, or None."""
+    if not admin_id:
+        return None
+
+    try:
+        response = execute_with_retry(
+            supabase
+            .table("admin_accounts")
+            .select("role")
+            .eq("admin_id", admin_id)
+            .limit(1)
+        )
+        if response.data:
+            return response.data[0].get("role")
+    except Exception as e:
+        logger.error("Admin role lookup error: %r", e)
+
+    return None
+
+
+def is_super_admin_user(user):
+    """
+    Check whether the verified auth user holds the `super_admin` role.
+
+    The role is read from admin_accounts for the admin_id resolved out
+    of the verified token — request bodies, JWT claims, and g.user are
+    never consulted, so a client cannot talk its way into this check.
+    """
+    admin_id = resolve_admin_id(user)
+    if not admin_id:
+        return False
+    return get_admin_role(admin_id) == SUPER_ADMIN_ROLE
 
 
 def resolve_student_id(user):
@@ -273,6 +356,41 @@ def require_admin(f):
 
         if not is_admin_user(user):
             return _forbidden("Admin privileges required")
+
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def require_super_admin(f):
+    """
+    Require the verified caller to hold the `super_admin` role.
+
+    Stack it under @require_admin (i.e. list @require_admin above it)
+    so ordinary admins clear the admin check first and receive a precise
+    403 here instead of a 401. The caller is re-verified from the bearer
+    token and their role is read from admin_accounts via app_accounts
+    (auth_user_id first, verified email fallback) — never from the
+    request body, JWT metadata, or any value the client controls.
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+
+        token = _get_bearer_token()
+
+        if token is None:
+            return _unauthorized(
+                "Missing or malformed Authorization header. "
+                "Expected: Bearer <access_token>"
+            )
+
+        user = _verify_token(token)
+
+        if user is None:
+            return _unauthorized("Invalid or expired token")
+
+        if not is_super_admin_user(user):
+            return _forbidden("Super admin privileges required")
 
         return f(*args, **kwargs)
 

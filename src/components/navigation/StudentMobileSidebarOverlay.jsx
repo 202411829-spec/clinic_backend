@@ -1,21 +1,10 @@
 // src/components/student/StudentMobileSidebarOverlay.jsx
-import { useEffect, useState } from "react";
 import StudentSidebarContent from "./StudentSidebarContent";
+import { GC_MODAL_CLOSE_MS, getModalMotionStyle, useModalPresence } from "../../lib/gcMotion.js";
 
 export default function StudentMobileSidebarOverlay({ open, onClose, profileComplete }) {
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      requestAnimationFrame(() => setVisible(true));
-    } else {
-      setVisible(false);
-      const t = setTimeout(() => setMounted(false), 300);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
+  const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS);
+  const motionStyle = getModalMotionStyle(visible);
 
   if (!mounted) return null;
 
@@ -24,13 +13,15 @@ export default function StudentMobileSidebarOverlay({ open, onClose, profileComp
       <button
         aria-label="Close menu"
         onClick={onClose}
-        className={`absolute inset-0 bg-shell/60 backdrop-blur-sm transition-opacity duration-300 ${
+        style={motionStyle}
+        className={`absolute inset-0 bg-shell/60 backdrop-blur-sm transition-opacity motion-reduce:transition-none ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       />
 
       <div
-        className={`absolute inset-x-3 bottom-3 top-3 app-shell app-shell--flat rounded-[28px] shadow-float overflow-hidden flex flex-col transition-transform duration-300 ease-out ${
+        style={motionStyle}
+        className={`absolute inset-x-3 bottom-3 top-3 app-shell app-shell--flat rounded-[28px] shadow-float overflow-hidden flex flex-col transition-transform motion-reduce:transition-none ${
           visible ? "translate-y-0" : "translate-y-full"
         }`}
       >

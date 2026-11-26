@@ -2,15 +2,23 @@
 // Admin & Staff management page: roster table, pending-requests queue, and
 // the "add admin" invite flow. Redesigned for a Gordon-College-branded,
 // look, built on the brand/ink token ramp.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { adminsApi } from '../../lib/api.js'
+import { useSelfClosingPresence, useTriggerOrigin } from '../../lib/gcMotion.js'
+import { formatAdminFormalName } from '../../lib/format.js'
 import { supabase } from '../../lib/supabaseClient.js'
+import { validateAdminInviteEmail } from '../../lib/signupValidation.js'
+import { clampPage, getPageCount } from '../../lib/pagination.js'
+import { useAdminAccess } from '../../context/AdminAccessContext.jsx'
 import { SearchIcon, ShieldIcon, ChevronLeftIcon, ChevronRightIcon } from '../ui/icons.jsx'
+import { PageHeader } from '../ui/primitives.jsx'
+import PortalOverlay from '../ui/PortalOverlay.jsx'
 
-const ALLOWED_ROLES = ['nurse', 'doctor']
+const ALLOWED_ROLES = ['admin', 'super_admin']
 const EMAIL_DOMAIN = '@gordoncollege.edu.ph'
-const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+const ROLE_LABELS = { admin: 'Admin', super_admin: 'Super Admin' }
+const ROLE_OPTIONS = ALLOWED_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }))
 
 function initials(admin) {
   const a = (admin.first_name || '')[0] || ''
@@ -20,16 +28,90 @@ function initials(admin) {
 }
 
 function roleTone(role) {
-  return role === 'doctor'
+  return role === 'super_admin'
     ? 'bg-brand-900 text-brand-100'
     : 'bg-ink-100 text-ink-600'
 }
 
 function RolePill({ role }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-ink-100 px-2 py-0.5 text-2xs font-medium capitalize text-ink-700">
-      {role || '—'}
+    <span className="inline-flex items-center rounded-full bg-ink-100 px-2 py-0.5 text-2xs font-medium text-ink-700">
+      {ROLE_LABELS[role] || '—'}
     </span>
+  )
+}
+
+// The role badge itself is the control: super-admins get a compact listbox,
+// everyone else keeps the original static pill. Styling intentionally stays
+// identical to RolePill so the table does not gain a second visual language.
+function RoleDropdown({ role, name, canChange, busy, onChange }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef(null)
+
+  if (!canChange) return <RolePill role={role} />
+
+  if (busy) {
+    return (
+      <span
+        aria-busy="true"
+        className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2 py-0.5 text-2xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200"
+      >
+        <span className="h-1.5 w-1.5 animate-spin rounded-full border border-brand-500 border-t-transparent" />
+        Saving…
+      </span>
+    )
+  }
+
+  return (
+    <div className="relative inline-block">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Change role for ${name}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-2xs font-medium text-ink-700 outline-none transition-colors hover:bg-ink-200 focus-visible:ring-2 focus-visible:ring-brand-600/30"
+      >
+        {ROLE_LABELS[role] || '—'}
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-ink-500" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <PortalOverlay
+          triggerRef={buttonRef}
+          enabled={open}
+          align="left"
+          preferredWidth={128}
+          estimatedHeight={96}
+          role="listbox"
+          ariaLabel={`Role for ${name}`}
+          className="rounded-control border border-ink-200 bg-white p-1 shadow-e3"
+          onOutside={() => setOpen(false)}
+          onEscape={() => setOpen(false)}
+        >
+          {ROLE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === role}
+              onClick={() => {
+                setOpen(false)
+                if (option.value !== role) onChange(option.value)
+              }}
+              className={`flex w-full items-center justify-between rounded-control px-2 py-1.5 text-left text-2xs transition-colors hover:bg-ink-50 ${
+                option.value === role ? 'font-semibold text-brand-800' : 'text-ink-700'
+              }`}
+            >
+              {option.label}
+              {option.value === role && <span aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </PortalOverlay>
+      )}
+    </div>
   )
 }
 
@@ -110,9 +192,14 @@ function BellIcon(props) {
 // and body-scroll lock — matches the pattern already used elsewhere in the
 // admin panel (see AddAnnualExamModal.jsx).
 function ModalShell({ onClose, maxWidth = 'max-w-md', children, labelledBy }) {
+  const panelRef = useRef(null)
+  const { mounted, visible, requestClose } = useSelfClosingPresence(onClose)
+  const origin = useTriggerOrigin({ enabled: mounted, panelRef })
+
   useEffect(() => {
+    if (!mounted) return undefined
     function onKey(e) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') requestClose()
     }
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
@@ -120,20 +207,28 @@ function ModalShell({ onClose, maxWidth = 'max-w-md', children, labelledBy }) {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
     }
-  }, [onClose])
+  }, [mounted, requestClose])
+
+  if (!mounted) return null
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-[3px] animate-fade-in motion-reduce:animate-none"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      className={`gc-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-[3px] ${
+        visible ? 'is-open' : 'is-close'
+      }`}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose() }}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`flex max-h-[85vh] w-full ${maxWidth} flex-col overflow-hidden rounded-panel bg-white shadow-e4 animate-pop-in motion-reduce:animate-none`}
+        style={origin.style}
+        className={`gc-modal-panel flex max-h-[85vh] w-full ${maxWidth} flex-col overflow-hidden rounded-panel bg-white shadow-e4 ${
+          visible ? 'is-open' : 'is-close'
+        } ${origin.className}`}
       >
-        {children}
+        {typeof children === 'function' ? children(requestClose) : children}
       </div>
     </div>,
     document.body
@@ -141,6 +236,10 @@ function ModalShell({ onClose, maxWidth = 'max-w-md', children, labelledBy }) {
 }
 
 export default function AdminsPanel() {
+  // Authoritative role from AdminLayout's adminsApi.me() fetch. Invite and
+  // role-change controls are super-admin only; everything else stays open.
+  const { isSuperAdmin } = useAdminAccess()
+
   // Roster (active admins)
   const [admins, setAdmins] = useState([])
   const [total, setTotal] = useState(0)
@@ -159,11 +258,14 @@ export default function AdminsPanel() {
   const [pendingAdmins, setPendingAdmins] = useState([])
   const [pendingTotal, setPendingTotal] = useState(0)
   const [pendingLoading, setPendingLoading] = useState(false)
+  const [resendingId, setResendingId] = useState('')
+  const [roleUpdatingId, setRoleUpdatingId] = useState('')
+  const [requestMessage, setRequestMessage] = useState('')
 
   // Add admin
   const [showAdd, setShowAdd] = useState(false)
   const [addEmail, setAddEmail] = useState('')
-  const [addRole, setAddRole] = useState('nurse')
+  const [addRole, setAddRole] = useState('admin')
   const [addSubmitting, setAddSubmitting] = useState(false)
   const [addError, setAddError] = useState('')
   const [addSuccess, setAddSuccess] = useState('')
@@ -208,6 +310,10 @@ export default function AdminsPanel() {
     }
   }
 
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch])
+
   useEffect(() => { fetchAdmins() }, [page, pageSize, debouncedSearch])
   // Pending is independent of the roster search box — it only needs to
   // refresh on mount and after mutations (handled explicitly below).
@@ -244,14 +350,13 @@ export default function AdminsPanel() {
     }
   }
 
-  async function handleConfirmedRemoval() {
+  async function handleConfirmedRemoval(requestClose) {
     if (!confirmTarget) return
     setConfirmSubmitting(true)
     setConfirmError('')
     try {
       await adminsApi.remove(confirmTarget.admin_id, confirmEmail.trim())
-      setConfirmTarget(null)
-      setConfirmEmail('')
+      requestClose()
       refreshAll()
     } catch (err) {
       setConfirmError(err?.message || 'Action failed')
@@ -261,23 +366,85 @@ export default function AdminsPanel() {
   }
 
   async function handleAddAdmin() {
+    // Defense in depth: the invite button/modal are already hidden for
+    // non-super-admins, but the handler refuses too.
+    if (!isSuperAdmin) return
     setAddSubmitting(true)
     setAddError('')
     setAddSuccess('')
     try {
-      await adminsApi.add({ email: addEmail.trim().toLowerCase(), role: addRole })
-      setAddSuccess(`Invite created for ${addEmail.trim()}. They'll appear under Requests once they sign up.`)
+      const email = addEmail.trim().toLowerCase()
+      const result = await adminsApi.add({ email, role: addRole })
+      if (result?.email_sent === true) {
+        setAddSuccess(result.created ? `Invite sent to ${email}.` : `Invite sent again to ${email}.`)
+      } else {
+        setAddSuccess(result?.error || result?.message || `A request already exists for ${email}; no duplicate was created.`)
+      }
       setAddEmail('')
       fetchPending()
     } catch (err) {
-      setAddError(err?.message || 'Failed to add admin')
+      // A 502 can still mean the request row was created before delivery
+      // failed, so refresh the pending queue immediately for resend.
+      setAddError(err?.message || 'Failed to send invite')
+      fetchPending()
     } finally {
       setAddSubmitting(false)
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const emailValid = EMAIL_RE.test(addEmail.trim()) && addEmail.trim().toLowerCase().endsWith(EMAIL_DOMAIN)
+  async function handleResendInvite(admin) {
+    if (!isSuperAdmin) return
+    const email = (admin.email || '').trim().toLowerCase()
+    setResendingId(admin.admin_id)
+    setRequestMessage('')
+    try {
+      const result = await adminsApi.add({
+        email,
+        // Stale legacy rows must not turn a resend into a failed request on
+        // role validation; the backend still owns the authorization check.
+        role: ALLOWED_ROLES.includes(admin.role) ? admin.role : 'admin',
+        resend: true,
+      })
+      setRequestMessage(result?.email_sent === true
+        ? `Invite sent again to ${email}.`
+        : result?.error || result?.message || `No new email was sent to ${email}.`)
+      await fetchPending()
+    } catch (err) {
+      setRequestMessage(err?.message || 'Failed to resend invite')
+    } finally {
+      setResendingId('')
+    }
+  }
+
+  // Super-admin only: change another admin between admin and super_admin.
+  // Self is excluded both in the row control and here as defense in depth.
+  async function handleChangeRole(admin, nextRole) {
+    if (!isSuperAdmin) return
+    if ((admin.email || '').toLowerCase() === selfEmail) return
+    if (!ALLOWED_ROLES.includes(nextRole) || nextRole === admin.role) return
+    setError('')
+    setRoleUpdatingId(admin.admin_id)
+    try {
+      await adminsApi.updateRole(admin.admin_id, nextRole)
+      // The server is authoritative; reload the roster after a successful
+      // change so the displayed role and counts come from persisted data.
+      await refreshAll()
+    } catch (err) {
+      // No optimistic local write: the original role stays visible on failure.
+      setError(err?.message || 'Action failed')
+    } finally {
+      setRoleUpdatingId('')
+    }
+  }
+
+  const totalPages = getPageCount(total, pageSize)
+  const currentPage = clampPage(page, totalPages)
+  const emailValid = !validateAdminInviteEmail(addEmail)
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
   const confirmMatches = confirmTarget && confirmEmail.trim().toLowerCase() === (confirmTarget.email || '').toLowerCase()
 
   const skeletonRows = useMemo(() => Array.from({ length: 5 }), [])
@@ -285,37 +452,36 @@ export default function AdminsPanel() {
   return (
     <div className="space-y-5">
       {/* ---------- Header ---------- */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          {/* The "ADMIN MANAGEMENT" eyebrow is gone: a tracked-out all-caps
-              label above a heading that already says the same thing is the
-              commonest generic-admin-template tell, and the sidebar already
-              shows you where you are. */}
-          <h1 className="font-serif text-3xl font-semibold text-ink-900">Admins &amp; staff</h1>
-          <p className="mt-1 text-base text-ink-500">Nurse and doctor accounts for the Health Services portal.</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setShowRequests(true)}
-            className="btn-press relative inline-flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 shadow-e1 hover:bg-ink-50"
-          >
-            <BellIcon className="h-4 w-4 text-ink-500" />
-            Requests
-            {pendingTotal > 0 && (
-              <span className="tnum absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-signal-amber px-1 text-2xs font-semibold leading-none text-white ring-2 ring-canvas">
-                {pendingTotal > 99 ? '99+' : pendingTotal}
-              </span>
+      <PageHeader
+        title="Admins"
+        icon={<ShieldIcon className="h-5 w-5" />}
+        subtitle="Admin and super-admin accounts for the Health Services portal."
+        actions={
+          <>
+            <button
+              onClick={() => setShowRequests(true)}
+              className="btn-press relative inline-flex items-center gap-2 rounded-control border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 shadow-e1 hover:bg-ink-50"
+            >
+              <BellIcon className="h-4 w-4 text-ink-500" />
+              Requests
+              {pendingTotal > 0 && (
+                <span className="tnum absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-signal-amber px-1 text-2xs font-semibold leading-none text-white ring-2 ring-canvas">
+                  {pendingTotal > 99 ? '99+' : pendingTotal}
+                </span>
+              )}
+            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => { setShowAdd(true); setAddError(''); setAddSuccess('') }}
+                className="btn-press inline-flex items-center gap-2 rounded-control bg-brand-900 px-3.5 py-2 text-sm font-medium text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New Admin
+              </button>
             )}
-          </button>
-          <button
-            onClick={() => { setShowAdd(true); setAddError(''); setAddSuccess('') }}
-            className="btn-press inline-flex items-center gap-2 rounded-control bg-brand-900 px-3.5 py-2 text-sm font-medium text-white shadow-e1 hover:bg-brand-800 active:bg-brand-950"
-          >
-            <PlusIcon className="h-4 w-4" />
-            New Admin
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* ---------- Stat strip ---------- */}
       <StatRail
@@ -381,9 +547,9 @@ export default function AdminsPanel() {
                     <p className="mx-auto mt-1 max-w-[42ch] text-sm text-ink-500">
                       {debouncedSearch
                         ? 'Check the spelling, or search by email instead.'
-                        : 'Invite a nurse or doctor and they’ll appear here once they sign up.'}
+                        : 'Invite an admin and they’ll appear here once they sign up.'}
                     </p>
-                    {!debouncedSearch && (
+                    {!debouncedSearch && isSuperAdmin && (
                       <button
                         onClick={() => { setShowAdd(true); setAddError(''); setAddSuccess('') }}
                         className="btn-press mt-4 inline-flex items-center gap-2 rounded-control bg-brand-900 px-3.5 py-2 text-sm font-medium text-white shadow-e1 hover:bg-brand-800"
@@ -395,7 +561,7 @@ export default function AdminsPanel() {
                   </td>
                 </tr>
               ) : admins.map((a) => {
-                const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || '—'
+                const name = formatAdminFormalName(a) || '—'
                 const isSelf = (a.email || '').toLowerCase() === selfEmail
                 return (
                   <tr key={a.admin_id} className="group/row row-hover">
@@ -411,7 +577,15 @@ export default function AdminsPanel() {
                       </div>
                     </td>
                     <td className="cell-wrap min-w-[180px] max-w-[260px]">{a.email}</td>
-                    <td><RolePill role={a.role} /></td>
+                    <td>
+                      <RoleDropdown
+                        role={a.role}
+                        name={name}
+                        canChange={isSuperAdmin && !isSelf}
+                        busy={roleUpdatingId === a.admin_id}
+                        onChange={(nextRole) => handleChangeRole(a, nextRole)}
+                      />
+                    </td>
                     <td className="tnum cell-wrap">{a.license_no || '—'}</td>
                     <td><StatusPill status={a.status} /></td>
                     <td>
@@ -450,37 +624,44 @@ export default function AdminsPanel() {
 
       {/* ---------- Pagination ---------- */}
       <div className="flex items-center justify-between gap-2">
-        <p className="tnum text-xs text-ink-500">Page {page} of {totalPages} &middot; {total} total</p>
-        <div className="flex items-center gap-1.5">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="btn-press flex h-8 w-8 items-center justify-center rounded-control border border-ink-200 text-ink-600 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Previous page"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-          </button>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="btn-press flex h-8 w-8 items-center justify-center rounded-control border border-ink-200 text-ink-600 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Next page"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
-        </div>
+        <p className="tnum text-xs text-ink-500">Page {currentPage} of {totalPages} &middot; {total} total</p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              disabled={currentPage <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="btn-press flex h-8 w-8 items-center justify-center rounded-control border border-ink-200 text-ink-600 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Previous page"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
+            <button
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="btn-press flex h-8 w-8 items-center justify-center rounded-control border border-ink-200 text-ink-600 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Next page"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ---------- Requests modal ---------- */}
       {showRequests && (
         <ModalShell onClose={() => setShowRequests(false)} maxWidth="max-w-3xl" labelledBy="requests-title">
+          {(requestClose) => (
+            <>
           <div className="flex items-center justify-between border-b border-ink-100 px-6 py-4">
             <h3 id="requests-title" className="flex items-center gap-2 text-base font-semibold text-ink-900">
               Pending Requests
               <span className="tnum rounded-full bg-signal-amber-bg px-2 py-0.5 text-xs font-medium text-signal-amber ring-1 ring-inset ring-signal-amber-ring">{pendingTotal}</span>
             </h3>
-            <button onClick={() => setShowRequests(false)} className="btn-press rounded-control p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Close">✕</button>
+            <button onClick={requestClose} className="btn-press rounded-control p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Close">✕</button>
           </div>
+          {requestMessage && (
+            <p className="border-b border-ink-100 px-6 py-2 text-xs font-medium text-ink-600">{requestMessage}</p>
+          )}
           <div className="overflow-auto p-5">
             {pendingLoading ? (
               <div className="space-y-2">
@@ -503,12 +684,13 @@ export default function AdminsPanel() {
                       <th>Email</th>
                       <th>Role</th>
                       <th>License no.</th>
+                      <th>Status</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="tbl-animate">
                     {pendingAdmins.map((a) => {
-                      const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || '—'
+                      const name = formatAdminFormalName(a) || '—'
                       return (
                         <tr key={a.admin_id} className="row-hover">
                           <td className="min-w-[160px]">
@@ -522,10 +704,35 @@ export default function AdminsPanel() {
                           <td className="cell-clip" style={{ '--cell-max': '220px' }} title={a.email}>{a.email}</td>
                           <td><RolePill role={a.role} /></td>
                           <td className="cell-wrap">{a.license_no || '—'}</td>
+                          <td className="cell-wrap">
+                            {a.is_invitation ? (
+                              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
+                                {a.invitation_status || 'Awaiting signup'}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-signal-amber-bg px-2 py-0.5 text-xs font-medium text-signal-amber ring-1 ring-inset ring-signal-amber-ring">
+                                Pending approval
+                              </span>
+                            )}
+                          </td>
                           <td>
                             <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                              <button onClick={() => handleAccept(a)} className="btn-press shrink-0 rounded-control bg-brand-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">Accept</button>
-                              <button onClick={() => { setConfirmTarget(a); setConfirmEmail(''); setConfirmError('') }} className="btn-press shrink-0 rounded-control px-3 py-1.5 text-xs font-medium text-signal-rose hover:bg-signal-rose-bg">Reject</button>
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleResendInvite(a)}
+                                  disabled={resendingId === a.admin_id}
+                                  aria-busy={resendingId === a.admin_id}
+                                  className="btn-press shrink-0 rounded-control border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {resendingId === a.admin_id ? 'Sending…' : 'Resend invite'}
+                                </button>
+                              )}
+                              {!a.is_invitation && (
+                                <>
+                                  <button onClick={() => handleAccept(a)} className="btn-press shrink-0 rounded-control bg-brand-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800">Accept</button>
+                                  <button onClick={() => { setConfirmTarget(a); setConfirmEmail(''); setConfirmError('') }} className="btn-press shrink-0 rounded-control px-3 py-1.5 text-xs font-medium text-signal-rose hover:bg-signal-rose-bg">Reject</button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -537,14 +744,18 @@ export default function AdminsPanel() {
             )}
           </div>
           <div className="flex justify-end border-t border-ink-100 px-6 py-3.5">
-            <button onClick={() => setShowRequests(false)} className="btn-press rounded-control border border-ink-200 px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50">Close</button>
+            <button onClick={requestClose} className="btn-press rounded-control border border-ink-200 px-4 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50">Close</button>
           </div>
+            </>
+          )}
         </ModalShell>
       )}
 
-      {/* ---------- Add admin modal ---------- */}
-      {showAdd && (
+      {/* ---------- Add admin modal (super-admin only) ---------- */}
+      {showAdd && isSuperAdmin && (
         <ModalShell onClose={() => setShowAdd(false)} labelledBy="add-admin-title">
+          {(requestClose) => (
+            <>
           <div className="px-6 pb-2 pt-6">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-800">
               <ShieldIcon className="h-5 w-5" />
@@ -577,13 +788,13 @@ export default function AdminsPanel() {
                     key={r}
                     type="button"
                     onClick={() => setAddRole(r)}
-                    className={`btn-press rounded-xl border px-4 py-2.5 text-sm font-semibold capitalize transition ${
+                    className={`btn-press rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
                       addRole === r
                         ? 'border-brand-900 bg-brand-900 text-white shadow-e1'
                         : 'border-ink-200 text-ink-600 hover:bg-ink-50'
                     }`}
                   >
-                    {r}
+                    {ROLE_LABELS[r]}
                   </button>
                 ))}
               </div>
@@ -596,7 +807,7 @@ export default function AdminsPanel() {
             )}
           </div>
           <div className="flex gap-3 border-t border-ink-100 px-6 py-4">
-            <button onClick={() => setShowAdd(false)} className="btn-press flex-1 rounded-control border border-ink-200 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">
+            <button onClick={requestClose} className="btn-press flex-1 rounded-control border border-ink-200 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">
               {addSuccess ? 'Done' : 'Cancel'}
             </button>
             {!addSuccess && (
@@ -609,12 +820,20 @@ export default function AdminsPanel() {
               </button>
             )}
           </div>
+            </>
+          )}
         </ModalShell>
       )}
 
       {/* ---------- Confirm delete / reject modal ---------- */}
       {confirmTarget && (
-        <ModalShell onClose={() => setConfirmTarget(null)} maxWidth="max-w-md" labelledBy="confirm-title">
+        <ModalShell
+          onClose={() => { setConfirmTarget(null); setConfirmEmail(''); setConfirmError('') }}
+          maxWidth="max-w-md"
+          labelledBy="confirm-title"
+        >
+          {(requestClose) => (
+            <>
           <div className="px-6 pt-6">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-signal-rose-bg text-signal-rose">
               <TrashIcon className="h-5 w-5" />
@@ -638,19 +857,21 @@ export default function AdminsPanel() {
           </div>
           <div className="flex gap-3 border-t border-ink-100 px-6 py-4">
             <button
-              onClick={() => { setConfirmTarget(null); setConfirmEmail(''); setConfirmError('') }}
+              onClick={requestClose}
               className="btn-press flex-1 rounded-control border border-ink-200 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
             >
               Cancel
             </button>
             <button
-              onClick={handleConfirmedRemoval}
+              onClick={() => handleConfirmedRemoval(requestClose)}
               disabled={!confirmMatches || confirmSubmitting}
               className="btn-press flex-1 rounded-control bg-signal-rose py-2.5 text-sm font-medium text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {confirmSubmitting ? 'Please wait…' : confirmTarget.status === 'pending' ? 'Reject' : 'Delete'}
             </button>
           </div>
+            </>
+          )}
         </ModalShell>
       )}
     </div>

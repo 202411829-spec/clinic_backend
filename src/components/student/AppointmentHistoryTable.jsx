@@ -4,18 +4,12 @@
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
 import StatusPill from "./StatusPill.jsx";
+import { formatTime12Hour } from "../../lib/timeFormat";
 
 function fmtDate(v) {
   const d = new Date(`${String(v).slice(0, 10)}T00:00:00`);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtTime(v) {
-  if (!v) return "—";
-  const [h, m] = String(v).slice(0, 5).split(":");
-  const hour = Number(h);
-  return `${hour % 12 || 12}:${m} ${hour < 12 ? "AM" : "PM"}`;
-}
-
 export default function AppointmentHistoryTable({ rows, loading }) {
   const navigate = useNavigate();
   return (
@@ -25,10 +19,6 @@ export default function AppointmentHistoryTable({ rows, loading }) {
           <h2 className="panel-title font-serif">Appointment history</h2>
           <p className="panel-sub">Every clinic visit you've booked, newest first.</p>
         </div>
-        <button onClick={() => navigate("/student/book")} className="btn-secondary btn-sm btn-press">
-          <NavIcon name="plus" className="h-3.5 w-3.5" />
-          New booking
-        </button>
       </div>
 
       <div className="tbl-scroll max-h-[26rem] overflow-y-auto">
@@ -49,16 +39,13 @@ export default function AppointmentHistoryTable({ rows, loading }) {
               <tr>
                 <td colSpan={4} className="py-12 text-center">
                   <p className="text-sm text-ink-500">No visits yet.</p>
-                  <button onClick={() => navigate("/student/book")} className="mt-3 btn-primary btn-sm btn-press">
-                    Book your first appointment
-                  </button>
                 </td>
               </tr>
             )}
             {rows.map((a) => (
               <tr key={a.appointment_id} className="row-hover">
                 <td className="whitespace-nowrap font-medium text-ink-900">{fmtDate(a.appointment_date)}</td>
-                <td className="tnum whitespace-nowrap">{fmtTime(a.appointment_time)}</td>
+                <td className="tnum whitespace-nowrap">{formatTime12Hour(a.appointment_time) || "—"}</td>
                 <td className="cell-wrap min-w-[180px]">{a.appointment_purpose || "—"}</td>
                 <td><StatusPill status={a.current_status || "pending"} /></td>
               </tr>

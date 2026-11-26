@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useOverlayPosition } from '../../components/ui/PortalOverlay.jsx'
+import { GC_OVERLAY_Z } from '../../lib/gcMotion.js'
 import { useNavigate } from 'react-router-dom'
 import { masterlistApi } from '../../lib/api.js'
 import { useDebouncedValue } from '../../lib/hooks.js'
+import { clampPage, getPageCount } from '../../lib/pagination.js'
 import {
   MasterlistIcon,
   SearchIcon,
@@ -11,8 +14,9 @@ import {
   ChevronRightIcon,
 } from '../../components/ui/icons.jsx'
 import NavIcon from '../../components/ui/NavIcon.jsx'
-import UniversalDropdown from '../../components/ui/UniversalDropdown.jsx'
+import FilterMultiSelect from '../../components/ui/FilterMultiSelect.jsx'
 import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
+import { PageHeader } from '../../components/ui/primitives.jsx'
 
 const COLUMNS = [
   { key: 'name', label: 'Name', sortable: true },
@@ -53,9 +57,10 @@ export default function Masterlist() {
   const [courses, setCourses] = useState([])
   const [years, setYears] = useState([])
 
-  const [departmentId, setDepartmentId] = useState('')
-  const [courseId, setCourseId] = useState('')
-  const [yearLevel, setYearLevel] = useState('')
+  // Categorical search filters are OR sets; empty arrays mean "All".
+  const [departmentId, setDepartmentId] = useState([])
+  const [courseId, setCourseId] = useState([])
+  const [yearLevel, setYearLevel] = useState([])
 
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState('asc')
@@ -73,11 +78,21 @@ export default function Masterlist() {
     masterlistApi.listYears().then(setYears).catch(() => {})
   }, [])
 
-  // Courses cascade off the selected department.
+  // Courses cascade off the selected departments. Multiple departments return
+  // the union of their courses; selections no longer offered are dropped so
+  // the two filters can never contradict each other.
   useEffect(() => {
     masterlistApi
-      .listCourses(departmentId || undefined)
-      .then(setCourses)
+      .listCourses(departmentId.length ? departmentId : undefined)
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : []
+        setCourses(list)
+        const validIds = new Set(list.map((c) => String(c.course_id)))
+        setCourseId((previous) => {
+          const next = previous.filter((id) => validIds.has(String(id)))
+          return next.length === previous.length ? previous : next
+        })
+      })
       .catch(() => {})
   }, [departmentId])
 
@@ -103,9 +118,9 @@ export default function Masterlist() {
       .listStudents(
         {
           search: debouncedSearch || undefined,
-          department_id: departmentId || undefined,
-          course_id: courseId || undefined,
-          year_level: yearLevel || undefined,
+          department_id: departmentId.length ? departmentId : undefined,
+          course_id: courseId.length ? courseId : undefined,
+          year_level: yearLevel.length ? yearLevel : undefined,
           sort_by: sortBy,
           sort_dir: sortDir,
           page,
@@ -132,10 +147,15 @@ export default function Masterlist() {
     }
   }, [debouncedSearch, departmentId, courseId, yearLevel, sortBy, sortDir, page])
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const pageList = useMemo(() => buildPageList(page, totalPages), [page, totalPages])
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(page * PAGE_SIZE, total)
+  const totalPages = getPageCount(total, PAGE_SIZE)
+  const currentPage = clampPage(page, totalPages)
+  const pageList = useMemo(() => buildPageList(currentPage, totalPages), [currentPage, totalPages])
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, total)
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   function toggleSort(key) {
     if (sortBy === key) {
@@ -148,11 +168,12 @@ export default function Masterlist() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 pt-2">
-        <MasterlistIcon className="h-5 w-5 text-gc-accent" />
-        <h1 className="text-lg font-extrabold tracking-wide text-gray-900">MASTERLIST</h1>
-      </div>
-      <p className="mt-0.5 text-sm text-gray-500">View and manage the master list of students.</p>
+      <PageHeader
+        className="pt-2"
+        title="Masterlist"
+        subtitle="View and manage the master list of students."
+        icon={<MasterlistIcon className="h-5 w-5" />}
+      />
 
       <div className="mt-6 rounded-2xl border border-gray-100 p-5 shadow-sm">
         {/* Search + filters */}
@@ -167,25 +188,31 @@ export default function Masterlist() {
             />
           </div>
 
-          <FilterSelect
+          <FilterMultiSelect
             value={departmentId}
-            onChange={(v) => {
-              setDepartmentId(v)
-              setCourseId('')
-            }}
-            placeholder="All Departments"
+            onChange={setDepartmentId}
+            allLabel="All Departments"
+            pluralLabel="Departments"
+            ariaLabel="Filter by department"
+            triggerTestId="masterlist-department-filter"
             options={departments.map((d) => ({ value: d.department_id, label: d.department_name }))}
           />
-          <FilterSelect
+          <FilterMultiSelect
             value={courseId}
             onChange={setCourseId}
-            placeholder="All Course"
+            allLabel="All Course"
+            pluralLabel="Courses"
+            ariaLabel="Filter by course"
+            triggerTestId="masterlist-course-filter"
             options={courses.map((c) => ({ value: c.course_id, label: c.course_name }))}
           />
-          <FilterSelect
+          <FilterMultiSelect
             value={yearLevel}
             onChange={setYearLevel}
-            placeholder="All Years"
+            allLabel="All Years"
+            pluralLabel="Years"
+            ariaLabel="Filter by year level"
+            triggerTestId="masterlist-year-filter"
             options={years.map((y) => ({ value: y, label: y }))}
           />
         </div>
@@ -278,26 +305,28 @@ export default function Masterlist() {
           <p>
             {total === 0 ? '0 results' : `${rangeStart} to ${rangeEnd} out of ${total.toLocaleString()} Students`}
           </p>
-          <div className="flex items-center gap-1.5">
-            <PageButton onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-              <ChevronLeftIcon className="h-4 w-4" />
-            </PageButton>
-            {pageList.map((p, i) => {
-              const prev = pageList[i - 1]
-              const showEllipsis = prev !== undefined && p - prev > 1
-              return (
-                <span key={p} className="flex items-center gap-1.5">
-                  {showEllipsis && <span className="px-1 text-gray-400">…</span>}
-                  <PageButton active={p === page} onClick={() => setPage(p)}>
-                    {p}
-                  </PageButton>
-                </span>
-              )
-            })}
-            <PageButton onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-              <ChevronRightIcon className="h-4 w-4" />
-            </PageButton>
-          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <PageButton onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                <ChevronLeftIcon className="h-4 w-4" />
+              </PageButton>
+              {pageList.map((p, i) => {
+                const prev = pageList[i - 1]
+                const showEllipsis = prev !== undefined && p - prev > 1
+                return (
+                  <span key={p} className="flex items-center gap-1.5">
+                    {showEllipsis && <span className="px-1 text-gray-400">…</span>}
+                    <PageButton active={p === currentPage} onClick={() => setPage(p)}>
+                      {p}
+                    </PageButton>
+                  </span>
+                )
+              })}
+              <PageButton onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                <ChevronRightIcon className="h-4 w-4" />
+              </PageButton>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -312,24 +341,19 @@ const MENU_WIDTH = 160 // matches w-40
 // `overflow-y: auto` on that container too (a CSS quirk) and was cutting the
 // "View Record" option off, requiring a scroll to reach it.
 function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
-  const [coords, setCoords] = useState({ top: 0, left: 0 })
   const buttonRef = useRef(null)
   const menuRef = useRef(null)
-
-  const updatePosition = useCallback(() => {
-    const btn = buttonRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    setCoords({
-      top: rect.bottom + 4,
-      left: Math.min(Math.max(8, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8),
-    })
-  }, [])
+  const position = useOverlayPosition({
+    triggerRef: buttonRef,
+    panelRef: menuRef,
+    enabled: open,
+    align: 'right',
+    preferredWidth: MENU_WIDTH,
+    estimatedHeight: 120,
+  })
 
   useEffect(() => {
     if (!open) return
-
-    updatePosition()
 
     function handleClickOutside(e) {
       if (
@@ -342,16 +366,11 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
       }
     }
 
-    // Keep the menu glued to the button, even while the table underneath scrolls.
-    window.addEventListener('scroll', updatePosition, true)
-    window.addEventListener('resize', updatePosition)
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      window.removeEventListener('scroll', updatePosition, true)
-      window.removeEventListener('resize', updatePosition)
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [open, updatePosition, onClose])
+  }, [open, onClose])
 
   return (
     <div className="relative inline-block">
@@ -368,8 +387,16 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
         createPortal(
           <div
             ref={menuRef}
-            style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg origin-top animate-pop-in motion-reduce:animate-none"
+            style={{
+              position: 'fixed',
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              maxHeight: position.maxHeight,
+              zIndex: GC_OVERLAY_Z.dropdown,
+              visibility: position.hidden ? 'hidden' : 'visible',
+            }}
+            className="gc-overlay-portal overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg origin-top animate-pop-in motion-reduce:animate-none"
           >
             <button
               onClick={() => {
@@ -384,18 +411,6 @@ function RowActionsMenu({ open, onToggle, onClose, onViewRecord }) {
           document.body
         )}
     </div>
-  )
-}
-
-function FilterSelect({ value, onChange, placeholder, options }) {
-  return (
-    <UniversalDropdown
-      value={value}
-      onChange={onChange}
-      options={options}
-      placeholder={placeholder}
-      className="min-w-[160px]"
-    />
   )
 }
 

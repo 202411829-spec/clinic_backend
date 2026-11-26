@@ -1,8 +1,8 @@
 node_modules
 dist
 dist-ssr
-# .env
-# .env.local
+.env
+.env.local
 *.local
 .DS_Store
 
@@ -17,4 +17,12 @@ __pycache__/
 *.zip
 
 # Frontend env (Vite vars for local runs)
-# .env.frontend
+.env.frontend
+
+# Local runtime output and credentials
+*.log
+*_token*.txt
+admin_token*.txt
+student_token*.txt
+local-backups/
+.vercel

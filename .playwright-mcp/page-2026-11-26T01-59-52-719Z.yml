@@ -1,0 +1,103 @@
+- generic [ref=f31e49]:
+  - complementary [ref=f31e50]:
+    - generic [ref=f31e51]:
+      - generic [ref=f31e52]:
+        - generic [ref=f31e53]:
+          - img "Gordon College seal" [ref=f31e54]
+          - img "Health Service Unit seal" [ref=f31e55]
+        - generic [ref=f31e56]:
+          - paragraph [ref=f31e57]: GORDON COLLEGE
+          - paragraph [ref=f31e58]: Clinic Appointment System
+          - paragraph [ref=f31e59]: STUDENT PORTAL
+      - navigation [ref=f31e61]:
+        - paragraph [ref=f31e62]: Main
+        - list [ref=f31e63]:
+          - listitem [ref=f31e64]:
+            - link "Dashboard" [ref=f31e65] [cursor=pointer]:
+              - /url: /student/dashboard
+          - listitem [ref=f31e72]:
+            - link "Book" [ref=f31e73] [cursor=pointer]:
+              - /url: /student/book
+          - listitem [ref=f31e78]:
+            - link "Profile" [ref=f31e79] [cursor=pointer]:
+              - /url: /student/profile
+      - button "Logout" [ref=f31e86] [cursor=pointer]
+      - generic [ref=f31e91]:
+        - link "Feedback" [ref=f31e92] [cursor=pointer]:
+          - /url: /student/feedback
+        - link "About" [ref=f31e97] [cursor=pointer]:
+          - /url: /student/about
+  - generic [ref=f31e102]:
+    - banner [ref=f31e103]:
+      - button "Back" [ref=f31e105] [cursor=pointer]
+      - generic [ref=f31e108]:
+        - generic [ref=f31e109]:
+          - paragraph [ref=f31e110]: Juan B. Dela Cruz
+          - paragraph [ref=f31e111]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f31e112]: JB
+    - main [ref=f31e113]:
+      - generic [ref=f31e115]:
+        - generic [ref=f31e117]:
+          - generic [ref=f31e118]:
+            - paragraph [ref=f31e119]: Thursday, November 26
+            - heading "Good morning, Juan" [level=1] [ref=f31e120]
+            - paragraph [ref=f31e121]: Book a visit with the clinic, check your record, or tell us how it went.
+          - generic [ref=f31e122]:
+            - button "Book appointment" [ref=f31e123] [cursor=pointer]
+            - button "My record" [ref=f31e126] [cursor=pointer]
+        - generic [ref=f31e130]:
+          - generic [ref=f31e136]:
+            - paragraph [ref=f31e137]: "2"
+            - paragraph [ref=f31e138]: Total visits
+          - generic [ref=f31e143]:
+            - paragraph [ref=f31e144]: "0"
+            - paragraph [ref=f31e145]: Completed
+          - generic [ref=f31e151]:
+            - paragraph [ref=f31e152]: "2"
+            - paragraph [ref=f31e153]: Pending
+          - generic [ref=f31e158]:
+            - paragraph [ref=f31e159]: "0"
+            - paragraph [ref=f31e160]: Cancelled / no show
+        - generic [ref=f31e161]:
+          - generic [ref=f31e163]:
+            - generic [ref=f31e164]:
+              - heading "Upcoming appointment" [level=2] [ref=f31e170]
+              - button "Appointment actions" [ref=f31e172] [cursor=pointer]
+            - generic [ref=f31e177]:
+              - generic [ref=f31e178]:
+                - generic [ref=f31e179]: NOV
+                - generic [ref=f31e180]: "26"
+                - generic [ref=f31e181]: THU
+              - generic [ref=f31e182]:
+                - generic [ref=f31e183]: 8:00 AM
+                - paragraph [ref=f31e188]: Consultation
+              - generic [ref=f31e189]: Pending
+          - generic [ref=f31e193]:
+            - generic [ref=f31e199]:
+              - heading "Notifications" [level=2] [ref=f31e200]
+              - paragraph [ref=f31e201]: Changes to the clinic schedule and your appointments.
+            - generic [ref=f31e202]: No notifications yet.
+        - generic [ref=f31e204]:
+          - generic [ref=f31e205]:
+            - generic [ref=f31e206]:
+              - heading "Appointment history" [level=2] [ref=f31e207]
+              - paragraph [ref=f31e208]: Every clinic visit you've booked, newest first.
+            - button "New booking" [ref=f31e209] [cursor=pointer]
+          - table [ref=f31e213]:
+            - rowgroup [ref=f31e214]:
+              - row [ref=f31e215]:
+                - columnheader "Date" [ref=f31e216]
+                - columnheader "Time" [ref=f31e217]
+                - columnheader "Reason" [ref=f31e218]
+                - columnheader "Status" [ref=f31e219]
+            - rowgroup [ref=f31e220]:
+              - row [ref=f31e221]:
+                - cell "Nov 27, 2026" [ref=f31e222]
+                - cell "8:00 AM" [ref=f31e223]
+                - cell "Consultation" [ref=f31e224]
+                - cell "Pending" [ref=f31e225]
+              - row [ref=f31e228]:
+                - cell "Nov 26, 2026" [ref=f31e229]
+                - cell "8:00 AM" [ref=f31e230]
+                - cell "Consultation" [ref=f31e231]
+                - cell "Pending" [ref=f31e232]

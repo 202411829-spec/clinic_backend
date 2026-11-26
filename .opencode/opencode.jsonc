@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        // Project-scoped and disabled by default. Enable only when current library/framework docs are needed.
+        "disabled": true
+      },
+      "playwright": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@latest",
+          "--caps=testing",
+          "--no-webmcp",
+          "--isolated"
+        ],
+        // Enabled for explicit local/dev browser or UI testing only; never use production accounts or real user data.
+        "disabled": false
+      }
+    }
+  }
+}

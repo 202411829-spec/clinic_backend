@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-def test_admin_check_email_not_invited():
+def test_admin_check_email_available_for_valid_admin_email():
     from unittest.mock import patch as _patch
     from main import app
     app.config["TESTING"] = True
@@ -14,10 +14,10 @@ def test_admin_check_email_not_invited():
         # Need execute_with_retry to pass through
         with _patch("routers.auth.execute_with_retry", side_effect=lambda q: q.execute()):
             c = app.test_client()
-            resp = c.post("/api/auth/admin/check-email", json={"email": "nobody@gordoncollege.edu.ph"})
-            assert resp.status_code == 404
-            assert resp.get_json()["success"] is False
-            assert "Not invited" in resp.get_json()["error"]
+            resp = c.post("/api/auth/admin/check-email", json={"email": "nobody.person@gordoncollege.edu.ph"})
+            assert resp.status_code == 200
+            assert resp.get_json()["success"] is True
+            assert resp.get_json()["available"] is True
 
 
 def test_admin_signup_rejects_short_password():
@@ -25,7 +25,7 @@ def test_admin_signup_rejects_short_password():
     app.config["TESTING"] = True
     c = app.test_client()
     resp = c.post("/api/auth/admin/signup", json={
-        "email": "test@gordoncollege.edu.ph",
+        "email": "dela.cruz@gordoncollege.edu.ph",
         "code": "123456",
         "password": "short",
         "confirmPassword": "short"

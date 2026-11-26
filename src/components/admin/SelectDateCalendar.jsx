@@ -5,12 +5,15 @@ import {
   getMonthMatrix,
   isSameDate,
   formatMDY,
+  toYMD,
   WEEKDAY_LABELS,
+  asCalendarDate,
+  calendarAnchor,
   startOfDay,
 } from "../../lib/calendar";
 
 /**
- * selectedDate: Date
+ * selectedDate: Date | null — null opens the view on today (empty record dates)
  * onSelectDate: (date: Date) => void — fired when the user taps a day cell
  *   (a final pick). Callers that close a popup on selection (e.g. Reports)
  *   should do that here.
@@ -25,6 +28,14 @@ import {
  *   month at a time instead, like a normal calendar (used by the student
  *   booking calendar), without changing the selected date until a day is
  *   tapped.
+ * availableDates: string[] | Date[] | null (optional) — allow-list of
+ *   bookable days (YMD strings or Date objects). When provided, every date
+ *   outside the set is disabled (an empty array disables them all); when
+ *   omitted, availability is unrestricted apart from min/maxDate, which
+ *   keeps existing callers unchanged.
+ *
+ * Visual treatment follows the GC-RFB DateCalendar design. Month navigation
+ * deliberately stays instant, matching the source spec.
  */
 export default function SelectDateCalendar({
   selectedDate,
@@ -33,19 +44,33 @@ export default function SelectDateCalendar({
   navigationMode = "day",
   minDate,
   maxDate,
+  selectedDates = null,
+  onToggleDate = null,
+  availableDates = null,
 }) {
-  const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
-  const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
+  const selectedDay = asCalendarDate(selectedDate);
+  const [viewYear, setViewYear] = useState(() => calendarAnchor(selectedDate).getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => calendarAnchor(selectedDate).getMonth());
 
-  // Keep view in sync if selectedDate prop changes externally (e.g. Book.jsx defaulting to tomorrow)
+  // Allowed-day set for reason-scoped availability (YMD lookup keys).
+  const availableSet = Array.isArray(availableDates)
+    ? new Set(
+        availableDates.map((d) => (d instanceof Date ? toYMD(d) : String(d).slice(0, 10)))
+      )
+    : null;
+
+  // Keep view in sync if selectedDate prop changes externally (e.g. Book.jsx defaulting to tomorrow).
+  // Empty selections (Medical Records) open on today instead of reading a null Date.
   useEffect(() => {
-    setViewYear(selectedDate.getFullYear());
-    setViewMonth(selectedDate.getMonth());
+    const anchor = calendarAnchor(selectedDate);
+    setViewYear(anchor.getFullYear());
+    setViewMonth(anchor.getMonth());
   }, [selectedDate]);
 
   const weeks = getMonthMatrix(viewYear, viewMonth);
-  const today = new Date();
+  const today = startOfDay(new Date());
   const isMonthMode = navigationMode === "month";
+  const multiSelect = Array.isArray(selectedDates) && typeof onToggleDate === "function";
 
   const minDay = minDate ? startOfDay(minDate) : null;
   const maxDay = maxDate ? startOfDay(maxDate) : null;
@@ -55,6 +80,7 @@ export default function SelectDateCalendar({
     const d = startOfDay(date);
     if (minDay && d < minDay) return true;
     if (maxDay && d > maxDay) return true;
+    if (availableSet && !availableSet.has(toYMD(d))) return true;
     return false;
   }
 
@@ -65,22 +91,17 @@ export default function SelectDateCalendar({
   const canGoPrev = minMonthKey == null || viewMonthKey > minMonthKey;
   const canGoNext = maxMonthKey == null || viewMonthKey < maxMonthKey;
 
-  // Day-mode arrow targets (shift selected date by 1 day)
-  const prevDayTarget = (() => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    return d;
-  })();
-  const nextDayTarget = (() => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    return d;
-  })();
+  // Day-mode arrow targets (shift selected date by 1 day; empty opens on today)
+  const dayBase = selectedDay ?? calendarAnchor(selectedDate);
+  const prevDayTarget = new Date(dayBase);
+  prevDayTarget.setDate(prevDayTarget.getDate() - 1);
+  const nextDayTarget = new Date(dayBase);
+  nextDayTarget.setDate(nextDayTarget.getDate() + 1);
   const canShiftPrevDay = !isDisabled(prevDayTarget);
   const canShiftNextDay = !isDisabled(nextDayTarget);
 
   function shiftDay(delta) {
-    const next = new Date(selectedDate);
+    const next = new Date(selectedDay ?? calendarAnchor(selectedDate));
     next.setDate(next.getDate() + delta);
     (onNavigate || onSelectDate)(next);
     setViewYear(next.getFullYear());
@@ -126,95 +147,95 @@ export default function SelectDateCalendar({
     if (isDisabled(today)) return;
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
-    onSelectDate(startOfDay(today));
+    if (onSelectDate) onSelectDate(startOfDay(today));
+    else onToggleDate?.(startOfDay(today));
   }
 
   function pickDay(day) {
     if (!day) return;
     const d = new Date(viewYear, viewMonth, day);
     if (isDisabled(d)) return;
-    onSelectDate(d);
+    if (multiSelect) onToggleDate(d);
+    else onSelectDate(d);
   }
 
   // In month mode, the date box should reflect whatever month is currently
   // on screen (even before a day is picked), not just the selected date.
   const isViewingSelectedMonth =
-    selectedDate.getFullYear() === viewYear && selectedDate.getMonth() === viewMonth;
+    selectedDay != null &&
+    selectedDay.getFullYear() === viewYear &&
+    selectedDay.getMonth() === viewMonth;
   const displayDate =
     isMonthMode && !isViewingSelectedMonth
       ? new Date(viewYear, viewMonth, 1)
-      : selectedDate;
+      : selectedDay ?? calendarAnchor(selectedDate);
 
   return (
-    <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
+    <section className="gc-cal card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5">
       <h2 className="text-center font-bold text-gray-800 text-sm md:text-base mb-4">
-        Select Date
+        {multiSelect ? "Select Days" : "Select Date"}
       </h2>
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="gc-cal-head">
         <button
           onClick={goPrev}
           disabled={isMonthMode ? !canGoPrev : !canShiftPrevDay}
           aria-label={isMonthMode ? "Previous month" : "Previous day"}
-          className={`btn-press w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors disabled:active:scale-100 ${
-            (isMonthMode ? !canGoPrev : !canShiftPrevDay)
-              ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
-              : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-          }`}
+          className="gc-cal-navbtn gc-no-btn-anim"
         >
-          <NavIcon name="chevron-left" className="w-4 h-4" />
+          <NavIcon name="chevron-left" className="h-4 w-4" />
         </button>
 
-        <div className="flex-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700">
-          <NavIcon name="calendar" className="w-4 h-4 text-gc-green shrink-0" />
-          {formatMDY(displayDate)}
+        <div className="gc-cal-trigger" aria-label={formatMDY(displayDate)}>
+          <NavIcon name="calendar" className="gc-cal-trigger-icon h-4 w-4 shrink-0" />
+          <span className="gc-cal-trigger-text font-semibold">{formatMDY(displayDate)}</span>
         </div>
 
         <button
           onClick={goNext}
           disabled={isMonthMode ? !canGoNext : !canShiftNextDay}
           aria-label={isMonthMode ? "Next month" : "Next day"}
-          className={`btn-press w-8 h-8 shrink-0 flex items-center justify-center rounded-full border transition-colors disabled:active:scale-100 ${
-            (isMonthMode ? !canGoNext : !canShiftNextDay)
-              ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
-              : "border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-          }`}
+          className="gc-cal-navbtn gc-no-btn-anim"
         >
-          <NavIcon name="chevron-right" className="w-4 h-4" />
+          <NavIcon name="chevron-right" className="h-4 w-4" />
         </button>
       </div>
 
-      <div key={`${viewYear}-${viewMonth}`} className="grid grid-cols-7 gap-y-2 text-center animate-fade-in motion-reduce:animate-none">
+      <div className="gc-cal-dow">
         {WEEKDAY_LABELS.map((label) => (
-          <div
-            key={label}
-            className="text-[11px] font-bold text-gray-500 tracking-wide"
-          >
+          <div key={label} className="gc-cal-dow-cell">
             {label}
           </div>
         ))}
+      </div>
 
+      <div className="gc-cal-grid" role="grid" aria-label={multiSelect ? "Select Days" : "Select Date"}>
         {weeks.flat().map((day, i) => {
           const date = day ? new Date(viewYear, viewMonth, day) : null;
-          const selected = date && isSameDate(date, selectedDate);
+          const selected = date && (
+            multiSelect
+              ? selectedDates.includes(toYMD(date))
+              : isSameDate(date, selectedDay)
+          );
           const disabled = date ? isDisabled(date) : false;
+          const outside = date ? date.getMonth() !== viewMonth : false;
+          const isToday = date && isSameDate(date, today);
           return (
-            <div key={i} className="flex items-center justify-center py-0.5">
+            <div
+              key={i}
+              className={`gc-cal-cell ${outside ? "is-outside" : ""}`}
+            >
               {day ? (
                 <button
+                  type="button"
                   onClick={() => pickDay(day)}
                   disabled={disabled}
-                  className={`btn-press w-8 h-8 rounded-full text-sm font-semibold transition-colors disabled:active:scale-100 ${
-                    disabled
-                      ? "text-gray-300 bg-gray-50 cursor-not-allowed opacity-60"
-                      : selected
-                        ? "bg-gc-accent text-white shadow-sm animate-pop-in"
-                        : isSameDate(date, today)
-                          ? "text-gc-accent ring-1 ring-gc-accent/50 hover:bg-gray-100"
-                          : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  aria-selected={Boolean(selected)}
+                  className={`gc-cal-day gc-no-btn-anim ${
+                    disabled ? "is-disabled" : ""
+                  } ${selected ? "is-selected" : ""} ${isToday ? "is-today" : ""}`}
                 >
-                  {day}
+                  <span className="gc-cal-daynum">{day}</span>
                 </button>
               ) : null}
             </div>
@@ -226,11 +247,11 @@ export default function SelectDateCalendar({
         <button
           type="button"
           onClick={goToday}
-          disabled={isSameDate(selectedDate, today)}
-          className="btn-press mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gc-accent transition-colors hover:bg-gray-50 disabled:cursor-default disabled:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+          disabled={isSameDate(selectedDay, today)}
+          className="gc-cal-today gc-no-btn-anim mt-4 flex w-full items-center justify-center gap-2 disabled:cursor-default"
         >
           <NavIcon name="calendar" className="h-3.5 w-3.5" />
-          {isSameDate(selectedDate, today) ? "Showing today" : `Back to today · ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+          {isSameDate(selectedDay, today) ? "Showing today" : `Back to today · ${today.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
         </button>
       )}
     </section>

@@ -1,5 +1,5 @@
 // src/pages/student/Book.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import SelectDateCalendar from "../../components/admin/SelectDateCalendar.jsx";
 import SelectTimeSlots from "../../components/student/SelectTimeSlots.jsx";
@@ -7,10 +7,22 @@ import SelectReasonPanel from "../../components/student/SelectReasonPanel.jsx";
 import AppointmentSummaryCard from "../../components/student/AppointmentSummaryCard.jsx";
 import BookingStepIndicator from "../../components/student/BookingStepIndicator.jsx";
 import { Link } from "react-router-dom";
-import { appointmentsApi, referenceApi } from "../../lib/api.js";
+import { appointmentsApi, clinicScheduleApi, referenceApi } from "../../lib/api.js";
 import { useAppointment } from "../../context/AppointmentContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { addDays, startOfDay, toYMD } from "../../lib/calendar.js";
+import { addDays, formatMDY, startOfDay, toYMD } from "../../lib/calendar.js";
+import { formatTimeRange } from "../../lib/timeFormat.js";
+import { buildAppointmentPayload, canStartBooking } from "../../lib/appointmentPayload.js";
+import {
+  availabilityDates,
+  canProceed,
+  clearOnReasonChange,
+  findReason,
+  isDedicatedReason,
+  isReasonSelected,
+  normalizeReasonId,
+  summarizeSelection,
+} from "../../lib/bookingFlow.js";
 
 function getTomorrow() {
   return addDays(startOfDay(new Date()), 1);
@@ -51,6 +63,67 @@ function SuccessPanel({ rescheduling, onDone }) {
       </button>
     </section>
   );
+}
+
+// Card-shaped placeholder shown until a step's prerequisite exists (reason
+// before the calendar, date before the times, all three before summary).
+function GatedPanel({ title, message }) {
+  return (
+    <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
+      <div className="mb-3 border-l-4 border-brand-600 pl-3">
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-brand-900">
+          {title}
+        </h2>
+      </div>
+      <p className="rounded-control border border-ink-200 px-3 py-5 text-center text-sm text-ink-400">
+        {message}
+      </p>
+    </section>
+  );
+}
+
+function SummaryRow({ label, value }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1.5">
+      <span className="shrink-0 text-xs text-ink-500">{label}</span>
+      <span
+        className={[
+          "cell-wrap text-right text-sm font-medium",
+          value ? "text-ink-900" : "text-ink-300",
+        ].join(" ")}
+      >
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
+
+// Step 4 recap — read-only. The actual submit lives on step 5 so Confirm is
+// its own step with its own action.
+function SummaryPanel({ date, time, reason }) {
+  return (
+    <section className="card-hover rounded-panel bg-white p-4 shadow-e2 md:p-5">
+      <div className="mb-3 border-l-4 border-brand-600 pl-3">
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-brand-900">
+          Appointment summary
+        </h2>
+      </div>
+      <div className="divide-y divide-ink-100">
+        <SummaryRow label="Date" value={date ? formatMDY(date) : ""} />
+        <SummaryRow label="Time" value={formatTimeRange(time)} />
+        <SummaryRow label="Reason" value={reason} />
+      </div>
+    </section>
+  );
+}
+
+function stepButtonClass(enabled) {
+  return [
+    "btn btn-press w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
+    enabled
+      ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
+      : "bg-ink-100 text-ink-400 cursor-not-allowed",
+  ].join(" ");
 }
 
 export default function Book() {
@@ -107,41 +180,93 @@ export default function Book() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reason-first flow: nothing but the reason is picked up front. A fresh
+  // booking starts with no date/time at all (the calendar and slots only
+  // load once a reason is chosen); reschedule mode keeps its prefills.
   const [step, setStep] = useState(1);
   const tomorrow = getTomorrow();
   const [selectedDate, setSelectedDate] = useState(
-    appointment && wantsReschedule ? appointment.date : getTomorrow()
+    appointment && wantsReschedule ? appointment.date : null
   );
   const [selectedTime, setSelectedTime] = useState(
     appointment && wantsReschedule ? appointment.time : null
   );
   const [reasonId, setReasonId] = useState(
-    appointment && wantsReschedule ? appointment.reason_id || "" : ""
+    appointment && wantsReschedule ? normalizeReasonId(appointment.reason_id) : ""
   );
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(false);
+  const bookingInFlightRef = useRef(false);
 
   // Sync the form once a fetched (backend) reschedule source resolves —
   // the context-based case above is already set synchronously at mount.
   useEffect(() => {
     if (!fetchedAppt) return;
     setSelectedDate(fetchedAppt.date);
-    setReasonId(fetchedAppt.reason_id || "");
+    setReasonId(normalizeReasonId(fetchedAppt.reason_id));
   }, [fetchedAppt]);
 
-  // Real slot availability for the selected date + real reason list.
-const [slots, setSlots] = useState([]);
+  // Slots for the selected date + reason, and the real reason list.
+  const [slots, setSlots] = useState([]);
   const [reasonList, setReasonList] = useState([]);
-  const [slotsStatus, setSlotsStatus] = useState("loading");
+  const [slotsStatus, setSlotsStatus] = useState("idle");
   const [bookingError, setBookingError] = useState("");
   const [hasPending, setHasPending] = useState(false);
   const [pendingCheckStatus, setPendingCheckStatus] = useState("loading");
 
+  // Dedicated reasons (Dental Service) load their own schedule so the
+  // calendar can offer only those dates. Non-dedicated reasons keep the
+  // legacy general availability — no extra request, nothing restricted.
+  const reasonReady = isReasonSelected(reasonId);
+  const reasonRecord = findReason(reasonList, reasonId);
+  const dedicatedSchedule = isDedicatedReason(reasonList, reasonId);
+  const [scheduleRows, setScheduleRows] = useState(null);
+
   useEffect(() => {
+    if (!reasonReady || !dedicatedSchedule) {
+      setScheduleRows(null);
+      return undefined;
+    }
+    let cancelled = false;
+    clinicScheduleApi
+      .list({ reason_id: normalizeReasonId(reasonId) })
+      .then((res) => {
+        if (cancelled) return;
+        setScheduleRows(Array.isArray(res?.schedule) ? res.schedule : []);
+      })
+      .catch((err) => {
+        console.error("Failed to load reason schedule:", err);
+        // No usable schedule -> no selectable dates; never fall back to
+        // the general schedule's availability.
+        if (!cancelled) setScheduleRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reasonReady, dedicatedSchedule, reasonId]);
+
+  const availability = availabilityDates({
+    reason: reasonRecord,
+    schedule: scheduleRows,
+    minDate: tomorrow,
+  });
+  const availableDates = availability.dates; // null = unrestricted
+
+  // Slots only load once both a reason and a date exist — and always with
+  // the reason_id so the backend answers from that reason's schedule.
+  const slotsDate = selectedDate ? toYMD(selectedDate) : "";
+  const slotsReasonId = reasonReady ? normalizeReasonId(reasonId) : "";
+
+  useEffect(() => {
+    if (!slotsDate || !slotsReasonId) {
+      setSlots([]);
+      setSlotsStatus("idle");
+      return undefined;
+    }
     let cancelled = false;
     setSlotsStatus("loading");
     appointmentsApi
-      .slots(toYMD(selectedDate))
+      .slots(slotsDate, slotsReasonId)
       .then((res) => {
         if (cancelled) return;
         setSlots(
@@ -165,7 +290,7 @@ const [slots, setSlots] = useState([]);
     return () => {
       cancelled = true;
     };
-  }, [selectedDate]);
+  }, [slotsDate, slotsReasonId]);
 
   // Once that date's real slots load, match the old appointment's time to
   // one of them (by start time) so the calendar shows the right slot
@@ -244,6 +369,22 @@ const [slots, setSlots] = useState([]);
     };
   }, [studentId, appointment, isReschedule, wantsReschedule]);
 
+  // Changing the reason invalidates everything derived from the old one:
+  // date, time, slots and calendar availability are cleared, the new
+  // reason's availability reloads below, and the flow restarts at step 1.
+  function handleSelectReason(nextReasonId) {
+    const next = normalizeReasonId(nextReasonId);
+    if (next === normalizeReasonId(reasonId)) return;
+    const cleared = clearOnReasonChange();
+    setReasonId(next);
+    setSelectedDate(cleared.selectedDate);
+    setSelectedTime(cleared.selectedTime);
+    setSlots(cleared.slots);
+    setSlotsStatus(cleared.slotsStatus);
+    setScheduleRows(cleared.availableDates);
+    setStep(1);
+  }
+
   function handleSelectDate(date) {
     setSelectedDate(date);
     setSelectedTime(null); // availability differs per day — clear a stale pick
@@ -258,60 +399,40 @@ const [slots, setSlots] = useState([]);
   const oldAppointmentId = appointmentIdParam || rescheduleSource?.id;
 
   async function handleBook() {
-    // Frontend guard — mirrors the backend's "only 1 pending" rule.
     if (isBookingBlocked) {
       setBookingError(
         "You already have an active appointment (pending). Please wait until it is completed or cancelled before booking again."
       );
       return;
     }
+    if (!canStartBooking(booking, bookingInFlightRef.current)) return;
+
     setBookingError("");
     setBooking(true);
+    bookingInFlightRef.current = true;
 
     const matchedSlot = slots.find((s) => s.time === selectedTime);
-    const matchedReason = reasonList.find((r) => r.reason_id === reasonId);
-    const createBody = {
-      student_id: studentId,
-      slot_id: matchedSlot?.id ?? null,
-      appointment_date: toYMD(selectedDate),
-      appointment_time: matchedSlot?.slot_start || "08:00",
-      reason_id: matchedReason?.reason_id,
-      purpose: matchedReason?.description || "",
-    };
+    const matchedReason = findReason(reasonList, reasonId);
+    const createBody = buildAppointmentPayload({
+      studentId,
+      slot: matchedSlot,
+      reason: matchedReason,
+      selectedDate,
+      rescheduledId: isReschedule ? oldAppointmentId : null,
+    });
 
     try {
       const created = await appointmentsApi.create(createBody);
       finishBooking(created);
     } catch (err) {
       const msg = err?.message || "Couldn't book the appointment. Please try again.";
-      const isDuplicatePending = /already have an active appointment/i.test(msg);
-
-      // Reschedule mode: the backend is correctly refusing to create a
-      // second pending appointment while the old one is still open. Cancel
-      // the old one and retry once — this is the actual "reschedule".
-      if (isReschedule && isDuplicatePending && oldAppointmentId) {
-        try {
-          await appointmentsApi.delete(oldAppointmentId);
-          const created = await appointmentsApi.create(createBody);
-          finishBooking(created);
-          return;
-        } catch (retryErr) {
-          console.error("Reschedule failed after cancelling old appointment:", retryErr);
-          setBookingError(
-            retryErr?.message || "Couldn't reschedule the appointment. Please try again."
-          );
-          setBooking(false);
-          return;
-        }
-      }
-
       console.error("Booking failed:", err);
       setBookingError(msg);
-      // If the backend confirmed a pending appointment exists, lock the form
-      // so the user sees the same disabled state as the pre-check.
-      if (isDuplicatePending) {
+      if (/already have an active appointment/i.test(msg)) {
         setHasPending(true);
       }
+    } finally {
+      bookingInFlightRef.current = false;
       setBooking(false);
     }
 
@@ -328,7 +449,6 @@ const [slots, setSlots] = useState([]);
         bookAppointment(payload);
       }
       setBooked(true);
-      setBooking(false);
     }
   }
 
@@ -347,6 +467,27 @@ const [slots, setSlots] = useState([]);
   const pageTitle = wantsReschedule ? "Reschedule Appointment" : "Book an Appointment";
   const summaryActionLabel = wantsReschedule ? "Confirm Reschedule" : "Book";
   const summaryLoadingLabel = wantsReschedule ? "Rescheduling…" : "Booking…";
+
+  const selection = { reasonId, date: selectedDate, time: selectedTime };
+  const summary = summarizeSelection({
+    reasons: reasonList,
+    reasonId,
+    date: selectedDate,
+    time: selectedTime,
+  });
+  const summaryReady = canProceed(4, selection);
+  const confirmReady = canProceed(5, selection);
+  // "idle" means nothing has been requested yet — the time panel only ever
+  // renders once a reason and a date exist, so that instant is a load in
+  // flight rather than an empty schedule.
+  const timeStatus = slotsStatus === "idle" ? "loading" : slotsStatus;
+  const calendarCaption = availableDates
+    ? "Only dates scheduled for this service are bookable."
+    : "Booking is available starting tomorrow";
+  const summaryDisabled = isBookingBlocked || pendingCheckStatus === "loading";
+  const summaryDisabledReason = isBookingBlocked
+    ? "You already have an active appointment (pending)."
+    : undefined;
 
   return (
     <div className="pt-2 md:pt-6">
@@ -376,127 +517,172 @@ const [slots, setSlots] = useState([]);
         <p className="mb-4 text-xs text-ink-400 animate-fade-in">Checking existing appointments…</p>
       )}
 
-      {/* ---------- Mobile: one step at a time ---------- */}
+      {/* ---------- Mobile: one step at a time (Reason -> Calendar ->
+          Time Slot -> Summary -> Confirm) ---------- */}
       <div className="md:hidden max-w-sm mx-auto">
         <p className="mb-3 text-center font-serif text-lg font-semibold text-ink-900">{pageTitle}</p>
         <BookingStepIndicator step={step} onStepClick={setStep} />
 
         {/* key={step} remounts this wrapper on every mobile step change so
-            Date -> Time -> Reason -> Confirmation each replay a quick
-            settle-in transition — transform/opacity only, so it stays cheap. */}
+            each step replays a quick settle-in transition — transform/opacity
+            only, so it stays cheap. */}
         <div key={step} className="animate-fade-in-up motion-reduce:animate-none">
         {step === 1 && (
           <div className="space-y-4">
-            <SelectDateCalendar
-              selectedDate={selectedDate}
-              onSelectDate={handleSelectDate}
-              navigationMode="month"
-              minDate={tomorrow}
+            <SelectReasonPanel
+              reasons={reasonList}
+              reasonId={reasonId}
+              onSelectReason={handleSelectReason}
             />
-            <p className="text-center text-xs text-ink-500">Booking is available starting tomorrow</p>
             <button
               type="button"
+              disabled={!canProceed(1, selection)}
               onClick={() => setStep(2)}
-              className="btn-primary btn-press btn-shine w-full py-2.5"
+              className={stepButtonClass(canProceed(1, selection))}
             >
-              Next: Select Time
+              Next: Calendar
             </button>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-4">
-            <SelectTimeSlots
-              slots={slots}
-              selectedTime={selectedTime}
-              onSelectTime={setSelectedTime}
-              status={slotsStatus}
+            <SelectDateCalendar
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+              navigationMode="month"
+              minDate={tomorrow}
+              availableDates={availableDates}
             />
+            <p className="text-center text-xs text-ink-500">{calendarCaption}</p>
             <button
               type="button"
-              disabled={!selectedTime}
+              disabled={!canProceed(2, selection)}
               onClick={() => setStep(3)}
-              className={[
-                "btn btn-press w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
-                selectedTime
-                  ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
-                  : "bg-ink-100 text-ink-400 cursor-not-allowed",
-              ].join(" ")}
+              className={stepButtonClass(canProceed(2, selection))}
             >
-              Next: Select Reason
+              Next: Time Slot
             </button>
           </div>
         )}
 
         {step === 3 && (
           <div className="space-y-4">
-            <SelectReasonPanel reasons={reasonList} reasonId={reasonId} onSelectReason={setReasonId} />
+            <SelectTimeSlots
+              slots={slots}
+              selectedTime={selectedTime}
+              onSelectTime={setSelectedTime}
+              status={timeStatus}
+            />
             <button
               type="button"
-              disabled={!reasonId}
+              disabled={!canProceed(3, selection)}
               onClick={() => setStep(4)}
-              className={[
-                "btn btn-press w-full py-2.5 font-semibold transition-colors disabled:active:scale-100",
-                reasonId
-                  ? "bg-brand-900 text-white shadow-e1 hover:bg-brand-800"
-                  : "bg-ink-100 text-ink-400 cursor-not-allowed",
-              ].join(" ")}
+              className={stepButtonClass(canProceed(3, selection))}
             >
-              Next: Confirmation
+              Next: Summary
             </button>
           </div>
         )}
 
         {step === 4 && (
+          <div className="space-y-4">
+            <SummaryPanel date={selectedDate} time={selectedTime} reason={summary.reasonLabel} />
+            <button
+              type="button"
+              disabled={!summaryReady}
+              onClick={() => setStep(5)}
+              className={stepButtonClass(summaryReady)}
+            >
+              Next: Confirm
+            </button>
+          </div>
+        )}
+
+        {step === 5 && (
           <AppointmentSummaryCard
             date={selectedDate}
             time={selectedTime}
-            reason={reasonList.find((r) => r.reason_id === Number(reasonId))?.description || ""}
+            reason={summary.reasonLabel}
             booking={booking}
             onBook={handleBook}
             actionLabel={summaryActionLabel}
             loadingLabel={summaryLoadingLabel}
-            disabled={isBookingBlocked || pendingCheckStatus === "loading"}
-            disabledReason={
-              isBookingBlocked
-                ? "You already have an active appointment (pending)."
-                : undefined
-            }
+            disabled={summaryDisabled}
+            disabledReason={summaryDisabledReason}
           />
         )}
         </div>
       </div>
 
-      {/* ---------- Desktop: all panels visible at once ---------- */}
-      <div className="hidden md:grid md:grid-cols-[1fr_1fr_1fr_1fr] md:gap-5 md:items-start">
-        <div>
-          <SelectDateCalendar
-            selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}
-            navigationMode="month"
-            minDate={tomorrow}
+      {/* ---------- Desktop: same order, later panels gated until their
+          prerequisite exists ---------- */}
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 md:gap-5 md:items-start">
+        <SelectReasonPanel
+          reasons={reasonList}
+          reasonId={reasonId}
+          onSelectReason={handleSelectReason}
+        />
+
+        {reasonReady ? (
+          <div>
+            <SelectDateCalendar
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+              navigationMode="month"
+              minDate={tomorrow}
+              availableDates={availableDates}
+            />
+            <p className="text-center text-xs text-ink-500 mt-2">{calendarCaption}</p>
+          </div>
+        ) : (
+          <GatedPanel
+            title="Select Date"
+            message="Choose a reason first to see the available dates."
           />
-          <p className="text-center text-xs text-ink-500 mt-2">Booking is available starting tomorrow</p>
-        </div>
-        <SelectTimeSlots
-          slots={slots}
-          selectedTime={selectedTime}
-          onSelectTime={setSelectedTime}
-        />
-        <SelectReasonPanel reasons={reasonList} reasonId={reasonId} onSelectReason={setReasonId} />
-        <AppointmentSummaryCard
-          date={selectedDate}
-          time={selectedTime}
-          reason={reasonList.find((r) => r.reason_id === Number(reasonId))?.description || ""}
-          booking={booking}
-          onBook={handleBook}
-          actionLabel={summaryActionLabel}
-          loadingLabel={summaryLoadingLabel}
-          disabled={isBookingBlocked || pendingCheckStatus === "loading"}
-          disabledReason={
-            isBookingBlocked ? "You already have an active appointment (pending)." : undefined
-          }
-        />
+        )}
+
+        {reasonReady && selectedDate ? (
+          <SelectTimeSlots
+            slots={slots}
+            selectedTime={selectedTime}
+            onSelectTime={setSelectedTime}
+            status={timeStatus}
+          />
+        ) : (
+          <GatedPanel
+            title="Select Time"
+            message="Choose a reason and a date first to see the available times."
+          />
+        )}
+
+        {summaryReady ? (
+          <SummaryPanel date={selectedDate} time={selectedTime} reason={summary.reasonLabel} />
+        ) : (
+          <GatedPanel
+            title="Appointment summary"
+            message="Choose a reason, date and time to see your summary."
+          />
+        )}
+
+        {confirmReady ? (
+          <AppointmentSummaryCard
+            date={selectedDate}
+            time={selectedTime}
+            reason={summary.reasonLabel}
+            booking={booking}
+            onBook={handleBook}
+            actionLabel={summaryActionLabel}
+            loadingLabel={summaryLoadingLabel}
+            disabled={summaryDisabled}
+            disabledReason={summaryDisabledReason}
+          />
+        ) : (
+          <GatedPanel
+            title="Confirm booking"
+            message="Choose a reason, date and time to confirm your appointment."
+          />
+        )}
       </div>
     </div>
   );

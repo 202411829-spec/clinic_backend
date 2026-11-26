@@ -13,9 +13,10 @@ generically from whatever distinct values actually exist for the given
 date.
 
 Aggregation is pushed into PostgreSQL via the `report_breakdown` RPC
-function (migrations/2026-08-29_report_aggregate_functions.sql), which
-runs `select <field>, count(*) group by <field>` for every bucket and
-returns the grouped counts as JSON in one round trip.
+function, which runs `select <field>, count(*) group by <field>` for every
+bucket and returns the grouped counts as JSON in one round trip. The live
+function contract is `report_breakdown(p_date_from, p_date_to,
+p_department_id)`; this endpoint requests a single-day window.
 
 FAST-PATH GUARANTEE: The endpoint now requires the RPC to be present.
 If the function is missing or the schema cache is stale, the endpoint
@@ -88,20 +89,23 @@ def _breakdown(rows: list[dict], field: str, missing_label: str, total: int) -> 
 def _fetch_breakdowns(report_date, department_id: Optional[int]):
     """Return grouped counts for every report bucket, via the SQL RPC.
 
-    Calls `report_breakdown(p_report_date, p_department_id)` which does
-    all the `group by` counting in PostgreSQL (one round trip). Returns
-    a dict {view_column: [{<column>: value, count}, ...]}.
+    Calls `report_breakdown(p_date_from, p_date_to, p_department_id)` which
+    does all the `group by` counting in PostgreSQL (one round trip). The
+    Reports page is single-date, so both date bounds are the same day.
+    Returns a dict {view_column: [{<column>: value, count}, ...]}.
 
     Raises an exception if the RPC is unavailable (function not
     migrated / schema cache stale) — the caller MUST fail fast with
     a 500 and a clear migration message instead of silently falling
     back to a full-table-scan Python counter.
     """
+    report_day = report_date.isoformat()
     response = execute_with_retry(
         supabase.rpc(
             REPORT_BREAKDOWN_RPC,
             {
-                "p_report_date": report_date.isoformat(),
+                "p_date_from": report_day,
+                "p_date_to": report_day,
                 "p_department_id": department_id,
             },
         )

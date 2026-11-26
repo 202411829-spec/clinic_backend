@@ -9,7 +9,7 @@ REST API backend (`main.py`, `routers/`), both talking to Supabase.
 - **Database/Auth:** Supabase (Postgres + Supabase Auth) — client lib `@supabase/supabase-js` 2.45
 - **Client libs:** `react-router-dom` 6.26, `jspdf` 4.2, `html2canvas` 1.4
 
-Docs: `docs/SYSTEM_DOCUMENTATION.md` (full spec 1034 lines; actual file 1292 lines), `docs/SYSTEM_DESIGN_AND_ARCHITECTURE.md` (634 lines), `docs/OVERVIEW.md` (151 lines)
+Docs: `docs/OVERVIEW.md` (plain-language overview). AI/project notes are indexed in `.ai/README.md`; feature design specs are in `.ai/superpowers/specs/`. Active schema DDL lives in `migrations/`.
 
 ## Running the backend (Flask)
 
@@ -51,63 +51,59 @@ Frontend env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_URL`
 ## Structure
 
 ```
-main.py                  # Flask app: CORS, blueprint registration, /health
-routers/                 # REST blueprints: student, appointment, dashboard,
-                         #   clinic_schedule, logbook, notifications, feedback,
-                         #   masterlist (returns {success:true, data:..., total,page,page_size} envelope via src/lib/api.js unwrapData),
-                         #   student_record, reports, admin_mgmt, agent + helpers.py, auth_guard.py, logging_setup.py
-database.py              # Supabase client setup for the backend
-supabase_client.py       # shared Supabase helpers
-supabase_migrations.sql  # legacy — feedback table only (34 lines / 28L DDL); core schema is now in schema.sql/migrations/
-schema.sql               # 570L DDL per header schema.sql:1-14 (actual file 630 lines with comments) = concatenation of migrations/ DDL
-migrations/              # 2026-08-28_clean_rebuild_ddl.sql (enums, 22 tables, 2 views), 2026-08-28_clean_seed.sql (seed, apply separately),
-                         #   2026-08-29_perf_current_status.sql (current_status + indexes), 2026-08-29_report_aggregate_functions.sql
-docs/                    # SYSTEM_DOCUMENTATION.md (1292 lines; spec claims 1034), SYSTEM_DESIGN_AND_ARCHITECTURE.md (634 lines), OVERVIEW.md (151 lines)
-tests/ + pytest.ini      # tests/test_defense_critical.py (5 defense-critical), test_admin_mgmt.py, test_agent.py, test_admin_auth.py — 25 tests total
-vite.config.js           # Vite + vite-plugin-pwa config, server.port 5173
-.env.example             # 12 env entries / 33 lines (VITE_* + SUPABASE_* + RESEND + GROQ)
-src/                     # React PWA (SPA layout)
-  assets/styles/index.css  # Tailwind layers, app shell, motion system, print rules
-  components/
-    ui/                  # primitives, icons, Pagination, Reveal, CountUp, PageLoader, ErrorBoundary
-    auth/                # login / sign-up / forgot forms, AuthShell
-    navigation/          # Sidebar, TopBar, HeaderBar, mobile menu handle + overlay
-    admin/ student/ agent/  # feature panels
-  layouts/               # AdminLayout.jsx, StudentLayout.jsx
-  pages/                 # auth/, admin/, student/ screens
-  router/                # index.jsx (route table), lazyPages.js, ProtectedRoute.jsx, RouteShell.jsx
-  context/               # Auth, Appointment, ProfileCompleteness providers
-  lib/                   # supabaseClient.js, api.js (unwrapData), adapters
-  data/                  # static nav config + sample data
-  App.jsx                # providers + <RouterProvider>
-  main.jsx               # mounts React to index.html
-public/                  # static assets + PWA icons
+main.py                   # Flask app: CORS, blueprint registration, /health
+api/                      # Vercel serverless adapter (api/index.py) + function requirements
+routers/                  # Flask REST blueprints, auth guard, and route helpers
+database.py               # Supabase client re-export used by backend routes
+supabase_client.py        # Creates the Supabase client from environment variables
+cache.py                  # Optional Redis/in-memory cache used by reports
+migrations/               # Active SQL schema, seed, and report migration files
+docs/                     # Human docs, archived notes, and legacy references
+  legacy/                 # Legacy SQL kept for reference, including supabase_migrations.sql
+scripts/                  # Small maintenance/ops scripts
+shared/                   # JSON/data shared by Python and JavaScript
+src/                      # React PWA source (components, pages, routes, libs, styles)
+public/                   # Static assets and PWA icons served by Vite
+tests/                    # Python tests and tests/frontend Node tests
+.agents/                  # Project-level agent instructions
+.ai/                      # Repository-specific AI notes, audits, progress, and plans
+.claude/                  # Claude-specific local configuration
+.opencode/                # OpenCode project config and skills
+.vscode/                  # Editor-only Explorer view settings
+Dockerfile                # Builds/runs the Flask backend with gunicorn
+package.json              # Frontend scripts and dependencies
+package-lock.json         # Locked frontend dependency versions
+requirements.txt          # Python dependencies for local/Docker backend
+README.md                 # This beginner-friendly project guide
+.ai/progress/PROGRESS.md  # Shared worklog and current status
+index.html                # Vite entry HTML
+vite.config.js            # Vite + vite-plugin-pwa config
+tailwind.config.js        # Tailwind content paths
+postcss.config.js         # PostCSS plugin config
+vercel.json               # Vercel build, function, and rewrite settings
+.env.example              # Template for environment variables
+.gitignore                # Files Git should ignore
+.vercelignore             # Files Vercel should not upload
 ```
 
 ## Database note
-Core DDL is idempotent in `schema.sql` (570L DDL per header `schema.sql:1-14`; actual file 630 lines with comments — previous 630 DDL claim was stale) = concatenation of `migrations/`; `supabase_migrations.sql` is legacy (feedback table only, 34 lines / 28L DDL). Rebuild via `psql < schema.sql` or step-by-step `migrations/`.
+Core DDL lives in `migrations/`: `2026-08-28_clean_rebuild_ddl.sql` plus the two 2026-08-29 follow-ups. `2026-08-28_clean_seed.sql` is seed data and is applied separately. `docs/legacy/supabase_migrations.sql` is legacy (feedback table only). There is no `schema.sql` bundle in this checkout.
 
 ## Testing
 
 ```bash
-pip install pytest && pytest -q
+python -m pytest tests -q
 ```
 
-- 25 tests total (5 defense-critical in `tests/test_defense_critical.py`) — 5/5 PASS, mocked (no live DB), covers 401/403, 409 capacity, 400 past-date/reports.
-- Unit suite: `tests/` — mocked Supabase / `execute_with_retry`, no live DB required. Covers auth guards (401/403), appointment capacity (409), past-date validation (400), profile ownership (403), reports date validation (400), admin lifecycle and agent tooling.
-- Coverage: `7% → ~15%` on critical paths (auth, booking invariants, reports, records) plus a live integration pass via `test_endpoints.py` (real Supabase, run separately: `python test_endpoints.py`).
-- Config: `pytest.ini` sets `addopts = -q` and `testpaths = tests` so `pytest -q` works without args.
-- Discovery check: `pytest -q --collect-only` lists all collected tests; individual defense file: `pytest tests/test_defense_critical.py -v` (or `-q`).
+- Scope collection to `tests/`: this repository has no pytest config, so run tests from the project root. One-off Git Desktop notes were moved to `docs/archive/`.
+- Current test modules: `tests/test_admin_auth.py`, `tests/test_admin_mgmt.py`, `tests/test_agent.py`, `tests/test_auth_email_delivery.py`. The last one imports `main`, so run from the project root.
+- There is no `pytest.ini`, no coverage config, and no npm `test` script. `npm run build` is the frontend check; `npm run lint` is declared but `eslint` is not installed via `package.json`.
 
 ## Schema rebuild
 
-Core DDL is idempotent — rebuild the database from the single `schema.sql` bundle (570L DDL per header `schema.sql:1-14`; actual file 630 lines with comments — previous 630 DDL claim was stale) or from `migrations/` in order:
+Apply the migrations in order; there is no `schema.sql` bundle in this checkout:
 
 ```bash
-# Full rebuild (DDL + helpers, no seed) — schema.sql header schema.sql:1-14 lists sources
-psql < schema.sql
-
-# Or step-by-step from migrations/ (applied in order):
 psql < migrations/2026-08-28_clean_rebuild_ddl.sql
 psql < migrations/2026-08-29_perf_current_status.sql
 psql < migrations/2026-08-29_report_aggregate_functions.sql
@@ -115,8 +111,6 @@ psql < migrations/2026-08-29_report_aggregate_functions.sql
 # Seed data (optional, after schema is applied):
 psql < migrations/2026-08-28_clean_seed.sql
 ```
-
-`schema.sql` is the concatenation of the three DDL migrations above; the seed file is excluded and must be applied separately.
 
 ## Defense Demo Script (5 min)
 

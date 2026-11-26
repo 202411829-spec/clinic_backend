@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
 import { ChevronLeftIcon } from "../ui/icons.jsx";
+import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import {
   academicYears,
@@ -385,21 +386,12 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
           >
             Medical Certificate
           </button>
-          <button
-            onClick={() => window.print()}
-            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-          >
-            <NavIcon name="printer" className="w-4 h-4" />
-            Print
-          </button>
-          <button
+          <PrintButton onClick={() => window.print()} />
+          <DownloadPdfButton
             onClick={handleDownloadPdf}
             disabled={downloading}
-            className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
-          >
-            <NavIcon name="download" className="w-4 h-4" />
-            {downloading ? "Preparing…" : "Download PDF"}
-          </button>
+            loading={downloading}
+          />
         </div>
         </div>
       </div>

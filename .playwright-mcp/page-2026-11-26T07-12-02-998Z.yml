@@ -1,0 +1,77 @@
+- generic [active] [ref=f27e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - main [ref=f27e3]:
+    - generic [ref=f27e6]:
+      - generic [ref=f27e7]:
+        - generic [ref=f27e8]:
+          - button "Open sidebar" [ref=f27e10] [cursor=pointer]
+          - generic [ref=f27e95]:
+            - link "gccas" [ref=f27e96] [cursor=pointer]:
+              - /url: /josephs-projects-eb79b005/gccas
+            - button "Open project switcher" [ref=f27e100] [cursor=pointer]
+            - link "Back to team view" [ref=f27e107] [cursor=pointer]:
+              - /url: /josephs-projects-eb79b005/~/domains
+        - navigation "Breadcrumb" [ref=f27e19]:
+          - generic [ref=f27e20]: Domains
+        - generic [ref=f27e23]:
+          - button "Create New" [ref=f27e111] [cursor=pointer]
+          - button "Vercel Agent is available on Pro" [ref=f27e118] [cursor=pointer]
+      - generic [ref=f27e33]:
+        - generic [ref=f27e34]:
+          - generic [ref=f27e35]:
+            - button "Filter domains" [ref=f27e36] [cursor=pointer]
+            - searchbox "Search" [ref=f27e42]
+          - generic [ref=f27e46]:
+            - button "Add Existing" [ref=f27e47] [cursor=pointer]
+            - button "Buy" [ref=f27e49] [cursor=pointer]
+        - generic [ref=f27e134]:
+          - generic [ref=f27e137]:
+            - generic [ref=f27e138]:
+              - generic [ref=f27e139]:
+                - generic [ref=f27e140]: Valid Configuration
+                - link "gccas.vercel.app" [ref=f27e145] [cursor=pointer]:
+                  - /url: https://gccas.vercel.app
+              - generic [ref=f27e149]: Production
+            - generic [ref=f27e201]:
+              - generic [ref=f27e202]:
+                - generic [ref=f27e203]: Domain
+                - textbox "Domain" [ref=f27e205]: gccas.vercel.app
+              - radiogroup [ref=f27e208]:
+                - generic [ref=f27e209]:
+                  - generic [ref=f27e211]:
+                    - radio "Connect to an environment" [checked] [ref=f27e213]
+                    - generic [ref=f27e215]: Connect to an environment
+                  - combobox "Environments" [ref=f27e220] [cursor=pointer]:
+                    - option "Production" [selected]
+                    - option "Preview"
+                    - option "Your project has no custom environments" [disabled]
+                - generic [ref=f27e222]:
+                  - generic [ref=f27e224]:
+                    - radio "Redirect to Another Domain" [ref=f27e226]
+                    - generic [ref=f27e228]: Redirect to Another Domain
+                  - generic [ref=f27e229]:
+                    - combobox [disabled] [ref=f27e233]:
+                      - option "307 Temporary Redirect" [selected]
+                      - option "302 Found"
+                      - option "308 Permanent Redirect"
+                      - option "301 Moved Permanently"
+                    - combobox [ref=f27e237]:
+                      - generic [ref=f27e238]:
+                        - searchbox "No Redirect" [disabled] [ref=f27e239]
+                        - button "Open menu" [disabled] [ref=f27e240]
+              - generic [ref=f27e243]:
+                - button "Remove" [ref=f27e244] [cursor=pointer]
+                - generic [ref=f27e246]:
+                  - button "Cancel" [ref=f27e247] [cursor=pointer]
+                  - button "Save" [ref=f27e249] [cursor=pointer]
+          - generic [ref=f27e167]:
+            - generic [ref=f27e168]:
+              - generic [ref=f27e169]: Valid Configuration
+              - link "gc-rfb-frontend.vercel.app" [ref=f27e174] [cursor=pointer]:
+                - /url: https://gc-rfb-frontend.vercel.app
+            - generic [ref=f27e178]: Production
+            - generic [ref=f27e183]:
+              - button "Refresh status for gc-rfb-frontend.vercel.app" [ref=f27e184] [cursor=pointer]
+              - button "Actions for gc-rfb-frontend.vercel.app" [ref=f27e188] [cursor=pointer]
+  - alert [ref=f27e94]

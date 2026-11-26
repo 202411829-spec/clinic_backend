@@ -1,0 +1,154 @@
+- generic [ref=f17e89]:
+  - complementary [ref=f17e90]:
+    - generic [ref=f17e91]:
+      - generic [ref=f17e92]:
+        - generic [ref=f17e93]:
+          - img "Gordon College seal" [ref=f17e94]
+          - img "Health Service Unit seal" [ref=f17e95]
+        - generic [ref=f17e96]:
+          - paragraph [ref=f17e97]: GORDON COLLEGE
+          - paragraph [ref=f17e98]: Clinic Appointment System
+          - paragraph [ref=f17e99]: STUDENT PORTAL
+      - navigation [ref=f17e101]:
+        - paragraph [ref=f17e102]: Main
+        - list
+      - button "Logout" [ref=f17e105] [cursor=pointer]
+      - link "About" [ref=f17e111] [cursor=pointer]:
+        - /url: /student/about
+  - generic [ref=f17e116]:
+    - banner [ref=f17e117]:
+      - button "Back" [ref=f17e119] [cursor=pointer]
+      - generic [ref=f17e122]:
+        - generic [ref=f17e123]:
+          - paragraph [ref=f17e124]: Juan B. Dela Cruz
+          - paragraph [ref=f17e125]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f17e126]: JB
+    - main [ref=f17e127]:
+      - generic [ref=f17e131]:
+        - generic [ref=f17e132]:
+          - heading "Edit student information" [level=1] [ref=f17e133]
+          - paragraph [ref=f17e134]: Step 1 of 3
+        - generic [ref=f17e137]:
+          - generic [ref=f17e139]:
+            - generic [ref=f17e140]: "1"
+            - generic [ref=f17e141]: Personal Information
+          - generic [ref=f17e144]:
+            - generic [ref=f17e145]: "2"
+            - generic [ref=f17e146]: Medical History
+          - generic [ref=f17e149]:
+            - generic [ref=f17e150]: "3"
+            - generic [ref=f17e151]: Data Privacy
+        - generic [ref=f17e153]:
+          - generic [ref=f17e154]:
+            - generic [ref=f17e155]:
+              - generic [ref=f17e156]:
+                - generic [ref=f17e157]:
+                  - button "Upload student photo" [ref=f17e158] [cursor=pointer]
+                  - button "Change photo" [ref=f17e162] [cursor=pointer]
+                - generic [ref=f17e166]:
+                  - paragraph [ref=f17e167]: Student 1x1 Photo
+                  - paragraph [ref=f17e168]: Tap the circle to upload
+              - generic [ref=f17e169]:
+                - heading "Academic Information" [level=3] [ref=f17e175]
+                - generic [ref=f17e176]:
+                  - generic [ref=f17e177]: Student Number
+                  - textbox "e.g. 20230000" [disabled] [ref=f17e178]: "202399999"
+                - generic [ref=f17e179]:
+                  - generic [ref=f17e180]: Department *
+                  - combobox [ref=f17e182] [cursor=pointer]:
+                    - generic "College of Computer Studies (CCS)" [ref=f17e183]
+                - generic [ref=f17e186]:
+                  - generic [ref=f17e187]: Course *
+                  - combobox [ref=f17e189] [cursor=pointer]:
+                    - generic "Bachelor of Science in Information Technology (BSIT)" [ref=f17e190]
+            - generic [ref=f17e194]:
+              - heading "Personal Details" [level=3] [ref=f17e200]
+              - generic [ref=f17e201]:
+                - generic [ref=f17e202]:
+                  - generic [ref=f17e203]: Last Name *
+                  - textbox "Last Name" [ref=f17e204]: Dela Cruz
+                - generic [ref=f17e205]:
+                  - generic [ref=f17e206]: First Name *
+                  - textbox "First Name" [ref=f17e207]: Juan
+                - generic [ref=f17e208]:
+                  - generic [ref=f17e209]: Middle Initial / M.I.
+                  - textbox "M.I." [ref=f17e210]: B.
+                - generic [ref=f17e211]:
+                  - generic [ref=f17e212]: Suffix
+                  - textbox "Optional" [ref=f17e213]
+              - generic [ref=f17e214]:
+                - generic [ref=f17e215]:
+                  - generic [ref=f17e216]: Birthday *
+                  - textbox [ref=f17e217]: 2003-05-14
+                - generic [ref=f17e218]:
+                  - generic [ref=f17e219]: Age (Auto-Computed)
+                  - textbox "—" [disabled] [ref=f17e220]: "23"
+              - generic [ref=f17e221]:
+                - generic [ref=f17e222]:
+                  - generic [ref=f17e223]: Sex *
+                  - generic [ref=f17e225]:
+                    - button "Male" [ref=f17e226] [cursor=pointer]
+                    - button "Female" [ref=f17e227] [cursor=pointer]
+                - generic [ref=f17e228]:
+                  - generic [ref=f17e229]: Civil Status *
+                  - generic [ref=f17e231]:
+                    - button "Single" [ref=f17e232] [cursor=pointer]
+                    - button "Married" [ref=f17e233] [cursor=pointer]
+              - generic [ref=f17e234]:
+                - generic [ref=f17e235]: Contact Number *
+                - textbox "09XX XXX XXXX" [ref=f17e236]: "09171234567"
+              - generic [ref=f17e237]:
+                - heading "Student Address" [level=4] [ref=f17e238]
+                - generic [ref=f17e239]:
+                  - generic [ref=f17e240]:
+                    - generic [ref=f17e241]:
+                      - generic [ref=f17e242]: Region *
+                      - combobox [ref=f17e244] [cursor=pointer]:
+                        - generic "National Capital Region (NCR)" [ref=f17e245]
+                    - generic [ref=f17e248]:
+                      - generic [ref=f17e249]: Province *
+                      - combobox [ref=f17e251] [cursor=pointer]:
+                        - generic "Not in a Province (HUC / ICC / NCR)" [ref=f17e252]
+                    - generic [ref=f17e255]:
+                      - generic [ref=f17e256]: City / Municipality *
+                      - combobox [ref=f17e258] [cursor=pointer]:
+                        - generic "City of Caloocan" [ref=f17e259]
+                    - generic [ref=f17e262]:
+                      - generic [ref=f17e263]: Barangay *
+                      - combobox [ref=f17e265] [cursor=pointer]:
+                        - generic "Barangay 1" [ref=f17e266]
+                  - generic [ref=f17e269]:
+                    - generic [ref=f17e270]:
+                      - generic [ref=f17e271]: Street *
+                      - textbox "Street / Road / Purok" [ref=f17e272]: Sample Street
+                    - generic [ref=f17e273]:
+                      - generic [ref=f17e274]: House Number / Building / Lot
+                      - textbox "Optional" [ref=f17e275]: "1"
+          - generic [ref=f17e276]:
+            - heading "Emergency Contact Information" [level=3] [ref=f17e281]
+            - generic [ref=f17e282]:
+              - generic [ref=f17e283]:
+                - generic [ref=f17e284]: First Name *
+                - textbox "First Name" [ref=f17e285]: Maria
+              - generic [ref=f17e286]:
+                - generic [ref=f17e287]: Middle Initial
+                - textbox "M.I." [ref=f17e288]
+              - generic [ref=f17e289]:
+                - generic [ref=f17e290]: Last Name *
+                - textbox "Last Name" [ref=f17e291]: Dela Cruz
+              - generic [ref=f17e292]:
+                - generic [ref=f17e293]: Suffix
+                - textbox "Optional" [ref=f17e294]
+              - generic [ref=f17e295]:
+                - generic [ref=f17e296]: Relationship *
+                - textbox "e.g. Mother / Father" [ref=f17e297]: Mother
+              - generic [ref=f17e298]:
+                - generic [ref=f17e299]: Contact Number *
+                - textbox "09XX XXX XXXX" [ref=f17e300]: "09180000000"
+            - generic [ref=f17e301]:
+              - heading "Emergency Contact Address" [level=4] [ref=f17e302]
+              - generic [ref=f17e303] [cursor=pointer]:
+                - checkbox "Same as Student Address" [checked] [ref=f17e305]
+                - text: Same as Student Address
+              - generic [ref=f17e306]: "Using student address: Blk 1, Barangay 1, City of Caloocan, NCR"
+          - 'button "Next: Medical History" [ref=f17e307] [cursor=pointer]'

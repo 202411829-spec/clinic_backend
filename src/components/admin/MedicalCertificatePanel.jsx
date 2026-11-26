@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
+import AnimatedCheckbox from "../ui/AnimatedCheckbox.jsx";
+import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import { ChevronLeftIcon } from "../ui/icons.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { formatMDY } from "../../lib/calendar.js";
@@ -278,21 +280,15 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
         >
           {sending ? "Opening…" : "Send through email"}
         </button>
-        <button
+        <PrintButton
           onClick={() => window.print()}
-          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-white text-gray-700 border border-gray-300 px-4 py-2.5 rounded-lg hover:bg-gray-50"
-        >
-          <NavIcon name="printer" className="w-4 h-4" />
-          Print (3 copies, A4 portrait)
-        </button>
-        <button
+          label="Print (3 copies, A4 portrait)"
+        />
+        <DownloadPdfButton
           onClick={handleDownloadPdf}
           disabled={downloadingPdf}
-          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:active:scale-100"
-        >
-          <NavIcon name="download" className="w-4 h-4" />
-          {downloadingPdf ? "Preparing…" : "Download PDF"}
-        </button>
+          loading={downloadingPdf}
+        />
       </div>
 
       {/* ---------- certificate card (screen: editable single form) ---------- */}
@@ -350,11 +346,10 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           <div className="flex items-start gap-3 mb-4">
             <label className="text-base font-semibold text-gray-800 shrink-0 pt-2">Findings:</label>
             <label className="flex-1 flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
+              <AnimatedCheckbox
                 checked={normalFindings}
                 onChange={(e) => setNormalFindings(e.target.checked)}
-                className="w-4 h-4 accent-gc-green shrink-0"
+                style={{ "--gc-cb-size": "16px" }}
               />
               Essentially normal physical findings at the time of evaluation
             </label>
@@ -385,11 +380,10 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
             <label className="text-base font-semibold text-gray-800 shrink-0">Purpose:</label>
             {PURPOSE_OPTIONS.map((label) => (
               <label key={label} className="flex items-center gap-1.5 text-base text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
+                <AnimatedCheckbox
                   checked={purpose.has(label)}
                   onChange={() => togglePurpose(label)}
-                  className="w-4 h-4 accent-gc-green"
+                  style={{ "--gc-cb-size": "16px" }}
                 />
                 {label}
               </label>

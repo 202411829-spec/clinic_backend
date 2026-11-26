@@ -1,0 +1,118 @@
+- generic [ref=f20e1]:
+  - generic [ref=f20e4]:
+    - complementary [ref=f20e5]:
+      - generic [ref=f20e6]:
+        - generic [ref=f20e7]:
+          - generic [ref=f20e8]:
+            - img "Gordon College seal" [ref=f20e9]
+            - img "Health Service Unit seal" [ref=f20e10]
+          - generic [ref=f20e11]:
+            - paragraph [ref=f20e12]: GORDON COLLEGE
+            - paragraph [ref=f20e13]: Clinic Appointment System
+            - paragraph [ref=f20e14]: STUDENT PORTAL
+        - navigation [ref=f20e16]:
+          - paragraph [ref=f20e17]: Main
+          - list [ref=f20e18]:
+            - listitem [ref=f20e19]:
+              - link "Dashboard" [ref=f20e20] [cursor=pointer]:
+                - /url: /student/dashboard
+            - listitem [ref=f20e27]:
+              - link "Book" [ref=f20e28] [cursor=pointer]:
+                - /url: /student/book
+            - listitem [ref=f20e33]:
+              - link "Profile" [ref=f20e34] [cursor=pointer]:
+                - /url: /student/profile
+        - button "Logout" [ref=f20e41] [cursor=pointer]
+        - generic [ref=f20e46]:
+          - link "Feedback" [ref=f20e47] [cursor=pointer]:
+            - /url: /student/feedback
+          - link "About" [ref=f20e52] [cursor=pointer]:
+            - /url: /student/about
+    - generic [ref=f20e57]:
+      - banner [ref=f20e58]:
+        - button "Back" [ref=f20e60] [cursor=pointer]
+        - generic [ref=f20e63]:
+          - generic [ref=f20e64]:
+            - paragraph [ref=f20e65]: Juan B. Dela Cruz
+            - paragraph [ref=f20e66]: CCS Bachelor of Science in Information Technology
+          - generic [ref=f20e67]: JB
+      - main [ref=f20e68]:
+        - generic [ref=f20e70]:
+          - heading "Book an Appointment" [level=1] [ref=f20e71]
+          - generic [ref=f20e72]:
+            - generic [ref=f20e73]:
+              - generic [ref=f20e74]:
+                - heading "Select Date" [level=2] [ref=f20e75]
+                - generic [ref=f20e76]:
+                  - button "Previous month" [disabled] [ref=f20e77]
+                  - generic "11/27/2026" [ref=f20e80]
+                  - button "Next month" [ref=f20e85] [cursor=pointer]
+                - generic [ref=f20e88]:
+                  - generic [ref=f20e89]: SUN
+                  - generic [ref=f20e90]: MON
+                  - generic [ref=f20e91]: TUE
+                  - generic [ref=f20e92]: WED
+                  - generic [ref=f20e93]: THU
+                  - generic [ref=f20e94]: FRI
+                  - generic [ref=f20e95]: SAT
+                - grid "Select Date" [ref=f20e96]:
+                  - button "1" [disabled] [ref=f20e98]
+                  - button "2" [disabled] [ref=f20e101]
+                  - button "3" [disabled] [ref=f20e104]
+                  - button "4" [disabled] [ref=f20e107]
+                  - button "5" [disabled] [ref=f20e110]
+                  - button "6" [disabled] [ref=f20e113]
+                  - button "7" [disabled] [ref=f20e116]
+                  - button "8" [disabled] [ref=f20e119]
+                  - button "9" [disabled] [ref=f20e122]
+                  - button "10" [disabled] [ref=f20e125]
+                  - button "11" [disabled] [ref=f20e128]
+                  - button "12" [disabled] [ref=f20e131]
+                  - button "13" [disabled] [ref=f20e134]
+                  - button "14" [disabled] [ref=f20e137]
+                  - button "15" [disabled] [ref=f20e140]
+                  - button "16" [disabled] [ref=f20e143]
+                  - button "17" [disabled] [ref=f20e146]
+                  - button "18" [disabled] [ref=f20e149]
+                  - button "19" [disabled] [ref=f20e152]
+                  - button "20" [disabled] [ref=f20e155]
+                  - button "21" [disabled] [ref=f20e158]
+                  - button "22" [disabled] [ref=f20e161]
+                  - button "23" [disabled] [ref=f20e164]
+                  - button "24" [disabled] [ref=f20e167]
+                  - button "25" [disabled] [ref=f20e170]
+                  - button "26" [disabled] [ref=f20e173]
+                  - button "27" [ref=f20e176] [cursor=pointer]
+                  - button "28" [ref=f20e179] [cursor=pointer]
+                  - button "29" [ref=f20e182] [cursor=pointer]
+                  - button "30" [ref=f20e185] [cursor=pointer]
+              - paragraph [ref=f20e192]: Booking is available starting tomorrow
+            - generic [ref=f20e193]:
+              - heading "Select Time" [level=2] [ref=f20e194]
+              - generic [ref=f20e195]: 8:00 AM – 9:00 AM
+              - button "8:00 AM – 9:00 AM 1 / 11 Booked 10 Slots Left" [ref=f20e201] [cursor=pointer]:
+                - generic [ref=f20e202]:
+                  - generic [ref=f20e203]: 8:00 AM – 9:00 AM
+                  - generic [ref=f20e204]:
+                    - generic [ref=f20e205]: 1 / 11 Booked
+                    - generic [ref=f20e206]: 10 Slots Left
+            - generic [ref=f20e210]:
+              - heading "Select Reason" [level=2] [ref=f20e211]
+              - combobox [expanded] [active] [ref=f20e213] [cursor=pointer]:
+                - generic "Choose a reason for your visit" [ref=f20e214]
+            - generic [ref=f20e217]:
+              - heading "Appointment summary" [level=2] [ref=f20e219]
+              - generic [ref=f20e220]:
+                - generic [ref=f20e221]:
+                  - generic [ref=f20e222]: Date
+                  - generic [ref=f20e223]: 11/27/2026
+                - generic [ref=f20e224]:
+                  - generic [ref=f20e225]: Time
+                  - generic [ref=f20e226]: 8:00 AM – 9:00 AM
+                - generic [ref=f20e227]:
+                  - generic [ref=f20e228]: Reason
+                  - generic [ref=f20e229]: —
+              - button "Book" [disabled]
+  - listbox [ref=f20e230]:
+    - option "Consultation" [ref=f20e231] [cursor=pointer]
+    - option "Medical Certificate" [ref=f20e233] [cursor=pointer]

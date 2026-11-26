@@ -120,6 +120,17 @@ export function startOfDay(date) {
   return d;
 }
 
+/** Usable Date at local midnight, or null for empty/invalid values. */
+export function asCalendarDate(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+  return startOfDay(value);
+}
+
+/** Safe calendar view anchor; empty/invalid selections open on today. */
+export function calendarAnchor(value) {
+  return asCalendarDate(value) ?? startOfDay(new Date());
+}
+
 export function addDays(date, days) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);

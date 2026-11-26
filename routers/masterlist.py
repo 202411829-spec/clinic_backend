@@ -16,6 +16,7 @@ from typing import Optional, Literal
 from supabase_client import supabase
 from routers.auth_guard import require_auth, sanitize_search
 from routers.helpers import error_response, execute_with_retry
+from routers.query_params import get_filter_list
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,13 @@ SORTABLE_COLUMNS = {
 @require_auth
 def list_students():
     search: Optional[str] = sanitize_search(request.args.get("search"))
-    department_id: Optional[int] = request.args.get("department_id", type=int)
-    course_id: Optional[int] = request.args.get("course_id", type=int)
-    year_level: Optional[str] = request.args.get("year_level")
+    # Multi-select filters: repeated keys (or legacy scalar/CSV) parse
+    # into a list; a non-empty list filters with IN (OR within the
+    # category), and the categories chain as separate filters (AND).
+    # An empty list means "All" for that category — no filter.
+    department_ids = get_filter_list("department_id")
+    course_ids = get_filter_list("course_id")
+    year_levels = get_filter_list("year_level", as_int=False)
     sort_by: Literal["name", "student_number", "department", "course", "year_level", "sex"] = request.args.get("sort_by", "name")
     sort_dir: Literal["asc", "desc"] = request.args.get("sort_dir", "asc")
 
@@ -60,12 +65,12 @@ def list_students():
             f"course_name.ilike.{like}"
         )
 
-    if department_id is not None:
-        query = query.eq("department_id", department_id)
-    if course_id is not None:
-        query = query.eq("course_id", course_id)
-    if year_level:
-        query = query.eq("year_level", year_level)
+    if department_ids:
+        query = query.in_("department_id", department_ids)
+    if course_ids:
+        query = query.in_("course_id", course_ids)
+    if year_levels:
+        query = query.in_("year_level", year_levels)
 
     if sort_by not in SORTABLE_COLUMNS:
         return error_response(f"Invalid sort_by '{sort_by}'. Allowed: {', '.join(sorted(SORTABLE_COLUMNS))}", 400)
@@ -139,18 +144,34 @@ def list_departments():
 @blueprint.route("/courses", methods=["GET"])
 @require_auth
 def list_courses():
-    department_id = request.args.get("department_id", type=int)
+    # Multi-select: repeated department_id values (or legacy scalar/CSV)
+    # select the deduped union of those departments' courses. A single
+    # value behaves exactly like the old scalar filter; an absent /
+    # invalid value means "all departments" (no filter).
+    department_ids = get_filter_list("department_id")
     query = supabase.table("courses").select("course_id, course_name, department_id")
-    if department_id is not None:
-        query = query.eq("department_id", department_id)
+    if department_ids:
+        query = query.in_("department_id", department_ids)
     try:
         response = execute_with_retry(query.order("course_name"))
     except Exception as e:
         logger.error("List courses failed: %r", e)
         return error_response("Failed to fetch courses.", 500)
+    # Deduped union: one row per course id even if a value arrives more
+    # than once through overlapping department values (defensive — the
+    # IN filter itself already returns distinct table rows). Order of
+    # first appearance (the course_name ordering above) is preserved.
+    seen = set()
+    data = []
+    for row in response.data or []:
+        course_id = row.get("course_id")
+        if course_id in seen:
+            continue
+        seen.add(course_id)
+        data.append(row)
     return jsonify({
         "success": True,
-        "data": response.data,
+        "data": data,
     })
 
 

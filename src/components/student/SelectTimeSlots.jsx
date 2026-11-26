@@ -1,6 +1,7 @@
 // src/components/student/SelectTimeSlots.jsx
 import NavIcon from "../ui/NavIcon";
 import { remainingSlots, isSlotFull } from "../../lib/timeSlots";
+import { formatTimeRange } from "../../lib/timeFormat";
 
 function SlotBar({ slot }) {
   const full = isSlotFull(slot);
@@ -121,7 +122,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
       <div className="mb-4 flex items-center gap-2 rounded-control border border-ink-200 px-3 py-2 text-sm font-semibold text-ink-700">
         <NavIcon name="clock" className="h-4 w-4 shrink-0 text-brand-600" />
         <span className={selectedTime ? "" : "font-normal text-ink-400"}>
-          {selectedTime || "Select a time slot"}
+          {selectedTime ? formatTimeRange(selectedTime) : "Select a time slot"}
         </span>
       </div>
 
@@ -152,7 +153,7 @@ export default function SelectTimeSlots({ slots, selectedTime, onSelectTime, sta
             >
               <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
                 <span className="whitespace-nowrap text-sm font-semibold text-ink-900">
-                  {slot.time}
+                  {formatTimeRange(slot.time)}
                 </span>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <SlotBadge slot={slot} />

@@ -1,34 +1,28 @@
 // src/components/admin/StatusMenu.jsx
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import NavIcon from "../ui/NavIcon";
+import { useOverlayPosition } from "../ui/PortalOverlay.jsx";
+import { GC_OVERLAY_Z } from "../../lib/gcMotion.js";
 import { statusOptions } from "../../data/dashboardSample";
 
 const MENU_WIDTH = 160; // matches w-40
 
 export default function StatusMenu({ current, onChange, onViewRecord }) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
-
-  const updatePosition = useCallback(() => {
-    const btn = buttonRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    setCoords({
-      top: rect.bottom + 4,
-      left: Math.min(
-        Math.max(8, rect.right - MENU_WIDTH),
-        window.innerWidth - MENU_WIDTH - 8
-      ),
-    });
-  }, []);
+  const position = useOverlayPosition({
+    triggerRef: buttonRef,
+    panelRef: menuRef,
+    enabled: open,
+    align: "right",
+    preferredWidth: MENU_WIDTH,
+    estimatedHeight: 240,
+  });
 
   useEffect(() => {
     if (!open) return;
-
-    updatePosition();
 
     function handleClickOutside(e) {
       if (
@@ -41,16 +35,11 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
       }
     }
 
-    // Keep the menu glued to the button, even while the table underneath scrolls.
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [open, updatePosition]);
+  }, [open]);
 
   return (
     <div className="inline-block">
@@ -67,8 +56,16 @@ export default function StatusMenu({ current, onChange, onViewRecord }) {
         createPortal(
           <div
             ref={menuRef}
-            style={{ position: "fixed", top: coords.top, left: coords.left, width: MENU_WIDTH }}
-            className="z-50 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden origin-top animate-pop-in motion-reduce:animate-none"
+            style={{
+              position: "fixed",
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              maxHeight: position.maxHeight,
+              zIndex: GC_OVERLAY_Z.dropdown,
+              visibility: position.hidden ? "hidden" : "visible",
+            }}
+            className="gc-overlay-portal bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden origin-top animate-pop-in motion-reduce:animate-none"
           >
             {statusOptions.map((opt) => (
               <button

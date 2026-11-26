@@ -1,10 +1,12 @@
 // src/components/admin/ClinicScheduleFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import NavIcon from "../ui/NavIcon.jsx";
+import PortalOverlay from "../ui/PortalOverlay.jsx";
+import UniversalDropdown from "../ui/UniversalDropdown.jsx";
 import ScheduleCalendar from "./ScheduleCalendar.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
 import { generateTimeBlocks } from "../../lib/schedule.js";
-import { clinicScheduleApi } from "../../lib/api.js";
+import { clinicScheduleApi, referenceApi } from "../../lib/api.js";
 import { formatMDY, toYMD } from "../../lib/calendar.js";
 
 function InfoDot({ label }) {
@@ -22,18 +24,7 @@ function InfoDot({ label }) {
 
 function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuWrapRef = useRef(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e) {
-      if (menuWrapRef.current && !menuWrapRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  const menuButtonRef = useRef(null);
 
   // Split "8:00 AM - 9:00 AM" into its start/end halves so we can force
   // exactly 2 lines every time ("8:00 AM -" / "9:00 AM"), instead of
@@ -59,8 +50,9 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
           {block.capacity} Slot{block.capacity === 1 ? "" : "s"}
         </span>
 
-        <div className="relative justify-self-center" ref={menuWrapRef}>
+        <div className="relative justify-self-center">
           <button
+            ref={menuButtonRef}
             onClick={() => setMenuOpen((v) => !v)}
             aria-label={`Actions for ${block.time}`}
             aria-haspopup="menu"
@@ -71,9 +63,17 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
           </button>
 
           {menuOpen && (
-            <div
+            <PortalOverlay
+              triggerRef={menuButtonRef}
+              enabled={menuOpen}
+              align="right"
+              preferredWidth={128}
+              estimatedHeight={112}
               role="menu"
-              className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              ariaLabel={`Actions for ${block.time}`}
+              className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden"
+              onOutside={() => setMenuOpen(false)}
+              onEscape={() => setMenuOpen(false)}
             >
               <button
                 role="menuitem"
@@ -95,7 +95,7 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
               >
                 Delete
               </button>
-            </div>
+            </PortalOverlay>
           )}
         </div>
       </div>
@@ -113,12 +113,44 @@ function TimeBlockRow({ block, onToggleEdit, editing, onSave, onDelete }) {
 
 const DEFAULT_OPEN_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
+// "" = General (the legacy clinic-wide schedule); a reason id scopes both
+// the schedule listing and the overrides this panel creates to that reason
+// (e.g. Dental Service's own schedule).
+const GENERAL_SCOPE = "";
+
+function toTimeInput(value, fallback = "") {
+  const text = value === null || value === undefined ? "" : String(value).slice(0, 5);
+  return text || fallback;
+}
+
 export default function ClinicScheduleFullPanel() {
   const [selectedDates, setSelectedDates] = useState([new Date()]);
   const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_OPEN_WEEKDAYS);
   const [calendarMode, setCalendarMode] = useState("specific");
   const [bookingEnabledMap, setBookingEnabledMap] = useState({});
   const [bookingSaving, setBookingSaving] = useState(false);
+
+  // Appointment Reason scope (General + every reason from /reasons).
+  const [reasonScope, setReasonScope] = useState(GENERAL_SCOPE);
+  const [reasonOptions, setReasonOptions] = useState([]);
+
+  useEffect(() => {
+    referenceApi
+      .reasons()
+      .then((res) => setReasonOptions(res?.reasons || []))
+      .catch((err) => console.error("Failed to load appointment reasons:", err));
+  }, []);
+
+  const scopeReasonId = reasonScope === GENERAL_SCOPE ? null : Number(reasonScope);
+  // Any reason-specific scope has only its explicit clinic_schedules rows;
+  // weekday defaults belong to the General scope alone. This keeps the
+  // admin filter literal for every /reasons option, even when that reason
+  // is not dedicated for student booking.
+  const scopeIsReasonSpecific = scopeReasonId !== null;
+  const reasonScopeOptions = [
+    { value: GENERAL_SCOPE, label: "General" },
+    ...reasonOptions.map((r) => ({ value: String(r.reason_id), label: r.description })),
+  ];
 
   const [workStart, setWorkStart] = useState("08:00");
   const [workEnd, setWorkEnd] = useState("17:00");
@@ -189,44 +221,72 @@ export default function ClinicScheduleFullPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch per-date is_enabled for selectedDates to drive booking pill + calendar closed styling.
-  // If no override exists, inherit weekday default (open if weekday is in selectedWeekdays).
+  // Fetch the selected reason's saved schedule rows. omitted reason_id =
+  // the legacy General schedule; any selected reason loads ONLY rows whose
+  // clinic_schedules.reason_id matches. The General scope keeps weekday
+  // defaults when no row exists; reason scopes have no implicit availability.
   useEffect(() => {
     if (calendarMode !== "specific" || selectedDates.length === 0) {
       setBookingEnabledMap({});
       return;
     }
     let cancelled = false;
+    const fallbackEnabled = (d) =>
+      scopeIsReasonSpecific ? false : selectedWeekdays.includes(d.getDay());
     async function load() {
       const next = {};
+      const loadedRows = [];
       await Promise.all(
         selectedDates.map(async (d) => {
           const ymd = toYMD(d);
           try {
-            const res = await clinicScheduleApi.byDate(ymd);
-            const sched = res?.schedule;
+            const res = scopeReasonId
+              ? await clinicScheduleApi.list({ start: ymd, end: ymd, reason_id: scopeReasonId })
+              : await clinicScheduleApi.list({ start: ymd, end: ymd });
+            const sched = Array.isArray(res?.schedule) ? res.schedule[0] : null;
             if (sched && typeof sched.is_enabled === "boolean") {
               next[ymd] = sched.is_enabled;
+              loadedRows.push(sched);
             } else {
-              next[ymd] = selectedWeekdays.includes(d.getDay());
+              next[ymd] = fallbackEnabled(d);
             }
           } catch {
-            next[ymd] = selectedWeekdays.includes(d.getDay());
+            next[ymd] = fallbackEnabled(d);
           }
         })
       );
-      if (!cancelled) setBookingEnabledMap(next);
+      if (cancelled) return;
+      setBookingEnabledMap(next);
+
+      // Restore the saved hours/break for this scope so a reload shows the
+      // reason-specific schedule, not just its open/closed flag. With
+      // multiple dates selected, the earliest saved row drives the form.
+      if (loadedRows.length > 0) {
+        const saved = loadedRows.sort((a, b) =>
+          String(a.working_date).localeCompare(String(b.working_date))
+        )[0];
+        setWorkStart(toTimeInput(saved.work_start, workStart));
+        setWorkEnd(toTimeInput(saved.work_end, workEnd));
+        setBreakStart(toTimeInput(saved.break_start));
+        setBreakEnd(toTimeInput(saved.break_end));
+      }
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [selectedDates, selectedWeekdays, calendarMode]);
+  }, [
+    selectedDates,
+    selectedWeekdays,
+    calendarMode,
+    scopeReasonId,
+    scopeIsReasonSpecific,
+  ]);
 
   function resolveBookingEnabled(date) {
     const ymd = toYMD(date);
     if (ymd in bookingEnabledMap) return bookingEnabledMap[ymd];
-    return selectedWeekdays.includes(date.getDay());
+    return !scopeIsReasonSpecific && selectedWeekdays.includes(date.getDay());
   }
 
   const bookingValues = selectedDates.map(resolveBookingEnabled);
@@ -261,6 +321,9 @@ export default function ClinicScheduleFullPanel() {
             slot_end: workEnd,
             break_start: breakStart || null,
             break_end: breakEnd || null,
+            // Omitted for General so legacy behavior is untouched; set for any
+            // selected reason so the override lands in its own schedule.
+            ...(scopeReasonId ? { reason_id: scopeReasonId } : {}),
           })
         )
       );
@@ -295,18 +358,22 @@ export default function ClinicScheduleFullPanel() {
   async function handleUpdateSchedule() {
     const failures = [];
 
-    // 1) Persist global defaults.
-    try {
-      await clinicScheduleApi.updateSettings({
-        work_start: workStart,
-        work_end: workEnd,
-        break_start: breakStart,
-        break_end: breakEnd,
-        max_students_per_slot: Number(computed.slotsPerBlock) || undefined,
-      });
-    } catch (err) {
-      console.error("Failed to save settings:", err);
-      failures.push("Settings");
+    // 1) Persist global defaults — but only from the General scope. Working
+    // hours are clinic-wide, so writing them from a reason-scoped edit
+    // would silently change the general schedule too.
+    if (scopeReasonId === null) {
+      try {
+        await clinicScheduleApi.updateSettings({
+          work_start: workStart,
+          work_end: workEnd,
+          break_start: breakStart,
+          break_end: breakEnd,
+          max_students_per_slot: Number(computed.slotsPerBlock) || undefined,
+        });
+      } catch (err) {
+        console.error("Failed to save settings:", err);
+        failures.push("Settings");
+      }
     }
 
     // 2) Persist per-date overrides — track each date individually.
@@ -319,6 +386,7 @@ export default function ClinicScheduleFullPanel() {
           break_start: breakStart || null,
           break_end: breakEnd || null,
           is_enabled: true,
+          ...(scopeReasonId ? { reason_id: scopeReasonId } : {}),
         })
       )
     );
@@ -355,6 +423,24 @@ export default function ClinicScheduleFullPanel() {
         <h1 className="font-bold text-gc-green text-base md:text-lg leading-tight">
           Clinic Schedule
         </h1>
+      </div>
+
+      {/* Appointment Reason scope — General keeps the legacy clinic-wide
+          schedule; selecting any reason scopes the schedule shown and the
+          overrides created below to that reason's own rows. */}
+      <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+        <span className="shrink-0 text-xs font-bold tracking-wide text-gray-500 uppercase">
+          Appointment Reason
+        </span>
+        <div className="w-full sm:w-64">
+          <UniversalDropdown
+            value={reasonScope}
+            onChange={(v) => setReasonScope(v ?? GENERAL_SCOPE)}
+            options={reasonScopeOptions}
+            ariaLabel="Appointment Reason"
+            placeholder="General"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-5 items-start">

@@ -1,0 +1,12 @@
+- generic [ref=f32e11]:
+  - generic [ref=f32e12]:
+    - img "Gordon College seal" [ref=f32e13]
+    - heading "GORDON COLLEGE" [level=1] [ref=f32e14]
+    - paragraph [ref=f32e15]: Clinic Appointment System
+  - generic [ref=f32e18]:
+    - paragraph [ref=f32e19]: Student Portal
+    - heading "Reset your password" [level=1] [ref=f32e20]
+    - paragraph [ref=f32e21]: We'll send a code to your Gordon College email to verify it's you.
+    - generic [ref=f32e88]:
+      - heading "Password reset" [level=1] [ref=f32e92]
+      - paragraph [ref=f32e93]: Your password has been updated. Redirecting you to the login page…

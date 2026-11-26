@@ -189,6 +189,18 @@ def error_response(message, status=500):
     return jsonify({"success": False, "error": message}), status
 
 
+def _safe_exception_detail(exc):
+    """Return log-safe exception diagnostics without raw provider text."""
+    detail = type(exc).__name__
+    cause = getattr(exc, "__cause__", None)
+    code = getattr(exc, "errno", None) or getattr(exc, "winerror", None)
+    if code is None and cause is not None:
+        code = getattr(cause, "errno", None) or getattr(cause, "winerror", None)
+    if code is not None:
+        detail = f"{detail} code={code}"
+    return detail
+
+
 def handle_errors(log_message):
     """
     Route decorator: catch any exception raised by the route body, log
@@ -208,8 +220,10 @@ def handle_errors(log_message):
             try:
                 return route_func(*args, **kwargs)
             except Exception as e:
-                logger.error("%s: %r", log_message, e)
-                return error_response(str(e))
+                logger.error("%s: %s", log_message, _safe_exception_detail(e))
+                return error_response(
+                    "The server could not complete this request. Please try again."
+                )
         return wrapper
     return decorator
 
@@ -295,8 +309,8 @@ def _merge_student_row(students, row):
     """
     Merge a single `student_masterlist` row into a student lookup dict,
     building the exact field shape build_student_lookup() has always
-    returned: name / age / sex / dept / deptCourse / year_level, keyed by
-    normalize_student_id(student_id).
+    returned: name / age / sex / dept / course / deptCourse /
+    year_level, keyed by normalize_student_id(student_id).
     """
     student_id = row.get("student_id")
     student_id_key = normalize_student_id(student_id)
@@ -319,6 +333,10 @@ def _merge_student_row(students, row):
         # "dept" is required by appointment.py's
         # GET /appointments/slots booking join — keep it.
         "dept": department_name or "-",
+        # Additive: plain course name for the appointment booking
+        # payload's Course filter (deptCourse keeps its combined
+        # "Course - Department" shape for existing consumers).
+        "course": course_name or "-",
         "deptCourse": dept_course,
         "year_level": row.get("year_level"),
     }
@@ -436,6 +454,24 @@ def build_student_lookup(ids=None):
                 _merge_student_row(students, row)
 
     return students
+
+
+# Reasons whose schedules are reason-scoped by product rule. The database
+# flag is authoritative when present; this description-based fallback covers
+# partially migrated environments where the flag column is absent or false.
+DEDICATED_REASON_DESCRIPTIONS = frozenset({"dental service"})
+
+
+def reason_uses_dedicated_schedule(row):
+    """True when a reason row should book against its own schedules only."""
+    if not isinstance(row, dict):
+        return False
+
+    if row.get("uses_dedicated_schedule") is True:
+        return True
+
+    description = str(row.get("description") or "").strip().casefold()
+    return description in DEDICATED_REASON_DESCRIPTIONS
 
 
 def build_reason_lookup():

@@ -1,13 +1,8 @@
 // src/components/student/BookingStepIndicator.jsx
-// Mobile-only 4-step progress indicator for the Book flow. Completed steps
+// Mobile-only 5-step progress indicator for the Book flow. The reason comes
+// first so the calendar and time slots can be scoped to it. Completed steps
 // are tappable so the student can jump back and change an earlier choice.
-
-const STEPS = [
-  { n: 1, label: "Date" },
-  { n: 2, label: "Time" },
-  { n: 3, label: "Reason" },
-  { n: 4, label: "Confirmation" },
-];
+import { BOOKING_STEPS } from "../../lib/bookingFlow.js";
 
 function CheckIcon() {
   return (
@@ -26,13 +21,13 @@ function CheckIcon() {
 }
 
 /**
- * step: 1 | 2 | 3 | 4 — the current active step
+ * step: 1..5 — the current active step (see BOOKING_STEPS)
  * onStepClick: (n: number) => void — only called for completed (n < step) steps
  */
 export default function BookingStepIndicator({ step, onStepClick }) {
   return (
     <div className="flex items-start justify-between max-w-sm mx-auto mb-5">
-      {STEPS.map(({ n, label }) => {
+      {BOOKING_STEPS.map(({ n, label }) => {
         const completed = n < step;
         const active = n === step;
         const clickable = completed && typeof onStepClick === "function";

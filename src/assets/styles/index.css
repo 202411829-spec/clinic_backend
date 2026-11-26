@@ -426,13 +426,7 @@
     transform: translateX(120%);
   }
 
-  /* Modal / popover entrances. */
-  .modal-backdrop {
-    @apply bg-shell/60 backdrop-blur-sm animate-fade-in;
-  }
-  .modal-pop {
-    animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
+  /* Modal entrance/exit motion lives in gc-rfb-ui.css via .gc-modal-*. */
 }
 
 @layer utilities {

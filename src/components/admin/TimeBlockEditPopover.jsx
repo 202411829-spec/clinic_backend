@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import NavIcon from "../ui/NavIcon";
 import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import { formatTimeRange } from "../../lib/timeFormat";
+import { useSelfClosingPresence, useTriggerOrigin } from "../../lib/gcMotion.js";
 
 const UNITS = ["Minute", "Hour"];
 
@@ -22,11 +24,14 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
   const [intervalValue, setIntervalValue] = useState(1);
   const [intervalUnit, setIntervalUnit] = useState("Hour");
   const [slotsValue, setSlotsValue] = useState(slot.capacity);
+  const { mounted, visible, requestClose } = useSelfClosingPresence(onClose);
+  const origin = useTriggerOrigin({ enabled: mounted, panelRef: cardRef });
 
   // Escape key + body scroll lock
   useEffect(() => {
+    if (!mounted) return undefined;
     function handleKeyDown(e) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") requestClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     const prevOverflow = document.body.style.overflow;
@@ -35,13 +40,15 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [onClose]);
+  }, [mounted, requestClose]);
 
   function handleSave() {
     const parsedSlots = Math.max(1, Number(slotsValue) || slot.capacity);
     onSave?.({ time: timeRange, slots: parsedSlots });
-    onClose();
+    requestClose();
   }
+
+  if (!mounted) return null;
 
   const modal = (
     <div
@@ -52,8 +59,10 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
     >
       {/* Backdrop — covers entire viewport, click to close */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px] animate-fade-in motion-reduce:animate-none"
-        onClick={onClose}
+        className={`gc-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px] ${
+          visible ? "is-open" : "is-close"
+        }`}
+        onClick={requestClose}
         aria-hidden="true"
       />
 
@@ -61,14 +70,17 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
       <div
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 w-full max-w-sm max-h-[90vh] overflow-visible bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 animate-pop-in motion-reduce:animate-none"
+        style={origin.style}
+        className={`gc-modal-panel relative z-10 w-full max-w-sm max-h-[90vh] overflow-visible bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 ${
+          visible ? "is-open" : "is-close"
+        } ${origin.className}`}
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold tracking-wide text-gray-800">
             TIME BLOCK EDIT
           </h3>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="btn-press w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             aria-label="Close"
           >
@@ -80,7 +92,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold text-gray-500">Time</span>
             <span className="text-xs font-semibold text-gray-700">
-              {slot.time}
+              {formatTimeRange(slot.time)}
             </span>
           </div>
           <input
@@ -132,7 +144,7 @@ export default function TimeBlockEditPopover({ slot, onClose, onSave }) {
 
         <div className="flex gap-2">
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="btn-press flex-1 rounded-lg border border-gray-200 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
           >
             Cancel

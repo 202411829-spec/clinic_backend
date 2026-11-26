@@ -1,0 +1,166 @@
+- generic [ref=f15e1]:
+  - generic [ref=f15e4]:
+    - link "Skip to content" [ref=f15e5] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f15e268]:
+      - button "Close menu" [ref=f15e269] [cursor=pointer]
+      - generic [ref=f15e273]:
+        - generic [ref=f15e274]:
+          - generic [ref=f15e275]:
+            - img "Gordon College seal" [ref=f15e277]
+            - img "Health Services Unit seal" [ref=f15e279]
+          - generic [ref=f15e280]:
+            - paragraph [ref=f15e281]: GORDON COLLEGE
+            - paragraph [ref=f15e282]: Clinic Appointment System
+            - paragraph [ref=f15e283]: ADMIN PORTAL
+        - navigation [ref=f15e285]:
+          - generic [ref=f15e286]:
+            - paragraph [ref=f15e287]: Main
+            - list [ref=f15e288]:
+              - listitem [ref=f15e289]:
+                - link "Dashboard" [ref=f15e290] [cursor=pointer]:
+                  - /url: /admin/dashboard
+              - listitem [ref=f15e298]:
+                - link "Appointments" [ref=f15e299] [cursor=pointer]:
+                  - /url: /admin/appointments
+              - listitem [ref=f15e304]:
+                - link "Logbook" [ref=f15e305] [cursor=pointer]:
+                  - /url: /admin/logbook
+              - listitem [ref=f15e310]:
+                - link "Masterlist" [ref=f15e311] [cursor=pointer]:
+                  - /url: /admin/masterlist
+          - generic [ref=f15e316]:
+            - paragraph [ref=f15e317]: Management
+            - list [ref=f15e318]:
+              - listitem [ref=f15e319]:
+                - link "Clinic Schedule" [ref=f15e320] [cursor=pointer]:
+                  - /url: /admin/clinic-schedule
+              - listitem [ref=f15e325]:
+                - link "Reports" [ref=f15e326] [cursor=pointer]:
+                  - /url: /admin/reports
+              - listitem [ref=f15e330]:
+                - link "Admins" [ref=f15e331] [cursor=pointer]:
+                  - /url: /admin/admins
+              - listitem [ref=f15e336]:
+                - link "Profile" [ref=f15e337] [cursor=pointer]:
+                  - /url: /admin/profile
+        - generic [ref=f15e342]:
+          - button "Logout" [active] [ref=f15e344] [cursor=pointer]
+          - link "About" [ref=f15e349] [cursor=pointer]:
+            - /url: /admin/about
+    - button "Open menu" [ref=f15e6] [cursor=pointer]
+    - generic [ref=f15e8]:
+      - generic [ref=f15e9]:
+        - button "Back" [ref=f15e10] [cursor=pointer]
+        - generic [ref=f15e13]:
+          - generic [ref=f15e14]:
+            - paragraph [ref=f15e15]: admin@gordoncollege.edu.ph
+            - paragraph [ref=f15e16]: Super Admin
+          - generic [ref=f15e17]: A
+      - main [ref=f15e18]:
+        - generic [ref=f15e20]:
+          - generic [ref=f15e23]:
+            - paragraph [ref=f15e24]: Thursday, November 26, 2026
+            - heading "Good morning" [level=1] [ref=f15e25]
+            - paragraph [ref=f15e26]: Overview of today's clinic activity.
+          - generic [ref=f15e28]:
+            - generic [ref=f15e29]:
+              - generic [ref=f15e35]:
+                - heading "Logbook" [level=2] [ref=f15e36]
+                - paragraph [ref=f15e37]: View history of completed clinic visits.
+              - button "View Full Logbook" [ref=f15e38] [cursor=pointer]:
+                - text: View Full Logbook
+                - generic [aria-hidden] [ref=f15e39]: ›
+            - generic [ref=f15e40]:
+              - generic [ref=f15e41]:
+                - textbox "Search by surname, name, student ID, or course..." [ref=f15e46]
+                - combobox [ref=f15e48] [cursor=pointer]:
+                  - generic "All Departments" [ref=f15e49]
+                - combobox [ref=f15e53] [cursor=pointer]:
+                  - generic "All Course" [ref=f15e54]
+                - combobox [ref=f15e58] [cursor=pointer]:
+                  - generic "All Reason" [ref=f15e59]
+              - generic [ref=f15e62]:
+                - generic [ref=f15e64]:
+                  - combobox "Report period" [ref=f15e66] [cursor=pointer]: Week
+                  - generic [ref=f15e69]:
+                    - button "Previous week" [ref=f15e70] [cursor=pointer]
+                    - button "Filter by date range" [ref=f15e73] [cursor=pointer]:
+                      - generic [ref=f15e77]: Week 4 — November 22, 2026 – November 28, 2026
+                    - button "Next week" [ref=f15e78] [cursor=pointer]
+                - generic [ref=f15e81]:
+                  - button "Print" [ref=f15e82] [cursor=pointer]
+                  - button "Download PDF" [ref=f15e92] [cursor=pointer]
+            - table [ref=f15e98]:
+              - rowgroup [ref=f15e108]:
+                - row [ref=f15e109]:
+                  - columnheader "Date / Time" [ref=f15e110]
+                  - columnheader "Name" [ref=f15e111]
+                  - columnheader "Age" [ref=f15e112]
+                  - columnheader "Dept. & Course" [ref=f15e113]
+                  - columnheader "Sex" [ref=f15e114]
+                  - columnheader "Reason" [ref=f15e115]
+                  - columnheader "Complaint" [ref=f15e116]
+                  - columnheader "Medicine" [ref=f15e117]
+              - rowgroup [ref=f15e118]:
+                - row [ref=f15e119]:
+                  - cell "11/26/2026 09:15 AM" [ref=f15e120]
+                  - cell "Dela Cruz, Juan B." [ref=f15e121]
+                  - cell "23" [ref=f15e122]
+                  - cell "BSIT - CCS" [ref=f15e123]
+                  - cell "Male" [ref=f15e124]
+                  - cell "Consultation" [ref=f15e125]
+                  - cell "Headache" [ref=f15e126]
+                  - cell "Paracetamol x1" [ref=f15e127]
+            - paragraph [ref=f15e129]: 1 search result
+            - button "+ Add Walk-in Visit" [ref=f15e131] [cursor=pointer]
+          - generic [ref=f15e133]:
+            - generic [ref=f15e134]:
+              - generic [ref=f15e140]:
+                - heading "Appointments" [level=2] [ref=f15e141]
+                - paragraph [ref=f15e142]: Today's appointment slots
+              - generic [ref=f15e143]: Today
+            - generic [ref=f15e144]:
+              - textbox "Search by surname, name, student ID, or course..." [ref=f15e149]
+              - combobox [ref=f15e151] [cursor=pointer]:
+                - generic "All Department" [ref=f15e152]
+              - combobox [ref=f15e156] [cursor=pointer]:
+                - generic "All Courses" [ref=f15e157]
+              - combobox [ref=f15e161] [cursor=pointer]:
+                - generic "All Reason" [ref=f15e162]
+            - generic [ref=f15e165]:
+              - generic [ref=f15e166]:
+                - button "› 8:00 AM – 9:00 AM" [ref=f15e167] [cursor=pointer]:
+                  - generic [ref=f15e168]: ›
+                  - generic [ref=f15e169]: 8:00 AM – 9:00 AM
+                - generic [ref=f15e170]:
+                  - generic [ref=f15e171]: 1 / 11 Booked
+                  - generic [ref=f15e172]: 10 Slots Left
+                  - button "Slot actions" [ref=f15e174] [cursor=pointer]
+              - table [ref=f15e182]:
+                - rowgroup [ref=f15e183]:
+                  - row [ref=f15e184]:
+                    - columnheader "Name" [ref=f15e185]
+                    - columnheader "Age" [ref=f15e186]
+                    - columnheader "Dept" [ref=f15e187]
+                    - columnheader "Sex" [ref=f15e188]
+                    - columnheader "Reason" [ref=f15e189]
+                    - columnheader "Status" [ref=f15e190]
+                    - columnheader "Action" [ref=f15e191]
+                - rowgroup [ref=f15e192]:
+                  - row [ref=f15e266]:
+                    - cell "Dela Cruz, Juan B." [ref=f15e194]
+                    - cell "23" [ref=f15e195]
+                    - cell "CCS" [ref=f15e196]
+                    - cell "Male" [ref=f15e197]
+                    - cell "Consultation" [ref=f15e198]
+                    - cell "Completed" [ref=f15e267]
+                    - cell [ref=f15e201]:
+                      - button "Row actions" [ref=f15e203] [cursor=pointer]
+    - button "Open Clinic Assistant" [ref=f15e208] [cursor=pointer]
+  - dialog "Confirm logout" [ref=f15e355]:
+    - heading "Logout" [level=2] [ref=f15e360]
+    - paragraph [ref=f15e361]: Are you sure you want to log out of your account?
+    - generic [ref=f15e362]:
+      - button "Cancel" [ref=f15e363] [cursor=pointer]
+      - button "Logout" [ref=f15e364] [cursor=pointer]

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EyeIcon, EyeOffIcon } from '../icons.jsx'
+import { EyeIcon, EyeOffIcon } from '../ui/icons.jsx'
 import { forgotApi } from '../../lib/api.js'
 
 const EMAIL_DOMAIN = '@gordoncollege.edu.ph'
@@ -67,7 +67,7 @@ const VARIANTS = {
  * Multi-step "forgot password" form, reused by both the Student and Admin
  * portals via the `variant` prop.
  *
- * Step 1: collect the email/username, confirm an account exists
+ * Step 1: collect the email/username and request a code without revealing account existence
  *         (POST /api/auth/forgot/check-email), then trigger a 6-digit code
  *         email (POST /api/auth/forgot/send-code).
  * Step 2: let the user paste the 6-digit code they received.
@@ -94,6 +94,7 @@ export default function ForgotPasswordForm({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [busy, setBusy] = useState(false)
   const [fieldError, setFieldError] = useState('')
@@ -114,24 +115,12 @@ export default function ForgotPasswordForm({
     setBusy(true)
     try {
       const target = cfg.normalizeEmail(email.trim())
-      const result = await forgotApi.checkEmail(target)
-      // A 200 means an account exists. If the backend explicitly flags it as
-      // missing, surface that so the user can correct the email.
-      if (result && result.exists === false) {
-        setFieldError('We could not find an account with that email. Check the address and try again.')
-        return
-      }
+      await forgotApi.checkEmail(target)
       await forgotApi.sendCode(target)
-      setInfo(`We sent a 6-digit code to ${target}.`)
+      setInfo(`If an account exists, a 6-digit code is on its way to ${target}.`)
       setStep(2)
     } catch (err) {
-      // The backend returns 404 when no account matches the email.
-      const message = err?.message || 'Could not verify this email. Please try again.'
-      if (/not found|no account|404/i.test(message)) {
-        setFieldError('We could not find an account with that email. Check the address and try again.')
-      } else {
-        setFieldError(message)
-      }
+      setFieldError(err?.message || 'Could not verify this email. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -143,7 +132,7 @@ export default function ForgotPasswordForm({
     try {
       const target = cfg.normalizeEmail(email.trim())
       await forgotApi.sendCode(target)
-      setInfo(`We resent a 6-digit code to ${target}.`)
+      setInfo(`If an account exists, a new 6-digit code is on its way to ${target}.`)
     } catch (err) {
       setFieldError(err?.message || 'Could not resend the code. Please try again.')
     } finally {
@@ -372,19 +361,29 @@ export default function ForgotPasswordForm({
               <label htmlFor="forgot-confirm" className="block text-sm font-semibold text-gray-900 mb-1.5">
                 Confirm new password
               </label>
-              <input
-                id="forgot-confirm"
-                name="confirmPassword"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value)
-                  setFieldError('')
-                }}
-                placeholder="Re-enter your password"
-                className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
-              />
+              <div className="relative">
+                <input
+                  id="forgot-confirm"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value)
+                    setFieldError('')
+                  }}
+                  placeholder="Re-enter your password"
+                  className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-[15px] text-gray-900 shadow-sm placeholder:text-gray-400 ${cfg.borderAccent} focus:outline-none focus:ring-2 ${cfg.ringAccent}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
           </>
         )}

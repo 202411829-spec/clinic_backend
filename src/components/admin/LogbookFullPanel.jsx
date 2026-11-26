@@ -1,98 +1,28 @@
 // src/components/admin/LogbookFullPanel.jsx
 import { useEffect, useState, useCallback, useRef } from "react";
-import { flushSync } from "react-dom";
 import NavIcon from "../ui/NavIcon.jsx";
-import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
+import LogbookRangePicker from "./LogbookRangePicker.jsx";
+import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import Pagination from "../ui/Pagination.jsx";
-import WalkInVisitForm from "./WalkInVisitForm.jsx";
+import WalkInVisitModal from "./WalkInVisitModal.jsx";
 import useWalkInForm from "./useWalkInForm.js";
 import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
 import { formatMDY, isoToMDY } from "../../lib/calendar.js";
+import { clampPage, getPageCount } from "../../lib/pagination.js";
+import { buildLogbookQueryParams } from "../../lib/logbookQuery.js";
+import { formatFilterSelectionLabel } from "../../lib/filterMultiSelect.js";
+import {
+  buildLogbookPdfMeta,
+  downloadLogbookPdf,
+  fetchAllLogbookRows,
+} from "../../lib/logbookPdf.js";
+import { getResponsivePageSize } from "../../lib/responsivePageSize.js";
 
-const PAGE_SIZE = 20;
-
-// ---- PDF export layout -----------------------------------------------------
-// Column widths (% of the 190mm printable width) — shared by the on-screen
-// print table and the PDF replica so they always match. "Student ID" needs
-// ~11% so its 9 digits stay inside the cell (digits never wrap).
-const EXPORT_COL_WIDTHS = [12, 11, 14, 5, 15, 7, 13, 10, 13];
-const EXPORT_HEADERS = ["Date & Time", "Student ID", "Name", "Age", "Dept / Course", "Sex", "Reason", "Complaint", "Medicine"];
-const PDF_MARGIN_MM = 10;
-const PDF_CONTENT_W_MM = 210 - PDF_MARGIN_MM * 2; // 190mm
-const PDF_CONTENT_H_MM = 297 - PDF_MARGIN_MM * 2; // 277mm
-// Blank space captured under each page so the last row's bottom border can never be clipped.
-const PDF_EXTRA_BOTTOM_PX = 16;
-
-// One self-contained PDF page: letterhead + title + summary + column header +
-// this page's rows. Every page gets its own full header, exactly like the
-// printed version (where the header lives in <thead> and repeats).
-function ExportPage({ rows, summary }) {
-  // The 2px padding on the wrapper matters: with border-collapse the outer half
-  // of the last row's bottom border (and the left/right edges) sits outside the
-  // table box, so the snapshot clipped it and the table looked open at the bottom.
-  return (
-    <div data-pdf-page className="bg-white w-[190mm] p-[2px]">
-      <Letterhead className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-300" />
-      <h2 className="text-center font-bold text-gc-green text-base tracking-[0.2em] underline underline-offset-4 mb-4">
-        CLINIC LOGBOOK
-      </h2>
-      <p className="text-xs text-gray-600 mb-4">{summary}</p>
-
-      <table className="w-full table-fixed border-collapse text-[9.5px] leading-snug [overflow-wrap:break-word]">
-        <colgroup>
-          {EXPORT_COL_WIDTHS.map((w, i) => (
-            <col key={i} style={{ width: `${w}%` }} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr className="text-left bg-gray-50">
-            {EXPORT_HEADERS.map((h) => (
-              <th key={h} className="px-1.5 py-2 font-semibold border border-gray-300 whitespace-normal">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="py-8 text-center text-gray-400 border border-gray-300">
-                No logbook entries found
-              </td>
-            </tr>
-          ) : (
-            rows.map((entry) => (
-              <tr key={entry.id}>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.dateTime}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300 font-medium">{entry.studentId}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.name}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.age}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">
-                  <div className="font-medium">{entry.dept}</div>
-                  <div className="text-[9px] text-gray-500">{entry.course}</div>
-                </td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.sex}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.reason}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.complaint}</td>
-                <td className="px-1.5 py-2 text-gray-700 border border-gray-300">{entry.medicine}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// Wait for webfonts + seal images so the snapshot never captures a half-loaded frame.
-async function waitForAssets(container) {
-  if (document.fonts?.ready) await document.fonts.ready;
-  await Promise.all(
-    Array.from(container.querySelectorAll("img")).map((img) =>
-      img.decode ? img.decode().catch(() => {}) : Promise.resolve()
-    )
-  );
-  await new Promise((resolve) => requestAnimationFrame(resolve));
-}
+const FALLBACK_PAGE_SIZE = 20;
+const MIN_PAGE_SIZE = 5;
+const MAX_PAGE_SIZE = 100;
 
 // Map a backend /logbook row onto the shape this panel renders.
 function mapEntry(r) {
@@ -113,6 +43,9 @@ function mapEntry(r) {
     reason: r.reason || "-",
     complaint: r.complaint || "-",
     medicine: r.medicine || "-",
+    // The backend already knows whether the visit was registered. The PDF may
+    // print this explicit label, but never infers "Walk-in" from a blank ID.
+    patientType: r.is_registered === true ? "Registered" : r.is_registered === false ? "Walk-in" : "",
   };
 }
 
@@ -123,16 +56,20 @@ export default function LogbookFullPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Pagination & filters state
+  // Pagination & filters state — categorical filters are multi-select arrays
+  // (empty = All); buildLogbookQueryParams emits them as repeated keys.
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [reasonFilter, setReasonFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [courseFilter, setCourseFilter] = useState("");
+  const [datePeriod, setDatePeriod] = useState("All Time");
+  const [reasonFilter, setReasonFilter] = useState([]);
+  const [departmentFilter, setDepartmentFilter] = useState([]);
+  const [courseFilter, setCourseFilter] = useState([]);
   const [totalEntries, setTotalEntries] = useState(0);
-  const [pageSize] = useState(PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(FALLBACK_PAGE_SIZE);
+  const totalPages = getPageCount(totalEntries, pageSize);
+  const currentPage = clampPage(page, totalPages);
 
   // Options for the new department/course filters, loaded from the masterlist.
   const [departments, setDepartments] = useState([]);
@@ -143,6 +80,9 @@ export default function LogbookFullPanel() {
   // whichever response lands second last would win, even if it's the older
   // one.
   const requestIdRef = useRef(0);
+  const panelRef = useRef(null);
+  const tableWrapRef = useRef(null);
+  const rowHeightRef = useRef(44);
 
   // Load data with server-side filtering
   const loadData = useCallback(async () => {
@@ -152,16 +92,16 @@ export default function LogbookFullPanel() {
       setLoading(true);
       setError(null);
 
-      const params = {
+      const params = buildLogbookQueryParams({
         page,
-        page_size: pageSize,
-        ...(search && { search }),
-        ...(dateFrom && { date_from: dateFrom }),
-        ...(dateTo && { date_to: dateTo }),
-        ...(reasonFilter && { reason_id: reasonFilter }),
-        ...(departmentFilter && { department_id: departmentFilter }),
-        ...(courseFilter && { course_id: courseFilter }),
-      };
+        pageSize,
+        search,
+        dateFrom,
+        dateTo,
+        reasonFilter,
+        departmentFilter,
+        courseFilter,
+      });
 
       const [logbookRes, reasonsRes, medicinesRes] = await Promise.all([
         logbookApi.list(params),
@@ -171,7 +111,7 @@ export default function LogbookFullPanel() {
 
       if (isCurrent()) {
         setEntries((logbookRes?.logbook || []).map(mapEntry));
-        setTotalEntries(logbookRes?.total || 0);
+        setTotalEntries(Number(logbookRes?.total || 0));
         const reasonsList = (reasonsRes?.reasons || []).filter((r) => r.description && r.description !== "-");
         if (reasonsList.length) setReasonRecords(reasonsList);
         const medicinesList = (medicinesRes?.medicines || []).filter((m) => m.medicine_name);
@@ -188,6 +128,46 @@ export default function LogbookFullPanel() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Keep the visible page valid if a filtered result set shrinks underneath us.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Fit rows to the space actually left below the filters instead of always
+  // showing 20. Only viewport/panel size and real row height feed the math, so
+  // scrolling never changes the page size underneath the user.
+  useEffect(() => {
+    if (loading || error || !panelRef.current) return undefined;
+
+    function recalculate() {
+      const wrapper = tableWrapRef.current;
+      if (!wrapper) return;
+
+      const firstRow = wrapper.querySelector("tbody tr");
+      const measuredHeight = firstRow?.getBoundingClientRect().height;
+      if (measuredHeight && measuredHeight > 0) rowHeightRef.current = measuredHeight;
+
+      const next = getResponsivePageSize({
+        viewportHeight: window.innerHeight,
+        tableTop: Math.max(0, wrapper.getBoundingClientRect().top),
+        rowHeight: rowHeightRef.current,
+        minRows: MIN_PAGE_SIZE,
+        maxRows: MAX_PAGE_SIZE,
+      });
+      setPageSize((previous) => (previous === next ? previous : next));
+    }
+
+    recalculate();
+    window.addEventListener("resize", recalculate);
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(recalculate) : null;
+    if (observer && panelRef.current) observer.observe(panelRef.current);
+
+    return () => {
+      window.removeEventListener("resize", recalculate);
+      observer?.disconnect();
+    };
+  }, [loading, error, entries.length]);
 
   // Load department & course options for the filters (independent, not cascaded).
   useEffect(() => {
@@ -218,8 +198,12 @@ export default function LogbookFullPanel() {
   // Any filter change resets the page to 1 so the user never lands out of
   // range on a smaller filtered result set.
   function changeSearch(v) { setSearch(v); setPage(1); }
-  function changeDateFrom(v) { setDateFrom(v); setPage(1); }
-  function changeDateTo(v) { setDateTo(v); setPage(1); }
+  function changeDateRange({ from, to, period }) {
+    setDateFrom(from);
+    setDateTo(to);
+    setDatePeriod(period ?? "All Time");
+    setPage(1);
+  }
   function changeReason(v) { setReasonFilter(v); setPage(1); }
   function changeDepartment(v) { setDepartmentFilter(v); setPage(1); }
   function changeCourse(v) { setCourseFilter(v); setPage(1); }
@@ -230,29 +214,49 @@ export default function LogbookFullPanel() {
     medicineRecords,
     onSubmit: async (payload) => {
       await logbookApi.createWalkIn(payload);
-      const res = await logbookApi.list({
+      const res = await logbookApi.list(buildLogbookQueryParams({
         page: 1,
-        page_size: pageSize,
-        ...(search && { search }),
-        ...(dateFrom && { date_from: dateFrom }),
-        ...(dateTo && { date_to: dateTo }),
-        ...(reasonFilter && { reason_id: reasonFilter }),
-        ...(departmentFilter && { department_id: departmentFilter }),
-        ...(courseFilter && { course_id: courseFilter }),
-      });
+        pageSize,
+        search,
+        dateFrom,
+        dateTo,
+        reasonFilter,
+        departmentFilter,
+        courseFilter,
+      }));
       setEntries((res?.logbook || []).map(mapEntry));
-      setTotalEntries(res?.total || 0);
+      setTotalEntries(Number(res?.total || 0));
       setPage(1);
     },
   });
 
   // Labels for the active filters, used for the print/PDF summary metadata line
-  // (mirrors Reports' "period — department" convention).
-  const departmentLabel = departments.find((d) => String(d.value) === String(departmentFilter))?.label;
-  const courseLabel = courses.find((c) => String(c.value) === String(courseFilter))?.label;
-  const reasonLabel = reasonRecords.find((r) => String(r.reason_id) === String(reasonFilter))?.description;
+  // (mirrors Reports' "period — department" convention). Empty selection keeps
+  // the classic "All …" labels; multiple picks render as "N … selected".
+  const reasonOptions = reasonRecords.map((r) => ({
+    value: String(r.reason_id),
+    label: r.description,
+  }));
+  const departmentLabel = formatFilterSelectionLabel({
+    selected: departmentFilter,
+    options: departments,
+    allLabel: "All Departments",
+    pluralLabel: "Departments",
+  });
+  const courseLabel = formatFilterSelectionLabel({
+    selected: courseFilter,
+    options: courses,
+    allLabel: "All Course",
+    pluralLabel: "Courses",
+  });
+  const reasonLabel = formatFilterSelectionLabel({
+    selected: reasonFilter,
+    options: reasonOptions,
+    allLabel: "All Reasons",
+    pluralLabel: "Reasons",
+  });
   const dateSummary = dateFrom || dateTo ? `${isoToMDY(dateFrom)} to ${isoToMDY(dateTo)}` : "All Dates";
-  const printSummary = `${dateSummary} — ${departmentLabel || "All Departments"} — ${courseLabel || "All Course"} — ${reasonLabel || "All Reasons"}${search ? ` — Search: "${search}"` : ""} — Total: ${totalEntries} entries`;
+  const printSummary = `${dateSummary} — ${departmentLabel} — ${courseLabel} — ${reasonLabel}${search ? ` — Search: "${search}"` : ""} — Total: ${totalEntries} entries`;
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -260,71 +264,44 @@ export default function LogbookFullPanel() {
     window.print();
   }
 
-  // The PDF is built page by page from an off-screen replica of the print
-  // layout. Rows are measured first and packed into A4 pages so a row is never
-  // sliced in half, and every page is rendered with its own full header
-  // (letterhead + title + column header) — same as the printed version.
-  // `exportPages` is null normally (nothing rendered); during a download it
-  // holds the rows for each page.
-  const [exportPages, setExportPages] = useState(null);
-  const exportRef = useRef(null);
-
+  // Export the same filtered set as the screen, not just the visible page.
+  // The helper walks /logbook in 100-row pages because that is the backend's
+  // page_size cap; the PDF then draws a real landscape document.
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
-      const [{ jsPDF }, { nodeToPng }] = await Promise.all([
-        import("jspdf"),
-        import("../../lib/pdf.js"),
-      ]);
-
-      // 1) Measure: render every row on a single tall page.
-      flushSync(() => setExportPages([entries]));
-      const container = exportRef.current;
-      if (!container) return;
-      await waitForAssets(container);
-
-      const measurePage = container.querySelector("[data-pdf-page]");
-      const tbody = measurePage.querySelector("tbody");
-      const headerH = tbody.getBoundingClientRect().top - measurePage.getBoundingClientRect().top;
-      const rowHeights = entries.length
-        ? Array.from(tbody.querySelectorAll("tr")).map((tr) => tr.getBoundingClientRect().height)
-        : [];
-
-      // 2) Pack rows into pages (CSS px @96dpi; small safety margin).
-      const capacity = (PDF_CONTENT_H_MM / 25.4) * 96 - 6 - PDF_EXTRA_BOTTOM_PX - 4;
-      const chunks = [];
-      let current = [];
-      let used = headerH;
-      rowHeights.forEach((h, i) => {
-        if (current.length && used + h > capacity) {
-          chunks.push(current);
-          current = [];
-          used = headerH;
-        }
-        current.push(entries[i]);
-        used += h;
+      const { rows } = await fetchAllLogbookRows({
+        list: logbookApi.list,
+        params: buildLogbookQueryParams({
+          page: 1,
+          pageSize: MAX_PAGE_SIZE,
+          search,
+          dateFrom,
+          dateTo,
+          reasonFilter,
+          departmentFilter,
+          courseFilter,
+        }),
       });
-      if (current.length || chunks.length === 0) chunks.push(current);
 
-      // 3) Render the real pages, one canvas per page.
-      flushSync(() => setExportPages(chunks));
-      await waitForAssets(container);
-      const pageNodes = Array.from(container.querySelectorAll("[data-pdf-page]"));
+      const meta = buildLogbookPdfMeta({
+        dateSummary,
+        departmentLabel: departmentLabel || "All Departments",
+        courseLabel: courseLabel || "All Course",
+        reasonLabel: reasonLabel || "All Reasons",
+        search,
+        total: rows.length,
+      });
 
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      for (let i = 0; i < pageNodes.length; i += 1) {
-        const { dataUrl, width, height } = await nodeToPng(pageNodes[i], { pixelRatio: 2, extraBottom: PDF_EXTRA_BOTTOM_PX });
-        const imgH = (height / width) * PDF_CONTENT_W_MM;
-        if (i > 0) doc.addPage();
-        doc.addImage(dataUrl, "PNG", PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_CONTENT_W_MM, imgH);
-      }
-
-      doc.save(`logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`);
+      await downloadLogbookPdf({
+        rows,
+        meta,
+        fileName: `logbook-report-${formatMDY(new Date()).replaceAll("/", "-")}.pdf`,
+      });
     } catch (err) {
       console.error("Failed to generate PDF:", err);
       setError(err.message || "Couldn't generate the PDF. Please try again.");
     } finally {
-      setExportPages(null);
       setDownloadingPdf(false);
     }
   }
@@ -347,7 +324,7 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+    <section ref={panelRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
       {error && (
         <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
           <span>{error}</span>
@@ -384,50 +361,50 @@ export default function LogbookFullPanel() {
               className="w-full outline-none placeholder:text-gray-400 text-gray-900"
             />
           </div>
-          <UniversalDropdown value={departmentFilter} onChange={changeDepartment} options={departments} placeholder="All Departments" />
-          <UniversalDropdown value={courseFilter} onChange={changeCourse} options={courses} placeholder="All Course" />
-          <UniversalDropdown
+          <FilterMultiSelect
+            value={departmentFilter}
+            onChange={changeDepartment}
+            options={departments}
+            allLabel="All Departments"
+            pluralLabel="Departments"
+            ariaLabel="Filter by department"
+            triggerTestId="logbook-department-filter"
+          />
+          <FilterMultiSelect
+            value={courseFilter}
+            onChange={changeCourse}
+            options={courses}
+            allLabel="All Course"
+            pluralLabel="Courses"
+            ariaLabel="Filter by course"
+            triggerTestId="logbook-course-filter"
+          />
+          <FilterMultiSelect
             value={reasonFilter}
             onChange={changeReason}
-            options={reasonRecords.map((r) => ({ value: String(r.reason_id), label: r.description }))}
-            placeholder="All Reasons"
+            options={reasonOptions}
+            allLabel="All Reasons"
+            pluralLabel="Reasons"
+            ariaLabel="Filter by reason"
+            triggerTestId="logbook-reason-filter"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-            From
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => changeDateFrom(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-            To
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => changeDateTo(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
-            />
-          </label>
+          <LogbookRangePicker
+            value={{ from: dateFrom, to: dateTo, period: datePeriod }}
+            onChange={changeDateRange}
+            ariaLabel="Filter by date range"
+            className="w-full sm:w-auto"
+            buttonClassName="sm:min-w-[15rem]"
+            triggerTestId="logbook-date-range"
+          />
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50"
-            >
-              <NavIcon name="printer" className="w-4 h-4" />
-              Print
-            </button>
-            <button
+            <PrintButton onClick={handlePrint} />
+            <DownloadPdfButton
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-gc-green text-white px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <NavIcon name="download" className="w-4 h-4" />
-              {downloadingPdf ? "Preparing…" : "Download PDF"}
-            </button>
+              loading={downloadingPdf}
+            />
           </div>
         </div>
       </div>
@@ -439,7 +416,7 @@ export default function LogbookFullPanel() {
           above; the toolbar/filters up top, the pagination below, and the
           walk-in form are all print:hidden, and the layout's sidebar/topbar
           already carry print:hidden. */}
-      <div className="overflow-x-auto -mx-4 md:mx-0 print:overflow-visible print:mx-0">
+      <div ref={tableWrapRef} className="overflow-x-auto -mx-4 md:mx-0 print:overflow-visible print:mx-0">
         <table className="w-full text-sm min-w-[900px] md:min-w-0 border-collapse print:min-w-0 print:w-full print:table-fixed print:text-[9.5px] print:leading-snug print:[overflow-wrap:break-word]">
           {/* Print-only column widths — forces the table to stay within the
               190mm printable width (see .print-a4-portrait in index.css)
@@ -517,53 +494,30 @@ export default function LogbookFullPanel() {
       {totalEntries > pageSize && (
         <div className="mt-3 flex items-center justify-between print:hidden">
           <p className="text-xs text-gray-400">
-            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalEntries)} of{" "}
+            Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalEntries)} of{" "}
             {totalEntries} entries
           </p>
-          <Pagination page={page} pageCount={Math.ceil(totalEntries / pageSize)} onChange={setPage} />
+          <Pagination page={currentPage} pageCount={totalPages} onChange={setPage} />
         </div>
       )}
 
-      {/* bottom trigger — hidden once the form is open, same as the dashboard widget */}
-      {!walkIn.showWalkInForm && (
-        <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
-          <button
-            onClick={() => walkIn.setShowWalkInForm(true)}
-            className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
-          >
-            + Add Walk-in Visit
-          </button>
-        </div>
-      )}
+      {/* bottom trigger — the shared form now opens in a portal so it no
+          longer pushes the table downward on the standalone page. */}
+      <div className="mt-4 pt-4 border-t-2 border-gray-300 flex items-center justify-end gap-2 print:hidden">
+        <button
+          onClick={() => walkIn.setShowWalkInForm(true)}
+          className="text-sm font-semibold bg-gc-green text-white px-4 py-2.5 rounded-lg hover:opacity-90"
+        >
+          + Add Walk-in Visit
+        </button>
+      </div>
 
-      {/* walk-in visit form */}
-      {walkIn.showWalkInForm && (
-        <WalkInVisitForm
-          regId={walkIn.regId} setRegId={walkIn.setRegId}
-          walkInName={walkIn.walkInName} setWalkInName={walkIn.setWalkInName}
-          walkInReasonId={walkIn.walkInReasonId} setWalkInReasonId={walkIn.setWalkInReasonId}
-          complaint={walkIn.complaint} setComplaint={walkIn.setComplaint}
-          medicineInput={walkIn.medicineInput} setMedicineInput={walkIn.setMedicineInput}
-          quantity={walkIn.quantity} setQuantity={walkIn.setQuantity}
-          medTags={walkIn.medTags}
-          walkInError={walkIn.walkInError}
-          isSubmitting={walkIn.isSubmitting}
-          handleAddMedicine={walkIn.handleAddMedicine}
-          handleAddWalkIn={walkIn.handleAddWalkIn}
-          handleClose={walkIn.handleClose}
-          reasonRecords={reasonRecords}
-        />
-      )}
-
-      {/* PDF-export-only replica (rendered only while "Download PDF" runs).
-          Off-screen but not display:none so it can be snapshotted. */}
-      {exportPages && (
-        <div ref={exportRef} className="fixed top-0 -left-[9999px] w-[190mm] flex flex-col">
-          {exportPages.map((rows, i) => (
-            <ExportPage key={i} rows={rows} summary={printSummary} />
-          ))}
-        </div>
-      )}
+      <WalkInVisitModal
+        open={walkIn.showWalkInForm}
+        walkIn={walkIn}
+        reasonRecords={reasonRecords}
+        onClose={walkIn.handleClose}
+      />
     </section>
   );
 }

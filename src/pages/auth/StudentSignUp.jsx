@@ -1,14 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthShell from '../../components/auth/AuthShell.jsx'
+import SignUpLayout from '../../components/auth/SignUpLayout.jsx'
 import StudentSignUpForm from '../../components/auth/StudentSignUpForm.jsx'
+import { friendlyPasswordError } from '../../lib/authPasswordErrors.js'
 import { studentSignIn } from '../../lib/supabaseClient.js'
-
-const BRAND = {
-  logo: '/gordon-college-seal.png',
-  name: 'GORDON COLLEGE',
-  tagline: 'Clinic Appointment System',
-}
 
 export default function StudentSignUp() {
   const navigate = useNavigate()
@@ -27,8 +22,10 @@ export default function StudentSignUp() {
       navigate('/student')
     } catch (err) {
       setError(
-        err?.message ||
+        friendlyPasswordError(
+          err,
           'Your account was created, but we could not log you in automatically. Please log in manually.'
+        )
       )
     } finally {
       setLoading(false)
@@ -36,13 +33,17 @@ export default function StudentSignUp() {
   }
 
   return (
-    <AuthShell brand={BRAND} tone="student">
+    <SignUpLayout
+      portalLabel="Student Portal"
+      title="Create your account"
+      subtitle="Sign up with your Gordon College email to book clinic appointments."
+      loginTo="/student/login"
+    >
       <StudentSignUpForm
-        align="left"
         onSignupSuccess={handleSignupSuccess}
         loading={loading}
         error={error}
       />
-    </AuthShell>
+    </SignUpLayout>
   )
 }

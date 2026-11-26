@@ -1,9 +1,10 @@
 // src/components/LogoutMenu.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient.js";
 import { clearApiCache } from "../../lib/api.js";
+import { GC_MODAL_CLOSE_MS, prefersReducedMotion, useModalPresence } from "../../lib/gcMotion.js";
 
 function LogoutIcon(props) {
   return (
@@ -42,9 +43,15 @@ export default function LogoutMenu({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const navigateTimerRef = useRef(0);
+  const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS);
+
+  useEffect(() => () => {
+    if (navigateTimerRef.current) clearTimeout(navigateTimerRef.current);
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!mounted) return;
     function handleEscape(e) {
       if (e.key === "Escape") setOpen(false);
     }
@@ -54,7 +61,7 @@ export default function LogoutMenu({
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [open]);
+  }, [mounted]);
 
   async function handleConfirm() {
     setLoading(true);
@@ -66,7 +73,15 @@ export default function LogoutMenu({
     } finally {
       setLoading(false);
       setOpen(false);
-      navigate(redirectTo, { replace: true });
+      const closeDelay = prefersReducedMotion() ? 0 : GC_MODAL_CLOSE_MS;
+      if (closeDelay === 0) {
+        navigate(redirectTo, { replace: true });
+      } else {
+        navigateTimerRef.current = setTimeout(
+          () => navigate(redirectTo, { replace: true }),
+          closeDelay
+        );
+      }
     }
   }
 
@@ -87,10 +102,12 @@ export default function LogoutMenu({
         {variant === "full" && <span>Logout</span>}
       </button>
 
-      {open &&
+      {mounted &&
         createPortal(
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-[fadeIn_0.15s_ease-out]"
+            className={`gc-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 ${
+              visible ? "is-open" : "is-close"
+            }`}
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) setOpen(false);
             }}
@@ -99,7 +116,9 @@ export default function LogoutMenu({
               role="dialog"
               aria-modal="true"
               aria-label="Confirm logout"
-              className="w-full max-w-[340px] rounded-3xl bg-white p-6 text-center shadow-2xl animate-[popIn_0.15s_ease-out]"
+              className={`gc-modal-panel w-full max-w-[340px] rounded-3xl bg-white p-6 text-center shadow-2xl ${
+                visible ? "is-open" : "is-close"
+              }`}
             >
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
                 <LogoutIcon className="h-6 w-6 text-red-600" />
@@ -128,14 +147,6 @@ export default function LogoutMenu({
                 </button>
               </div>
             </div>
-
-            <style>{`
-              @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-              @keyframes popIn {
-                from { opacity: 0; transform: scale(0.95) translateY(4px) }
-                to { opacity: 1; transform: scale(1) translateY(0) }
-              }
-            `}</style>
           </div>,
           document.body
         )}

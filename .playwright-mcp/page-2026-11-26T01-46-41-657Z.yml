@@ -1,0 +1,158 @@
+- generic [ref=f15e1]:
+  - generic [ref=f15e4]:
+    - link "Skip to content" [ref=f15e5] [cursor=pointer]:
+      - /url: "#main-content"
+    - button "Open menu" [ref=f15e6] [cursor=pointer]
+    - generic [ref=f15e8]:
+      - generic [ref=f15e9]:
+        - button "Back" [ref=f15e10] [cursor=pointer]
+        - generic [ref=f15e13]:
+          - generic [ref=f15e14]:
+            - paragraph [ref=f15e15]: admin@gordoncollege.edu.ph
+            - paragraph [ref=f15e16]: Super Admin
+          - generic [ref=f15e17]: A
+      - main [ref=f15e18]:
+        - generic [ref=f15e20]:
+          - generic [ref=f15e23]:
+            - paragraph [ref=f15e24]: Thursday, November 26, 2026
+            - heading "Good morning" [level=1] [ref=f15e25]
+            - paragraph [ref=f15e26]: Overview of today's clinic activity.
+          - generic [ref=f15e28]:
+            - generic [ref=f15e29]:
+              - generic [ref=f15e35]:
+                - heading "Logbook" [level=2] [ref=f15e36]
+                - paragraph [ref=f15e37]: View history of completed clinic visits.
+              - button "View Full Logbook" [ref=f15e38] [cursor=pointer]:
+                - text: View Full Logbook
+                - generic [aria-hidden] [ref=f15e39]: ›
+            - generic [ref=f15e40]:
+              - generic [ref=f15e41]:
+                - textbox "Search by surname, name, student ID, or course..." [ref=f15e46]
+                - combobox [ref=f15e48] [cursor=pointer]:
+                  - generic "All Departments" [ref=f15e49]
+                - combobox [ref=f15e53] [cursor=pointer]:
+                  - generic "All Course" [ref=f15e54]
+                - combobox [ref=f15e58] [cursor=pointer]:
+                  - generic "All Reason" [ref=f15e59]
+              - generic [ref=f15e62]:
+                - generic [ref=f15e64]:
+                  - combobox "Report period" [ref=f15e66] [cursor=pointer]: Week
+                  - generic [ref=f15e69]:
+                    - button "Previous week" [ref=f15e70] [cursor=pointer]
+                    - button "Filter by date range" [ref=f15e73] [cursor=pointer]:
+                      - generic [ref=f15e77]: Week 4 — November 22, 2026 – November 28, 2026
+                    - button "Next week" [ref=f15e78] [cursor=pointer]
+                - generic [ref=f15e81]:
+                  - button "Print" [ref=f15e82] [cursor=pointer]
+                  - button "Download PDF" [ref=f15e92] [cursor=pointer]
+            - table [ref=f15e98]:
+              - rowgroup [ref=f15e108]:
+                - row [ref=f15e109]:
+                  - columnheader "Date / Time" [ref=f15e110]
+                  - columnheader "Name" [ref=f15e111]
+                  - columnheader "Age" [ref=f15e112]
+                  - columnheader "Dept. & Course" [ref=f15e113]
+                  - columnheader "Sex" [ref=f15e114]
+                  - columnheader "Reason" [ref=f15e115]
+                  - columnheader "Complaint" [ref=f15e116]
+                  - columnheader "Medicine" [ref=f15e117]
+              - rowgroup [ref=f15e118]:
+                - row [ref=f15e119]:
+                  - cell "11/26/2026 09:15 AM" [ref=f15e120]
+                  - cell "Dela Cruz, Juan B." [ref=f15e121]
+                  - cell "23" [ref=f15e122]
+                  - cell "BSIT - CCS" [ref=f15e123]
+                  - cell "Male" [ref=f15e124]
+                  - cell "Consultation" [ref=f15e125]
+                  - cell "Headache" [ref=f15e126]
+                  - cell "Paracetamol x1" [ref=f15e127]
+            - paragraph [ref=f15e129]: 1 search result
+            - button "+ Add Walk-in Visit" [ref=f15e131] [cursor=pointer]
+          - generic [ref=f15e133]:
+            - generic [ref=f15e134]:
+              - generic [ref=f15e140]:
+                - heading "Appointments" [level=2] [ref=f15e141]
+                - paragraph [ref=f15e142]: Today's appointment slots
+              - generic [ref=f15e143]: Today
+            - generic [ref=f15e144]:
+              - textbox "Search by surname, name, student ID, or course..." [ref=f15e149]
+              - combobox [ref=f15e151] [cursor=pointer]:
+                - generic "All Department" [ref=f15e152]
+              - combobox [ref=f15e156] [cursor=pointer]:
+                - generic "All Courses" [ref=f15e157]
+              - combobox [ref=f15e161] [cursor=pointer]:
+                - generic "All Reason" [ref=f15e162]
+            - generic [ref=f15e165]:
+              - generic [ref=f15e166]:
+                - button "› 8:00 AM – 9:00 AM" [ref=f15e167] [cursor=pointer]:
+                  - generic [ref=f15e168]: ›
+                  - generic [ref=f15e169]: 8:00 AM – 9:00 AM
+                - generic [ref=f15e170]:
+                  - generic [ref=f15e171]: 1 / 11 Booked
+                  - generic [ref=f15e172]: 10 Slots Left
+                  - button "Slot actions" [ref=f15e174] [cursor=pointer]
+              - table [ref=f15e182]:
+                - rowgroup [ref=f15e183]:
+                  - row [ref=f15e184]:
+                    - columnheader "Name" [ref=f15e185]
+                    - columnheader "Age" [ref=f15e186]
+                    - columnheader "Dept" [ref=f15e187]
+                    - columnheader "Sex" [ref=f15e188]
+                    - columnheader "Reason" [ref=f15e189]
+                    - columnheader "Status" [ref=f15e190]
+                    - columnheader "Action" [ref=f15e191]
+                - rowgroup [ref=f15e192]:
+                  - row [ref=f15e193]:
+                    - cell "Dela Cruz, Juan B." [ref=f15e194]
+                    - cell "23" [ref=f15e195]
+                    - cell "CCS" [ref=f15e196]
+                    - cell "Male" [ref=f15e197]
+                    - cell "Consultation" [ref=f15e198]
+                    - cell "Scheduled" [ref=f15e199]
+                    - cell [ref=f15e201]:
+                      - button "Row actions" [ref=f15e203] [cursor=pointer]
+    - button "Open Clinic Assistant" [ref=f15e208] [cursor=pointer]
+  - dialog "Add Walk-in Visit" [ref=f15e213]:
+    - generic [ref=f15e215]:
+      - generic [ref=f15e216]:
+        - heading "Add Walk-in Visit" [level=2] [ref=f15e217]
+        - button "Close" [ref=f15e218] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f15e219]: ×
+      - generic [ref=f15e220]:
+        - generic [ref=f15e221]:
+          - text: ID / Registration Number
+          - textbox "Student ID" [ref=f15e222]: "202388888"
+        - generic [ref=f15e223]:
+          - generic [ref=f15e224]: Last Name *
+          - textbox "Last Name" [ref=f15e225]: Walkin
+        - generic [ref=f15e226]:
+          - generic [ref=f15e227]: First Name *
+          - textbox "First Name" [ref=f15e228]: Testa
+        - generic [ref=f15e229]:
+          - text: Middle Initial
+          - textbox "Middle Initial" [ref=f15e230]: M
+      - generic [ref=f15e231]:
+        - generic [ref=f15e232]:
+          - text: Suffix
+          - textbox "Suffix" [ref=f15e233]
+        - generic [ref=f15e234]:
+          - generic [ref=f15e235]: Reason *
+          - combobox [expanded] [active] [ref=f15e237] [cursor=pointer]:
+            - generic "Select Reason" [ref=f15e238]
+        - generic [ref=f15e241]:
+          - text: Complaint
+          - textbox "E.g. Headache" [ref=f15e242]: Stomach pain
+        - generic [ref=f15e243]:
+          - text: Medicine
+          - textbox "E.g. Paracetamol" [ref=f15e244]: Mylanta
+      - generic [ref=f15e246]:
+        - text: Quantity
+        - generic [ref=f15e247]:
+          - spinbutton "1" [ref=f15e248]
+          - button "+ Add" [ref=f15e249] [cursor=pointer]
+      - generic [ref=f15e250]:
+        - button "Cancel" [ref=f15e251] [cursor=pointer]
+        - button "+ Add Walk-in Visit" [ref=f15e252] [cursor=pointer]
+  - listbox [ref=f15e253]:
+    - option "Consultation" [ref=f15e254] [cursor=pointer]
+    - option "Medical Certificate" [ref=f15e256] [cursor=pointer]

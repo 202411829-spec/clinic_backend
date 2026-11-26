@@ -1,10 +1,13 @@
 // src/components/ui/ConfirmDialog.jsx
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { GC_MODAL_CLOSE_MS, GC_OVERLAY_Z, useModalPresence, useTriggerOrigin } from "../../lib/gcMotion";
 
 /**
  * Small "are you sure?" modal (portal to <body>, Esc / backdrop to dismiss).
  * Used before destructive actions such as cancelling an appointment.
+ * Motion follows the GC-RFB modal + trigger-origin design; copy and callbacks
+ * remain unchanged.
  */
 export default function ConfirmDialog({
   open,
@@ -16,33 +19,45 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
+  const panelRef = useRef(null);
+  const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS);
+  const origin = useTriggerOrigin({ enabled: open && mounted, panelRef });
+
   useEffect(() => {
-    if (!open) return undefined;
+    if (!mounted) return undefined;
     function onKey(e) {
-      if (e.key === "Escape") onCancel?.();
+      if (e.key === "Escape" && !busy) onCancel?.();
     }
+    const previousOverflow = document.body.style.overflow;
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
     };
-  }, [open, onCancel]);
+  }, [mounted, busy, onCancel]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-[3px] animate-fade-in motion-reduce:animate-none"
+      className={`gc-modal-backdrop fixed inset-0 flex items-center justify-center bg-ink-900/40 p-4 backdrop-blur-[3px] ${
+        visible ? "is-open" : "is-close"
+      }`}
+      style={{ zIndex: GC_OVERLAY_Z.confirmBackdrop }}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel?.();
+        if (e.target === e.currentTarget && !busy) onCancel?.();
       }}
     >
       <div
+        ref={panelRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-sm rounded-panel bg-white p-6 shadow-e4 animate-pop-in motion-reduce:animate-none"
+        style={{ ...origin.style, zIndex: GC_OVERLAY_Z.confirmPanel }}
+        className={`gc-modal-panel relative w-full max-w-sm rounded-panel bg-white p-6 shadow-e4 ${
+          visible ? "is-open" : "is-close"
+        } ${origin.className}`}
       >
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-signal-rose-bg text-signal-rose">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-6 w-6">

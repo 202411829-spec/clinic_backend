@@ -1,9 +1,9 @@
 // src/context/ProfileCompletenessContext.jsx
 // Shared, cached "complete your record" gate state for the student portal.
 //
-// Completeness is derived (no DB column): a student's record is "complete"
-// when the persistent profile fields the clinic needs are filled and at
-// least one emergency contact exists (see src/lib/profileCompleteness.js).
+// Completeness is derived from persistent profile fields, an emergency
+// contact, and the backend-owned `data_privacy_consented_at` timestamp
+// (see src/lib/profileCompleteness.js).
 // The source of truth is the same shape recordsApi.medicalSummary() returns
 // — {profile, emergency_contact, ...} — which is fetched once here and
 // reused by every student page, so navigating between pages never triggers a
@@ -15,6 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "./AuthContext.jsx";
 import { recordsApi } from "../lib/api.js";
 import { isStudentProfileComplete } from "../lib/profileCompleteness.js";
+import { createMedicalSummaryLoader } from "../lib/studentProfileLoading.js";
 
 const ProfileCompletenessContext = createContext(null);
 
@@ -22,16 +23,59 @@ export function ProfileCompletenessProvider({ children }) {
   const { studentId } = useAuth();
   const [status, setStatus] = useState("checking"); // "checking" | "complete" | "incomplete"
   const [loadError, setLoadError] = useState(null);
+  const [medicalSummary, setMedicalSummary] = useState(null);
+  const [medicalSummaryStudentId, setMedicalSummaryStudentId] = useState(null);
 
   // Monotonic sequence so a stale in-flight fetch can never override a
   // newer result (e.g. the mount fetch resolving AFTER the user saved).
   const seqRef = useRef(0);
+  const summaryLoaderRef = useRef(null);
+  const activeStudentIdRef = useRef(studentId);
+  activeStudentIdRef.current = studentId;
+  if (!summaryLoaderRef.current) {
+    summaryLoaderRef.current = createMedicalSummaryLoader(recordsApi.medicalSummary);
+  }
+
+  const acceptMedicalSummary = useCallback((summaryStudentId, summary) => {
+    summaryLoaderRef.current.setCached(summaryStudentId, summary);
+    setMedicalSummary(summary);
+    setMedicalSummaryStudentId(summaryStudentId);
+  }, []);
+
+  const loadMedicalSummary = useCallback(async (summaryStudentId, expectedSeq) => {
+    const isCurrent = () =>
+      expectedSeq != null &&
+      activeStudentIdRef.current === summaryStudentId &&
+      expectedSeq === seqRef.current;
+    if (isCurrent()) setLoadError(null);
+    try {
+      const result = await summaryLoaderRef.current.load(summaryStudentId);
+      if (isCurrent()) acceptMedicalSummary(summaryStudentId, result.summary);
+      return result;
+    } catch (err) {
+      if (isCurrent()) setLoadError(err?.message || "Could not check your profile");
+      throw err;
+    }
+  }, [acceptMedicalSummary]);
+
+  const retryMedicalSummary = useCallback(async () => {
+    if (!studentId) return null;
+    const seq = seqRef.current + 1;
+    seqRef.current = seq;
+    setLoadError(null);
+    const result = await loadMedicalSummary(studentId, seq);
+    if (seq === seqRef.current) {
+      setStatus(isStudentProfileComplete(result.summary) ? "complete" : "incomplete");
+    }
+    return result;
+  }, [studentId, loadMedicalSummary]);
 
   const applyProfile = useCallback((data) => {
     seqRef.current += 1;
     setLoadError(null);
+    acceptMedicalSummary(studentId, data);
     setStatus(isStudentProfileComplete(data) ? "complete" : "incomplete");
-  }, []);
+  }, [studentId, acceptMedicalSummary]);
 
   const recheck = useCallback(async () => {
     if (!studentId) {
@@ -45,9 +89,11 @@ export function ProfileCompletenessProvider({ children }) {
     const seq = seqRef.current + 1;
     seqRef.current = seq;
     try {
-      const summary = await recordsApi.medicalSummary(studentId);
+      const { summary } = await loadMedicalSummary(studentId, seq);
       if (seq !== seqRef.current) return "stale";
       setLoadError(null);
+      setMedicalSummary(summary);
+      setMedicalSummaryStudentId(studentId);
       const result = isStudentProfileComplete(summary) ? "complete" : "incomplete";
       setStatus(result);
       return result;
@@ -59,12 +105,14 @@ export function ProfileCompletenessProvider({ children }) {
       setStatus("incomplete");
       return "incomplete";
     }
-  }, [studentId]);
+  }, [studentId, loadMedicalSummary]);
 
   useEffect(() => {
     if (!studentId) {
       seqRef.current += 1;
       setLoadError(null);
+      setMedicalSummary(null);
+      setMedicalSummaryStudentId(null);
       setStatus("incomplete");
       return () => {};
     }
@@ -75,11 +123,12 @@ export function ProfileCompletenessProvider({ children }) {
     seqRef.current = seq;
     let cancelled = false;
 
-    recordsApi
-      .medicalSummary(studentId)
-      .then((summary) => {
+    loadMedicalSummary(studentId, seq)
+      .then(({ summary }) => {
         if (cancelled || seq !== seqRef.current) return;
         setLoadError(null);
+        setMedicalSummary(summary);
+        setMedicalSummaryStudentId(studentId);
         setStatus(isStudentProfileComplete(summary) ? "complete" : "incomplete");
       })
       .catch((err) => {
@@ -91,7 +140,7 @@ export function ProfileCompletenessProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [studentId]);
+  }, [studentId, loadMedicalSummary]);
 
   const value = useMemo(
     () => ({
@@ -99,10 +148,23 @@ export function ProfileCompletenessProvider({ children }) {
       checking: status === "checking",
       profileComplete: status === "complete",
       loadError,
+      medicalSummary,
+      medicalSummaryStudentId,
+      loadMedicalSummary,
+      retryMedicalSummary,
       applyProfile,
       recheck,
     }),
-    [status, loadError, applyProfile, recheck]
+    [
+      status,
+      loadError,
+      medicalSummary,
+      medicalSummaryStudentId,
+      loadMedicalSummary,
+      retryMedicalSummary,
+      applyProfile,
+      recheck,
+    ]
   );
 
   return (

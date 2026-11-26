@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronLeftIcon } from '../ui/icons.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useAdminAccess } from '../../context/AdminAccessContext.jsx'
 
 // Medical Certificate / Medical Summary are printable official documents
 // (letterhead layout) — the "Back" link and admin profile chip don't belong
@@ -11,8 +12,11 @@ export default function TopBar({ showBack = true }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const { role } = useAdminAccess()
   const displayName = user?.user_metadata?.full_name || user?.email || 'Admin'
-  const displayRole = user?.user_metadata?.role || 'Nurse'
+  // Authoritative role from AdminAccessContext (adminsApi.me) — fails closed
+  // to the plain "Admin" label when the role is unknown or not yet loaded.
+  const displayRole = role === 'super_admin' ? 'Super Admin' : 'Admin'
   const initials = displayName
     .split(' ')
     .filter(Boolean)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ToolPreviewCard from './ToolPreviewCard.jsx'
+import { GC_MODAL_CLOSE_MS, getModalMotionStyle, useModalPresence } from '../../lib/gcMotion.js'
 
 export default function AgentPanel({
   open,
@@ -15,6 +16,8 @@ export default function AgentPanel({
 }) {
   const [input, setInput] = useState('')
   const listRef = useRef(null)
+  const { mounted, visible } = useModalPresence(open, GC_MODAL_CLOSE_MS)
+  const backdropMotionStyle = getModalMotionStyle(visible)
 
   useEffect(() => {
     if (open && listRef.current) {
@@ -35,7 +38,7 @@ export default function AgentPanel({
   // Focus trap: keep focus inside the dialog while open. For full trap,
   // consider integrating focus-trap-react or manual Tab loop handling.
 
-  if (!open) return null
+  if (!mounted) return null
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -52,9 +55,16 @@ export default function AgentPanel({
         type="button"
         aria-label="Close assistant"
         onClick={onClose}
-        className="absolute inset-0 bg-black/20 md:hidden"
+        style={backdropMotionStyle}
+        className={`absolute inset-0 bg-black/20 transition-opacity md:hidden motion-reduce:transition-none ${
+          visible ? 'opacity-100' : 'opacity-0'
+        }`}
       />
-      <div className="relative flex h-[85vh] max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gc-green-100 bg-white shadow-2xl md:h-[520px] md:w-[380px] md:rounded-2xl animate-fade-in-up [animation-duration:0.22s] motion-reduce:animate-none">
+      <div
+        className={`gc-modal-panel relative flex h-[85vh] max-h-[85vh] w-full flex-col overflow-hidden rounded-t-2xl border border-gc-green-100 bg-white shadow-2xl md:h-[520px] md:w-[380px] md:rounded-2xl ${
+          visible ? 'is-open' : 'is-close'
+        }`}
+      >
         <div className="flex items-center justify-between bg-gc-green-700 px-4 py-3 text-white">
           <div>
             <p className="text-sm font-bold">Clinic Assistant</p>

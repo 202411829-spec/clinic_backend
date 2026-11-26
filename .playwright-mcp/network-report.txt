@@ -1,0 +1,26 @@
+2428. [GET] http://127.0.0.1:5000/api/masterlist/students/202399999 => [200] OK
+2429. [GET] http://127.0.0.1:5000/api/records/202399999/medical-summary => [200] OK
+2430. [GET] http://127.0.0.1:5000/api/masterlist/students/202399999 => [200] OK
+2433. [GET] http://127.0.0.1:5000/feedback/202399999 => [200] OK
+2434. [GET] http://127.0.0.1:5000/feedback/202399999 => [200] OK
+2435. [POST] http://127.0.0.1:5000/feedback => [200] OK
+2436. [GET] http://127.0.0.1:5000/feedback/202399999 => [200] OK
+2437. [POST] https://vqhydemespcbqgjpnoap.supabase.co/auth/v1/logout?scope=global => [204] No Content
+2494. [POST] https://vqhydemespcbqgjpnoap.supabase.co/auth/v1/token?grant_type=password => [200] OK
+2511. [GET] http://127.0.0.1:5000/api/masterlist/students/202399999 => [200] OK
+2512. [GET] http://127.0.0.1:5000/api/records/202399999/medical-summary => [200] OK
+2513. [GET] http://127.0.0.1:5000/api/masterlist/students/202399999 => [200] OK
+2526. [GET] http://127.0.0.1:5000/appointments?student_id=202399999 => [200] OK
+2527. [GET] http://127.0.0.1:5000/notifications/202399999 => [200] OK
+2528. [GET] http://127.0.0.1:5000/appointments?student_id=202399999 => [200] OK
+2529. [GET] http://127.0.0.1:5000/appointments?student_id=202399999 => [200] OK
+2530. [GET] http://127.0.0.1:5000/notifications/202399999 => [200] OK
+2531. [GET] http://127.0.0.1:5000/appointments?student_id=202399999 => [200] OK
+2582. [POST] http://127.0.0.1:5000/api/auth/forgot/check-email => [200] OK
+2583. [POST] http://127.0.0.1:5000/api/auth/forgot/send-code => [200] OK
+2585. [POST] http://127.0.0.1:5000/api/auth/forgot/reset => [200] OK
+2648. [POST] http://127.0.0.1:5000/api/auth/forgot/check-email => [200] OK
+2649. [POST] http://127.0.0.1:5000/api/auth/forgot/send-code => [200] OK
+2654. [POST] http://127.0.0.1:5000/api/auth/forgot/reset => [200] OK
+
+Note: 247 static requests not shown, run with "static" option to see them.

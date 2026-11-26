@@ -1,0 +1,42 @@
+- generic [ref=f20e4]:
+  - complementary [ref=f20e5]:
+    - generic [ref=f20e6]:
+      - generic [ref=f20e7]:
+        - generic [ref=f20e8]:
+          - img "Gordon College seal" [ref=f20e9]
+          - img "Health Service Unit seal" [ref=f20e10]
+        - generic [ref=f20e11]:
+          - paragraph [ref=f20e12]: GORDON COLLEGE
+          - paragraph [ref=f20e13]: Clinic Appointment System
+          - paragraph [ref=f20e14]: STUDENT PORTAL
+      - navigation [ref=f20e16]:
+        - paragraph [ref=f20e17]: Main
+        - list [ref=f20e18]:
+          - listitem [ref=f20e19]:
+            - link "Dashboard" [ref=f20e20] [cursor=pointer]:
+              - /url: /student/dashboard
+          - listitem [ref=f20e27]:
+            - link "Book" [ref=f20e28] [cursor=pointer]:
+              - /url: /student/book
+          - listitem [ref=f20e33]:
+            - link "Profile" [ref=f20e34] [cursor=pointer]:
+              - /url: /student/profile
+      - button "Logout" [ref=f20e41] [cursor=pointer]
+      - generic [ref=f20e46]:
+        - link "Feedback" [ref=f20e47] [cursor=pointer]:
+          - /url: /student/feedback
+        - link "About" [ref=f20e52] [cursor=pointer]:
+          - /url: /student/about
+  - generic [ref=f20e57]:
+    - banner [ref=f20e58]:
+      - button "Back" [ref=f20e60] [cursor=pointer]
+      - generic [ref=f20e63]:
+        - generic [ref=f20e64]:
+          - paragraph [ref=f20e65]: Juan B. Dela Cruz
+          - paragraph [ref=f20e66]: CCS Bachelor of Science in Information Technology
+        - generic [ref=f20e67]: JB
+    - main [ref=f20e68]:
+      - generic [ref=f20e237]:
+        - paragraph [ref=f20e241]: Appointment Booked!
+        - paragraph [ref=f20e242]: You'll get a notification once the clinic confirms your slot.
+        - button "Back to Dashboard" [ref=f20e243] [cursor=pointer]

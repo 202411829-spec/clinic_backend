@@ -1,0 +1,70 @@
+- generic [ref=e49]:
+  - generic [ref=e50]:
+    - img "Gordon College seal" [ref=e51]
+    - heading "GORDON COLLEGE" [level=1] [ref=e52]
+    - paragraph [ref=e53]: Clinic Appointment System
+  - generic [ref=e56]:
+    - paragraph [ref=e57]: Admin Portal
+    - heading "Admin Sign Up" [level=1] [ref=e58]
+    - paragraph [ref=e59]: Create a request — an existing admin will review it.
+    - list [ref=e60]:
+      - listitem [ref=e61]:
+        - generic [ref=e62]: "1"
+        - generic [ref=e63]: Email
+      - listitem [ref=e65]:
+        - generic [ref=e66]: "2"
+        - generic [ref=e67]: Verify
+      - listitem [ref=e69]:
+        - generic [ref=e70]: "3"
+        - generic [ref=e71]: Profile
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - generic [ref=e90]: Last Name *
+          - textbox "Last Name * Last Name *" [ref=e91]:
+            - /placeholder: Last Name
+        - generic [ref=e92]:
+          - generic [ref=e93]: First Name *
+          - textbox "First Name * First Name *" [ref=e94]:
+            - /placeholder: First Name
+        - generic [ref=e95]:
+          - generic [ref=e96]: Middle Initial (optional)
+          - textbox "Middle Initial (optional) Middle Initial (optional)" [ref=e97]:
+            - /placeholder: Middle Initial
+        - generic [ref=e98]:
+          - generic [ref=e99]: Suffix (optional)
+          - textbox "Suffix (optional) Suffix (optional)" [ref=e100]:
+            - /placeholder: Suffix
+      - generic [ref=e101]:
+        - generic [ref=e102]: License No. (optional)
+        - textbox "License No. (optional) License No. (optional)" [ref=e103]:
+          - /placeholder: License Number
+      - generic [ref=e104]:
+        - generic [ref=e105]: New Password *
+        - generic [ref=e106]:
+          - textbox "New Password * New Password *" [ref=e107]:
+            - /placeholder: 12+ characters
+          - button "Show password" [ref=e108] [cursor=pointer]
+        - generic [ref=e112]:
+          - status [ref=e118]: "Password strength: Enter a password"
+          - list [ref=e119]:
+            - listitem [ref=e120]:
+              - generic [ref=e122]: At least 12 characters
+            - listitem [ref=e123]:
+              - generic [ref=e125]: Uppercase letter
+            - listitem [ref=e126]:
+              - generic [ref=e128]: Number
+            - listitem [ref=e129]:
+              - generic [ref=e131]: Symbol
+      - generic [ref=e132]:
+        - generic [ref=e133]: Confirm Password *
+        - generic [ref=e134]:
+          - textbox "Confirm Password * Confirm Password *" [ref=e135]:
+            - /placeholder: Re-enter your password
+          - button "Show password" [ref=e136] [cursor=pointer]
+      - button "Submit request" [ref=e140] [cursor=pointer]
+      - button "Back" [ref=e141] [cursor=pointer]
+    - paragraph [ref=e77]:
+      - text: Already have an account?
+      - link "Log in" [ref=e78] [cursor=pointer]:
+        - /url: /admin/login

@@ -1,14 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import AuthShell from '../../components/auth/AuthShell.jsx'
+import { Link, useNavigate } from 'react-router-dom'
+import SignUpLayout from '../../components/auth/SignUpLayout.jsx'
 import LoginForm from '../../components/auth/LoginForm.jsx'
 import { adminSignIn } from '../../lib/supabaseClient.js'
-
-const BRAND = {
-  logo: '/gordon-college-seal.png',
-  name: 'GORDON COLLEGE',
-  tagline: 'Clinic Appointment System'
-}
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -29,8 +23,20 @@ export default function AdminLogin() {
   }
 
   return (
-    <AuthShell brand={BRAND} tone="admin">
-      <LoginForm align="left" onSubmit={handleSubmit} loading={loading} error={error} />
-    </AuthShell>
+    <SignUpLayout
+      portalLabel="Admin Portal"
+      title="Welcome"
+      subtitle="Book, reschedule, or check the status of your clinic appointments."
+      footer={
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Request admin access?{' '}
+          <Link to="/admin/signup" className="font-semibold text-gc-green-700 hover:text-gc-green-800">
+            Sign up
+          </Link>
+        </p>
+      }
+    >
+      <LoginForm onSubmit={handleSubmit} loading={loading} error={error} />
+    </SignUpLayout>
   )
 }

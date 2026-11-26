@@ -34,14 +34,29 @@ export function PanelHeader({ title, subtitle, actions, className = '' }) {
    The serif is scoped to page titles and the printed letterhead only. It is
    what gives an institutional document its weight; used everywhere it would
    just be decoration. */
-export function PageHeader({ title, meta, actions }) {
+export function PageHeader({ title, subtitle, meta, eyebrow, icon, actions, className = '' }) {
+  const description = subtitle ?? meta
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="font-serif text-3xl font-semibold text-ink-900">{title}</h1>
-        {meta && <p className="mt-1 text-base text-ink-500">{meta}</p>}
+    <div className={cx('flex flex-wrap items-center justify-between gap-3', className)}>
+      <div className="flex items-center gap-3">
+        {icon && (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-brand-900 text-white shadow-e2">
+            {icon}
+          </span>
+        )}
+        <div>
+          {eyebrow && (
+            <p className="text-2xs font-semibold uppercase tracking-[0.22em] text-brand-600">
+              {eyebrow}
+            </p>
+          )}
+          <h1 className={cx('font-serif text-2xl font-semibold leading-tight text-ink-900', eyebrow && 'mt-1')}>
+            {title}
+          </h1>
+          {description && <p className={cx('text-xs text-ink-500', eyebrow && 'mt-1')}>{description}</p>}
+        </div>
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
   )
 }
