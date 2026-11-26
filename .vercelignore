@@ -2,7 +2,6 @@
 node_modules
 dist
 dev-dist
-deepseek-harness
 __pycache__
 *.pyc
 .env
@@ -19,3 +18,19 @@ test_*.py
 tests
 docs/demo
 .git
+
+# AI workflow files and local development context (kept in Git, not deployed)
+.ai
+.agents
+.claude
+.opencode
+.superpowers
+.vscode
+.playwright-mcp
+playwright-output
+AGENTS.md
+CLAUDE.md
+RTK.md
+PROGRESS.md
+opencode.json
+opencode.jsonc

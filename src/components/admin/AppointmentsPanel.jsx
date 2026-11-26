@@ -1,30 +1,31 @@
 // src/components/admin/AppointmentsPanel.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import StatusMenu from "./StatusMenu.jsx";
 import TimeBlockEditPopover from "./TimeBlockEditPopover.jsx";
-import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
+import PortalOverlay from "../ui/PortalOverlay.jsx";
 import { appointmentsApi } from "../../lib/api.js";
 import { toYMD } from "../../lib/calendar.js";
+import { formatTimeRange } from "../../lib/timeFormat";
+import {
+  buildAppointmentCourseOptions,
+  buildAppointmentDepartmentOptions,
+  buildAppointmentReasonOptions,
+  filterAppointmentSlots,
+} from "../../lib/appointmentSlots.js";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  const buttonRef = useRef(null);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -38,9 +39,17 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
       </button>
 
       {open && (
-        <div
+        <PortalOverlay
+          triggerRef={buttonRef}
+          enabled={open}
+          align="right"
+          preferredWidth={128}
+          estimatedHeight={112}
           role="menu"
-          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+          ariaLabel="Slot actions"
+          className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden"
+          onOutside={() => setOpen(false)}
+          onEscape={() => setOpen(false)}
         >
           <button
             role="menuitem"
@@ -62,7 +71,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
           >
             Delete
           </button>
-        </div>
+        </PortalOverlay>
       )}
 
       {editing && (
@@ -76,8 +85,8 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
   );
 }
 
-function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
-  const [expanded, setExpanded] = useState(slot.bookings.length > 0);
+function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
+  const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState(null);
 
   return (
@@ -101,7 +110,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
             ›
           </span>
           <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-            {slot.time}
+            {formatTimeRange(slot.time)}
           </span>
         </button>
 
@@ -128,7 +137,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
           <SlotActionMenu
             onEdit={() => onToggleEdit(slot.id)}
             onDelete={() => {
-              if (window.confirm(`Delete the ${slot.time} time block?`)) {
+              if (window.confirm(`Delete the ${formatTimeRange(slot.time)} time block?`)) {
                 onDeleteTimeBlock(slot.id);
               }
             }}
@@ -176,7 +185,15 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                           onChange={(newStatus) =>
                             onStatusChange(slot.id, b.id, newStatus)
                           }
-                          onViewRecord={() => { console.error(`Viewing record for ${b.name}`); setError(`Viewing record for ${b.name}`); }}
+                          onViewRecord={() => {
+                            const studentId = String(b.student_id ?? "").trim();
+                            if (!studentId) {
+                              setError("This appointment has no student ID to open a record.");
+                              return;
+                            }
+                            setError(null);
+                            onViewRecord(studentId);
+                          }}
                         />
                       </td>
                     </tr>
@@ -195,51 +212,21 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
   );
 }
 
-function normalizeAppointmentStatus(value) {
-  if (!value) return "pending";
-  const v = String(value).trim().toLowerCase();
-  if (v === "no-show" || v === "no show" || v === "no_show") return "no_show";
-  if (v === "canceled") return "cancelled";
-  if (v === "pending" || v === "completed" || v === "cancelled" || v === "no_show") return v;
-  return "pending";
-}
-
-function AppointmentsSummary({ counts }) {
-  const items = [
-    { label: "Total", value: counts.total, dotClass: "bg-gc-green", textClass: "text-gc-green" },
-    { label: "Pending", value: counts.pending, dotClass: "bg-amber-500", textClass: "text-amber-600" },
-    { label: "Completed", value: counts.completed, dotClass: "bg-green-500", textClass: "text-green-600" },
-    { label: "No-show", value: counts.no_show, dotClass: "bg-red-500", textClass: "text-red-600" },
-    { label: "Cancelled", value: counts.cancelled, dotClass: "bg-gray-400", textClass: "text-gray-500" },
-  ];
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-xs">
-      {items.map((item, idx) => (
-        <span key={item.label} className="inline-flex items-center gap-1.5">
-          {idx > 0 && <span className="text-gray-300 mr-1 hidden sm:inline">•</span>}
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} aria-hidden />
-          <span className="text-gray-500 font-medium">{item.label}:</span>
-          <span className={`font-bold ${item.textClass}`}>{item.value}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export default function AppointmentsPanel({ reasonRecords = [] }) {
+  const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [dateLabel, setDateLabel] = useState("");
   const [openEditId, setOpenEditId] = useState(null);
 
-  // Search and filter state
+  // Search and filter state — categorical filters are OR sets; empty = All.
   const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("All Department");
-  const [reasonFilter, setReasonFilter] = useState("All Reason");
+  const [department, setDepartment] = useState([]);
+  const [course, setCourse] = useState([]);
+  const [reasonFilter, setReasonFilter] = useState([]);
 
   // Recent slots for the dashboard widget. Reasons are provided by the parent
   // Dashboard via props (fetched once, shared). This is the single fetch for
-  // today — the summary tiles below are derived from each slot's bookings
-  // (which carry per-appointment statuses), so there's no second round-trip.
+  // today; visible appointment blocks are derived from these same bookings.
   useEffect(() => {
     appointmentsApi
       .slots(toYMD(new Date()))
@@ -247,68 +234,26 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
       .catch((err) => console.error("Failed to load slots:", err));
   }, []);
 
-  // Derive departments and reasons from loaded slots
-  const departments = useMemo(() => {
-    const set = new Set(slots.flatMap((s) => s.bookings.map((b) => b.dept)));
-    return ["All Department", ...Array.from(set)];
-  }, [slots]);
-
+  // Derive every categorical option from the actual loaded bookings so the
+  // selected values always match what filterAppointmentSlots compares.
+  const departments = useMemo(() => buildAppointmentDepartmentOptions(slots), [slots]);
+  const courses = useMemo(() => buildAppointmentCourseOptions(slots), [slots]);
   const reasons = useMemo(() => {
-    const set = new Set(slots.flatMap((s) => s.bookings.map((b) => b.reason)));
-    return ["All Reason", ...Array.from(set)];
-  }, [slots]);
-
-  // Derive real reason records for the dropdown (with reason_id)
-  const reasonRecordsForDropdown = useMemo(() => {
-    return reasonRecords.map((r) => ({ value: r.reason_id, label: r.description }));
-  }, [reasonRecords]);
-
-  const filteredSlots = useMemo(() => {
-    return slots.map((slot) => {
-      const nonCancelled = slot.bookings.filter(
-        (b) => String(b.status ?? "").toLowerCase() !== "cancelled"
-      );
-      const pendingCount = nonCancelled.length;
-      const filteredBookings = nonCancelled.filter((b) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-          !q ||
-          b.name.toLowerCase().includes(q) ||
-          b.dept.toLowerCase().includes(q);
-        const matchesDept = department === "All Department" || b.dept === department;
-        const matchesReason = reasonFilter === "All Reason" || b.reason === reasonFilter;
-        return matchesSearch && matchesDept && matchesReason;
-      });
-      return {
-        ...slot,
-        bookings: filteredBookings,
-        booked: pendingCount,
-        slotsLeft: Math.max(slot.capacity - pendingCount, 0),
-        full: pendingCount >= slot.capacity,
-      };
+    // Include the shared /reasons list so dedicated reasons remain filterable
+    // even before their first appointment appears in today's slots.
+    const values = new Set(buildAppointmentReasonOptions(slots));
+    (reasonRecords || []).forEach((reason) => {
+      const description = String(reason?.description || "").trim();
+      if (description) values.add(description);
     });
-  }, [slots, search, department, reasonFilter]);
+    return Array.from(values).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [slots, reasonRecords]);
 
-  const summaryCounts = useMemo(() => {
-    const counts = { total: 0, pending: 0, completed: 0, no_show: 0, cancelled: 0 };
-    for (const slot of slots) {
-      for (const b of slot.bookings) {
-        const st = normalizeAppointmentStatus(b.status);
-        counts.total += 1;
-        if (st === "pending") counts.pending += 1;
-        else if (st === "completed") counts.completed += 1;
-        else if (st === "no_show") counts.no_show += 1;
-        else if (st === "cancelled") counts.cancelled += 1;
-      }
-    }
-    return counts;
-  }, [slots]);
-
-  const totalBookings = useMemo(
-    () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
-    [filteredSlots]
+  const filteredSlots = useMemo(
+    () => filterAppointmentSlots(slots, { search, department, course, reason: reasonFilter }),
+    [slots, search, department, course, reasonFilter]
   );
-  const hasAppointments = totalBookings > 0;
+  const hasAppointments = filteredSlots.length > 0;
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     setSlots((prev) =>
@@ -370,6 +315,10 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
     setOpenEditId((cur) => (cur === slotId ? null : cur));
   }
 
+  function handleViewRecord(studentId) {
+    navigate(`/admin/masterlist/${encodeURIComponent(studentId)}`);
+  }
+
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-4">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
@@ -391,8 +340,6 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
         </span>
       </div>
 
-      <AppointmentsSummary counts={summaryCounts} />
-
       {/* search + filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
         <div className="md:col-span-1 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400">
@@ -404,22 +351,38 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
             className="w-full outline-none placeholder:text-gray-400"
           />
         </div>
-        <UniversalDropdown
+        <FilterMultiSelect
           value={department}
           onChange={setDepartment}
           options={departments}
+          allLabel="All Department"
+          pluralLabel="Departments"
+          ariaLabel="Filter by department"
+          triggerTestId="appointments-department-filter"
         />
-        <UniversalDropdown value="All Courses" onChange={() => {}} options={["All Courses"]} />
-        <UniversalDropdown
+        <FilterMultiSelect
+          value={course}
+          onChange={setCourse}
+          options={courses}
+          allLabel="All Courses"
+          pluralLabel="Courses"
+          ariaLabel="Filter by course"
+          triggerTestId="appointments-course-filter"
+        />
+        <FilterMultiSelect
           value={reasonFilter}
           onChange={setReasonFilter}
-          options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecordsForDropdown]}
+          options={reasons}
+          allLabel="All Reason"
+          pluralLabel="Reasons"
+          ariaLabel="Filter by reason"
+          triggerTestId="appointments-reason-filter"
         />
       </div>
 
       {!hasAppointments ? (
         <div className="py-12 text-center text-gray-500 text-sm">
-          No appointment today.
+          No appointments today.
         </div>
       ) : (
         filteredSlots.map((slot) => (
@@ -427,6 +390,7 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
             key={slot.id}
             slot={slot}
             onStatusChange={requestStatusChange}
+            onViewRecord={handleViewRecord}
             editing={openEditId === slot.id}
             onToggleEdit={(id) => setOpenEditId((cur) => (cur === id ? null : id))}
             onSaveTimeBlock={handleSaveTimeBlock}

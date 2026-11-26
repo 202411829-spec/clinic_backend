@@ -1,23 +1,20 @@
 import { supabase } from './supabaseClient.js'
+import { appendRequestParams } from './requestParams.js'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:5000'
 
 // ---- Backend URL normalizer (two modes, one place) ----
-// Local dev  (VITE_API_URL unset => http://127.0.0.1:5000): Flask is served
-//   directly at the root, so paths are used verbatim — `/appointments` stays
-//   `/appointments` and `/health` stays `/health`. Byte-identical to before.
-// Production (VITE_API_URL = https://<project>.vercel.app): Vercel only exposes
-//   serverless functions under `/api/*`, and the whole Flask app is mounted there
-//   via DispatcherMiddleware, so every path gains an `/api` prefix. Paths that
-//   already carry it (`/api/reports/`, `/api/masterlist/students`, `/api/auth/*`)
-//   are left alone, so nothing double-prefixes. Note `/health` is therefore
-//   served at `/api/health` in production and bare `/health` locally.
-// Working on the parsed URL (not string surgery) keeps query strings and hashes
-// intact: `/api/masterlist/students?page=1` is never mangled.
-function isLocalBackend(baseUrl) {
+// Same-origin backend (local Flask proxy or Flask mounted in a Vercel
+// serverless function): root-level Flask routes must be reached through `/api`.
+// Separate backend host (Railway/Render/etc.): Flask is already reachable at
+// its own root, so paths are used verbatim. Paths that already carry `/api`
+// (`/api/reports/`, `/api/masterlist/students`, `/api/auth/*`) are never
+// double-prefixed. Working on the parsed URL keeps query strings intact.
+export function shouldPrefixApi(baseUrl, origin) {
   try {
-    const { hostname } = new URL(baseUrl)
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
+    if (!origin) return false
+    const base = new URL(baseUrl, origin)
+    return base.origin === new URL(origin).origin
   } catch {
     return false
   }
@@ -26,7 +23,8 @@ function isLocalBackend(baseUrl) {
 export function toApiUrl(path) {
   const url = new URL(path, API_BASE_URL)
   const alreadyPrefixed = url.pathname === '/api' || url.pathname.startsWith('/api/')
-  if (!alreadyPrefixed && !isLocalBackend(API_BASE_URL)) {
+  const origin = typeof window === 'undefined' ? null : window.location.origin
+  if (!alreadyPrefixed && shouldPrefixApi(API_BASE_URL, origin)) {
     url.pathname = `/api${url.pathname}`
   }
   return url.toString()
@@ -37,7 +35,19 @@ export function toApiUrl(path) {
 async function getAccessToken() {
   try {
     const { data } = (await supabase?.auth.getSession()) ?? {}
-    return data?.session?.access_token ?? null
+    const session = data?.session
+    if (!session?.access_token) return null
+
+    // Supabase can hand back a token that is already close to expiration
+    // (e.g. after the tab slept). Refresh it before sending it to Flask so a
+    // live session does not turn into a spurious 401 on dashboard/profile.
+    if (session.expires_at && session.expires_at * 1000 <= Date.now() + 10_000) {
+      const { data: refreshed, error } = await refreshSessionOnce()
+      if (error || !refreshed?.session?.access_token) return null
+      return refreshed.session.access_token
+    }
+
+    return session.access_token
   } catch {
     // No usable session yet — send the request unauthenticated and let the
     // backend's 401 handling below route the user back to login.
@@ -47,7 +57,7 @@ async function getAccessToken() {
 
 function redirectToLogin() {
   const isAdminArea = window.location.pathname.startsWith('/admin')
-  window.location.assign(isAdminArea ? '/admin/login' : '/student/login')
+  window.location.replace(isAdminArea ? '/admin/login' : '/student/login')
 }
 
 // Guards against a pile of parallel 401s (e.g. a page firing several
@@ -94,13 +104,7 @@ export function clearApiCache() {
 
 async function request(path, { params, headers, cacheTtl: explicitCacheTtl, signal, ...options } = {}, _retried = false) {
   const url = new URL(toApiUrl(path))
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        url.searchParams.set(key, value)
-      }
-    })
-  }
+  appendRequestParams(url.searchParams, params)
 
   const method = (options.method || 'GET').toUpperCase()
   const effectiveTtl = method === 'GET' ? resolveCacheTtl(path, explicitCacheTtl) : null
@@ -203,7 +207,17 @@ export const appointmentsApi = {
   list: (params, opts) => api.get('/appointments', params, opts),
   get: (appointmentId, opts) => api.get(`/appointments/${appointmentId}`, undefined, opts),
   create: (body, opts) => api.post('/appointments', body, opts),
-  slots: (date, opts) => api.get('/appointments/slots', { date }, opts),
+  // `reasonId` scopes availability to that reason's own schedule (e.g.
+  // Dental Service). It is only sent when a reason is actually selected —
+  // omitting it keeps the legacy general-availability behavior.
+  slots: (date, reasonId, opts) =>
+    api.get(
+      '/appointments/slots',
+      reasonId === undefined || reasonId === null || reasonId === ''
+        ? { date }
+        : { date, reason_id: reasonId },
+      opts
+    ),
   getStatus: (appointmentId, opts) => api.get(`/appointments/${appointmentId}/status`, undefined, opts),
   updateStatus: (appointmentId, body, opts) =>
     api.patch(`/appointments/${appointmentId}/status`, body, opts),
@@ -251,6 +265,8 @@ export const adminsApi = {
   remove: (adminId, confirmEmail) =>
     request(`/api/admins/${adminId}`, { method: 'DELETE', body: JSON.stringify({ confirmEmail }) }),
   updateProfile: (adminId, body) => api.patch(`/api/admins/${adminId}/profile`, body),
+  // Super-admin only: switch another admin between 'admin' and 'super_admin'.
+  updateRole: (adminId, role) => api.patch(`/api/admins/${adminId}/role`, { role }),
 }
 
 // ---- Clinic Schedule & Settings ----
@@ -275,8 +291,9 @@ export const recordsApi = {
   saveLabResults: (annualExamId, body) => api.put(`/api/records/annual-exams/${annualExamId}/lab-results`, body),
   diagnosis: (annualExamId) => api.get(`/api/records/annual-exams/${annualExamId}/diagnosis`),
   saveDiagnosis: (annualExamId, body) => api.put(`/api/records/annual-exams/${annualExamId}/diagnosis`, body),
+  updateAnnualExamStatus: (annualExamId, body) => api.patch(`/api/records/annual-exams/${annualExamId}/status`, body),
   medicalCertificate: (annualExamId) => api.get(`/api/records/annual-exams/${annualExamId}/medical-certificate`),
-  medicalSummary: (studentId) => api.get(`/api/records/${studentId}/medical-summary`),
+  medicalSummary: (studentId, opts) => api.get(`/api/records/${studentId}/medical-summary`, undefined, opts),
   updateProfile: (studentId, body) => api.patch(`/api/records/${studentId}/profile`, body),
 }
 
@@ -313,14 +330,17 @@ export const authApi = {
 // admin record) before a code can be sent and the account activated.
 export const adminAuthApi = {
   checkEmail: (email) => authRequest('/api/auth/admin/check-email', { email }),
-  sendCode: (email) => authRequest('/api/auth/admin/send-code', { email }),
+  sendCode: (email, invitationToken) => authRequest('/api/auth/admin/send-code', {
+    email,
+    ...(invitationToken ? { invitation_token: invitationToken } : {}),
+  }),
   signup: (payload) => authRequest('/api/auth/admin/signup', payload),
 }
 
 // ---- Public Student Forgot Password ----
 // Same pre-auth, unauthenticated raw-fetch pattern as authApi above.
-//   POST /api/auth/forgot/check-email { email }        -> 200 { exists } | 404
-//   POST /api/auth/forgot/send-code   { email }        -> 200 { success }
+//   POST /api/auth/forgot/check-email { email }        -> 200 { success, message }
+//   POST /api/auth/forgot/send-code   { email }        -> 200 { success, message }
 //   POST /api/auth/forgot/reset       { email, code,
 //                                       password,
 //                                       confirmPassword } -> 200 | 400

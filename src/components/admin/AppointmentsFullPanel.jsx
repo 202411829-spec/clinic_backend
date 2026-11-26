@@ -1,30 +1,31 @@
 // src/components/admin/AppointmentsFullPanel.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon";
 import StatusBadge from "./StatusBadge";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import StatusMenu from "./StatusMenu";
 import TimeBlockEditPopover from "./TimeBlockEditPopover";
-import UniversalDropdown from "../ui/UniversalDropdown.jsx";
+import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
+import PortalOverlay from "../ui/PortalOverlay.jsx";
+import AppointmentDatePicker from "./AppointmentDatePicker.jsx";
 import { appointmentsApi, referenceApi } from "../../lib/api.js";
-import { formatLongDate, toYMD } from "../../lib/calendar";
+import {
+  buildAppointmentCourseOptions,
+  buildAppointmentDepartmentOptions,
+  filterAppointmentSlots,
+} from "../../lib/appointmentSlots.js";
+import { toYMD } from "../../lib/calendar";
+import { formatTimeRange } from "../../lib/timeFormat";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  const buttonRef = useRef(null);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
@@ -38,9 +39,17 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
       </button>
 
       {open && (
-        <div
+        <PortalOverlay
+          triggerRef={buttonRef}
+          enabled={open}
+          align="right"
+          preferredWidth={128}
+          estimatedHeight={112}
           role="menu"
-          className="absolute right-0 top-full mt-1 z-20 w-32 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden origin-top-right animate-pop-in motion-reduce:animate-none"
+          ariaLabel="Time block actions"
+          className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden"
+          onOutside={() => setOpen(false)}
+          onEscape={() => setOpen(false)}
         >
           <button
             role="menuitem"
@@ -62,7 +71,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
           >
             Delete
           </button>
-        </div>
+        </PortalOverlay>
       )}
 
       {editing && (
@@ -101,7 +110,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
             ›
           </span>
           <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">
-            {slot.time}
+            {formatTimeRange(slot.time)}
           </span>
           <span
             className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${
@@ -127,7 +136,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
           <SlotActionMenu
             onEdit={() => onToggleEdit(slot.id)}
             onDelete={() => {
-              if (window.confirm(`Delete the ${slot.time} time block?`)) {
+              if (window.confirm(`Delete the ${formatTimeRange(slot.time)} time block?`)) {
                 onDeleteTimeBlock(slot.id);
               }
             }}
@@ -175,7 +184,7 @@ function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBloc
                           onChange={(newStatus) =>
                             onStatusChange(slot.id, b.id, newStatus)
                           }
-                          onViewRecord={() => { console.error(`Viewing record for ${b.name}`); setError(`Viewing record for ${b.name}`); }}
+                          onViewRecord={() => handleViewRecord(b.student_id)}
                         />
                       </td>
                     </tr>
@@ -203,14 +212,16 @@ function normalizeAppointmentStatus(value) {
   return "pending";
 }
 
-export default function AppointmentsFullPanel({ selectedDate }) {
+export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
+  const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openEditId, setOpenEditId] = useState(null);
   const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("All Department");
-  const [reasonFilter, setReasonFilter] = useState("All Reason");
+  const [department, setDepartment] = useState([]);
+  const [course, setCourse] = useState([]);
+  const [reasonFilter, setReasonFilter] = useState([]);
   const [reasonRecords, setReasonRecords] = useState([]);
 
   // Fetch real time slots + bookings for the selected date.
@@ -250,12 +261,9 @@ export default function AppointmentsFullPanel({ selectedDate }) {
       .catch(() => {});
   }, []);
 
-  // Derive departments from the loaded slots/bookings
-  const departments = useMemo(() => {
-    const set = new Set();
-    slots.forEach((s) => s.bookings.forEach((b) => set.add(b.dept)));
-    return ["All Department", ...Array.from(set)];
-  }, [slots]);
+  // Derive categorical options from the loaded slots/bookings
+  const departments = useMemo(() => buildAppointmentDepartmentOptions(slots), [slots]);
+  const courses = useMemo(() => buildAppointmentCourseOptions(slots), [slots]);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     // Optimistic update, persisted via PATCH /appointments/<id>/status.
@@ -274,6 +282,16 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     appointmentsApi
       .updateStatus(bookingId, { new_status: newStatus })
       .catch((err) => console.error("Failed to save status:", err));
+  }
+
+  function handleViewRecord(studentId) {
+    const normalized = String(studentId ?? "").trim();
+    if (!normalized) {
+      setError("This appointment has no student ID to open a record.");
+      return;
+    }
+    setError(null);
+    navigate(`/admin/masterlist/${encodeURIComponent(normalized)}`);
   }
 
   // Cancelling is hard to undo, so ask first. Every other status applies at once.
@@ -318,44 +336,18 @@ export default function AppointmentsFullPanel({ selectedDate }) {
     setOpenEditId((cur) => (cur === slotId ? null : cur));
   }
 
-  const filteredSlots = useMemo(() => {
-    const withPendingOnly = slots.map((slot) => {
-      const nonCancelled = slot.bookings.filter(
-        (b) => String(b.status ?? "").toLowerCase() !== "cancelled"
-      );
-      const pendingCount = nonCancelled.length;
-      return {
-        ...slot,
-        bookings: nonCancelled,
-        booked: pendingCount,
-        slotsLeft: Math.max(slot.capacity - pendingCount, 0),
-        full: pendingCount >= slot.capacity,
-      };
-    });
-    if (!search && department === "All Department" && reasonFilter === "All Reason") {
-      return withPendingOnly;
-    }
-    return withPendingOnly.map((slot) => ({
-      ...slot,
-      bookings: slot.bookings.filter((b) => {
-        const q = search.trim().toLowerCase();
-        const matchesSearch =
-          !q ||
-          b.name.toLowerCase().includes(q) ||
-          b.dept.toLowerCase().includes(q);
-        const matchesDept =
-          department === "All Department" || b.dept === department;
-        const matchesReason = reasonFilter === "All Reason" || b.reason === reasonFilter;
-        return matchesSearch && matchesDept && matchesReason;
+  const filteredSlots = useMemo(
+    () =>
+      filterAppointmentSlots(slots, {
+        search,
+        department,
+        course,
+        reason: reasonFilter,
       }),
-    }));
-  }, [slots, search, department, reasonFilter]);
-
-  const totalBookings = useMemo(
-    () => filteredSlots.reduce((acc, s) => acc + s.bookings.length, 0),
-    [filteredSlots]
+    [slots, search, department, course, reasonFilter]
   );
-  const hasAppointments = totalBookings > 0;
+
+  const hasAppointments = filteredSlots.length > 0;
 
   return (
     <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
@@ -368,12 +360,10 @@ export default function AppointmentsFullPanel({ selectedDate }) {
             Appointments
           </h2>
         </div>
-        <span className="text-xs font-semibold text-gray-500">
-          {formatLongDate(selectedDate)}
-        </span>
+        <AppointmentDatePicker selectedDate={selectedDate} onSelectDate={onSelectDate} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
         <div className="md:col-span-2 flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus-within:ring-2 focus-within:ring-gc-accent/40 focus-within:border-gc-accent">
           <NavIcon name="search" className="w-4 h-4 shrink-0 text-gray-400" />
           <input
@@ -383,11 +373,32 @@ export default function AppointmentsFullPanel({ selectedDate }) {
             className="w-full outline-none placeholder:text-gray-400 text-gray-700"
           />
         </div>
-        <UniversalDropdown value={department} onChange={setDepartment} options={departments} />
-        <UniversalDropdown
+        <FilterMultiSelect
+          value={department}
+          onChange={setDepartment}
+          options={departments}
+          allLabel="All Department"
+          pluralLabel="Departments"
+          ariaLabel="Filter by department"
+          triggerTestId="appointments-department-filter"
+        />
+        <FilterMultiSelect
+          value={course}
+          onChange={setCourse}
+          options={courses}
+          allLabel="All Courses"
+          pluralLabel="Courses"
+          ariaLabel="Filter by course"
+          triggerTestId="appointments-course-filter"
+        />
+        <FilterMultiSelect
           value={reasonFilter}
           onChange={setReasonFilter}
-          options={[{ value: "All Reason", label: "All Reason" }, ...reasonRecords.map((r) => ({ value: r.description, label: r.description }))]}
+          options={reasonRecords.map((r) => r.description)}
+          allLabel="All Reason"
+          pluralLabel="Reasons"
+          ariaLabel="Filter by reason"
+          triggerTestId="appointments-reason-filter"
         />
       </div>
 
@@ -399,7 +410,7 @@ export default function AppointmentsFullPanel({ selectedDate }) {
       )}
       {!loading && !error && !hasAppointments && (
         <div className="py-12 text-center text-gray-500 text-sm">
-          No appointment today.
+          No appointments today.
         </div>
       )}
 
