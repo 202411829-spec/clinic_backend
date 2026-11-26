@@ -11,12 +11,11 @@ import PortalOverlay from "../ui/PortalOverlay.jsx";
 import { appointmentsApi } from "../../lib/api.js";
 import { toYMD } from "../../lib/calendar.js";
 import { formatTimeRange } from "../../lib/timeFormat";
+import { filterAppointmentSlots } from "../../lib/appointmentSlots.js";
 import {
-  buildAppointmentCourseOptions,
-  buildAppointmentDepartmentOptions,
-  buildAppointmentReasonOptions,
-  filterAppointmentSlots,
-} from "../../lib/appointmentSlots.js";
+  deriveRecordFilterOptions,
+  reconcileRecordFilterSelections,
+} from "../../lib/filterMultiSelect.js";
 
 function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTimeBlock }) {
   const [open, setOpen] = useState(false);
@@ -212,7 +211,7 @@ function SlotGroup({ slot, onStatusChange, onViewRecord, editing, onToggleEdit, 
   );
 }
 
-export default function AppointmentsPanel({ reasonRecords = [] }) {
+export default function AppointmentsPanel() {
   const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [dateLabel, setDateLabel] = useState("");
@@ -234,20 +233,57 @@ export default function AppointmentsPanel({ reasonRecords = [] }) {
       .catch((err) => console.error("Failed to load slots:", err));
   }, []);
 
-  // Derive every categorical option from the actual loaded bookings so the
-  // selected values always match what filterAppointmentSlots compares.
-  const departments = useMemo(() => buildAppointmentDepartmentOptions(slots), [slots]);
-  const courses = useMemo(() => buildAppointmentCourseOptions(slots), [slots]);
-  const reasons = useMemo(() => {
-    // Include the shared /reasons list so dedicated reasons remain filterable
-    // even before their first appointment appears in today's slots.
-    const values = new Set(buildAppointmentReasonOptions(slots));
-    (reasonRecords || []).forEach((reason) => {
-      const description = String(reason?.description || "").trim();
-      if (description) values.add(description);
+  // Every option comes from the bookings this widget can actually render.
+  // Each category ignores its own selection when deriving options, so adding
+  // another value never hides the values that are still available.
+  const bookings = useMemo(
+    () => (Array.isArray(slots) ? slots : []).flatMap((slot) => slot?.bookings || []),
+    [slots]
+  );
+  const filterFields = useMemo(
+    () => ({
+      department: (booking) => booking?.dept,
+      course: (booking) => booking?.course,
+      reason: (booking) => booking?.reason,
+    }),
+    []
+  );
+  const filterSelections = useMemo(
+    () => ({ department, course, reason: reasonFilter }),
+    [department, course, reasonFilter]
+  );
+  const options = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: bookings,
+        fields: filterFields,
+        selections: filterSelections,
+        matches: (booking, key) => {
+          if (String(booking?.status ?? "").trim().toLowerCase() === "cancelled") return false;
+          const query = search.trim().toLowerCase();
+          if (!query) return true;
+          // Keep the same searchable fields as filterAppointmentSlots.
+          return key === "department" || key === "course" || key === "reason"
+            ? [booking?.name, booking?.dept].some((value) =>
+                String(value ?? "").toLowerCase().includes(query)
+              )
+            : true;
+        },
+      }),
+    [bookings, filterFields, filterSelections, search]
+  );
+  const { departments, courses, reasons } = options;
+
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: filterSelections,
+      options,
     });
-    return Array.from(values).filter(Boolean).sort((a, b) => a.localeCompare(b));
-  }, [slots, reasonRecords]);
+    if (!changed) return;
+    if (next.department !== department) setDepartment(next.department);
+    if (next.course !== course) setCourse(next.course);
+    if (next.reason !== reasonFilter) setReasonFilter(next.reason);
+  }, [options, filterSelections, department, course, reasonFilter]);
 
   const filteredSlots = useMemo(
     () => filterAppointmentSlots(slots, { search, department, course, reason: reasonFilter }),

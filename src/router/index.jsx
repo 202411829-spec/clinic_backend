@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import ProtectedRoute from './ProtectedRoute.jsx'
 import RouteShell from './RouteShell.jsx'
 import { AppointmentProvider } from '../context/AppointmentContext.jsx'
 import { ProfileCompletenessProvider } from '../context/ProfileCompletenessContext.jsx'
+import LogbookSkeleton from '../components/admin/LogbookSkeleton.jsx'
 import * as P from './lazyPages.js'
 
 /**
@@ -32,7 +34,11 @@ export const router = createBrowserRouter([
         children: [
           { path: 'dashboard', element: <P.AdminDashboard /> },
           { path: 'appointments', element: <P.Appointments /> },
-          { path: 'logbook', element: <P.Logbook /> },
+          { path: 'logbook', element: (
+            <Suspense fallback={<LogbookSkeleton />}>
+              <P.Logbook />
+            </Suspense>
+          ) },
           { path: 'masterlist', element: <P.Masterlist /> },
           { path: 'masterlist/:studentId', element: <P.AdminStudentRecord /> },
           { path: 'masterlist/:studentId/medical-certificate', element: <P.MedicalCertificate /> },

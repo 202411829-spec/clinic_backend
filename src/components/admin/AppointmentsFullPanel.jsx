@@ -9,12 +9,12 @@ import TimeBlockEditPopover from "./TimeBlockEditPopover";
 import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
 import PortalOverlay from "../ui/PortalOverlay.jsx";
 import AppointmentDatePicker from "./AppointmentDatePicker.jsx";
-import { appointmentsApi, referenceApi } from "../../lib/api.js";
+import { appointmentsApi } from "../../lib/api.js";
+import { filterAppointmentSlots } from "../../lib/appointmentSlots.js";
 import {
-  buildAppointmentCourseOptions,
-  buildAppointmentDepartmentOptions,
-  filterAppointmentSlots,
-} from "../../lib/appointmentSlots.js";
+  deriveRecordFilterOptions,
+  reconcileRecordFilterSelections,
+} from "../../lib/filterMultiSelect.js";
 import { toYMD } from "../../lib/calendar";
 import { formatTimeRange } from "../../lib/timeFormat";
 
@@ -86,7 +86,7 @@ function SlotActionMenu({ onEdit, onDelete, editing, slot, onCloseEdit, onSaveTi
 }
 
 function SlotGroup({ slot, onStatusChange, editing, onToggleEdit, onSaveTimeBlock, onDeleteTimeBlock }) {
-  const [expanded, setExpanded] = useState(slot.bookings.length > 0);
+  const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState(null);
 
   return (
@@ -222,7 +222,6 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
   const [department, setDepartment] = useState([]);
   const [course, setCourse] = useState([]);
   const [reasonFilter, setReasonFilter] = useState([]);
-  const [reasonRecords, setReasonRecords] = useState([]);
 
   // Fetch real time slots + bookings for the selected date.
   useEffect(() => {
@@ -248,22 +247,53 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
     };
   }, [selectedDate]);
 
-  // Fetch real reasons for the filter dropdown
-  useEffect(() => {
-    referenceApi
-      .reasons()
-      .then((res) => {
-        const list = (res?.reasons || [])
-          .filter((r) => r.description && r.description !== "-")
-          .sort((a, b) => a.description.localeCompare(b.description));
-        if (list.length) setReasonRecords(list);
-      })
-      .catch(() => {});
-  }, []);
+  // Derive categorical options from the bookings this screen can render.
+  const bookings = useMemo(
+    () => (Array.isArray(slots) ? slots : []).flatMap((slot) => slot?.bookings || []),
+    [slots]
+  );
+  const filterFields = useMemo(
+    () => ({
+      department: (booking) => booking?.dept,
+      course: (booking) => booking?.course,
+      reason: (booking) => booking?.reason,
+    }),
+    []
+  );
+  const filterSelections = useMemo(
+    () => ({ department, course, reason: reasonFilter }),
+    [department, course, reasonFilter]
+  );
+  const options = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: bookings,
+        fields: filterFields,
+        selections: filterSelections,
+        matches: (booking) => {
+          if (String(booking?.status ?? "").trim().toLowerCase() === "cancelled") return false;
+          const query = search.trim().toLowerCase();
+          if (!query) return true;
+          // Keep the same searchable fields as filterAppointmentSlots.
+          return [booking?.name, booking?.dept].some((value) =>
+            String(value ?? "").toLowerCase().includes(query)
+          );
+        },
+      }),
+    [bookings, filterFields, filterSelections, search]
+  );
+  const { departments, courses, reasons } = options;
 
-  // Derive categorical options from the loaded slots/bookings
-  const departments = useMemo(() => buildAppointmentDepartmentOptions(slots), [slots]);
-  const courses = useMemo(() => buildAppointmentCourseOptions(slots), [slots]);
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: filterSelections,
+      options,
+    });
+    if (!changed) return;
+    if (next.department !== department) setDepartment(next.department);
+    if (next.course !== course) setCourse(next.course);
+    if (next.reason !== reasonFilter) setReasonFilter(next.reason);
+  }, [options, filterSelections, department, course, reasonFilter]);
 
   function handleStatusChange(slotId, bookingId, newStatus) {
     // Optimistic update, persisted via PATCH /appointments/<id>/status.
@@ -349,6 +379,17 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
 
   const hasAppointments = filteredSlots.length > 0;
 
+  // A new date/search/category view starts every block collapsed. Other
+  // updates (status changes, saving a time block, editing) keep the same keys
+  // so the user's open/closed choices survive unrelated refreshes.
+  const expansionViewKey = JSON.stringify({
+    date: toYMD(selectedDate),
+    search,
+    department,
+    course,
+    reason: reasonFilter,
+  });
+
   return (
     <section className="card-hover bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
@@ -394,7 +435,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
         <FilterMultiSelect
           value={reasonFilter}
           onChange={setReasonFilter}
-          options={reasonRecords.map((r) => r.description)}
+          options={reasons}
           allLabel="All Reason"
           pluralLabel="Reasons"
           ariaLabel="Filter by reason"
@@ -417,7 +458,7 @@ export default function AppointmentsFullPanel({ selectedDate, onSelectDate }) {
       {!loading && !error && hasAppointments &&
         filteredSlots.map((slot) => (
           <SlotGroup
-            key={slot.id}
+            key={`${slot.id}:${expansionViewKey}`}
             slot={slot}
             onStatusChange={requestStatusChange}
             editing={openEditId === slot.id}

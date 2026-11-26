@@ -47,6 +47,79 @@ export function isFilterSelected(value, selected) {
   return values.length === 0 || values.includes(stringValue(value))
 }
 
+function filterOptionValue(value) {
+  if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, "value")) {
+    return stringValue(value.value)
+  }
+  return stringValue(value)
+}
+
+function filterOptionLabel(value) {
+  if (value && typeof value === "object") {
+    return stringValue(value.label ?? value.name ?? filterOptionValue(value))
+  }
+  return stringValue(value)
+}
+
+// Builds categorical options from the records that are actually available to
+// a screen. Each field getter reads one category from a record; a category's
+// options honor every OTHER selected category, so dependent filters never
+// suggest a value that would produce an empty result. An option may be a
+// primitive or an object with `value` + `label`.
+export function deriveRecordFilterOptions({
+  records = [],
+  fields = {},
+  selections = {},
+  matches = () => true,
+} = {}) {
+  const result = {}
+  const sourceRecords = Array.isArray(records) ? records : []
+
+  for (const [key, readValue] of Object.entries(fields)) {
+    const options = new Map()
+    for (const record of sourceRecords) {
+      const rawValue = readValue(record)
+      const value = filterOptionValue(rawValue)
+      if (!value || value === "-" || !matches(record, key)) continue
+
+      const otherCategoriesMatch = Object.entries(fields).every(([otherKey, otherReader]) => {
+        if (otherKey === key) return true
+        return isFilterSelected(filterOptionValue(otherReader(record)), selections[otherKey])
+      })
+      if (!otherCategoriesMatch) continue
+      if (!options.has(value)) {
+        options.set(value, { value, label: filterOptionLabel(rawValue) || value })
+      }
+    }
+    result[key] = Array.from(options.values()).sort((a, b) =>
+      String(a.label).localeCompare(String(b.label))
+    )
+  }
+  return result
+}
+
+// Drops selections that are no longer offered after another filter changed.
+// Returning the original reference when nothing changed avoids needless React
+// state updates.
+export function reconcileRecordFilterSelections({ selections = {}, options = {} } = {}) {
+  const next = {}
+  let changed = false
+
+  for (const [key, value] of Object.entries(selections)) {
+    const normalized = normalizeFilterValues(value)
+    const allowed = new Set(
+      normalizeFilterOptions(options[key]).map((option) => stringValue(option.value))
+    )
+    const kept = normalized.filter((item) => allowed.has(item))
+    const isSame =
+      kept.length === normalized.length && kept.every((item, index) => item === normalized[index])
+    next[key] = isSame ? value : kept
+    if (!isSame) changed = true
+  }
+
+  return { next, changed }
+}
+
 export function toggleFilterValue(selected, value) {
   const values = normalizeFilterValues(selected)
   const normalized = stringValue(value).trim()

@@ -15,6 +15,10 @@ import {
 } from '../../components/ui/icons.jsx'
 import NavIcon from '../../components/ui/NavIcon.jsx'
 import FilterMultiSelect from '../../components/ui/FilterMultiSelect.jsx'
+import {
+  deriveRecordFilterOptions,
+  reconcileRecordFilterSelections,
+} from '../../lib/filterMultiSelect.js'
 import SkeletonRows from '../../components/ui/SkeletonRows.jsx'
 import { PageHeader } from '../../components/ui/primitives.jsx'
 
@@ -53,9 +57,9 @@ export default function Masterlist() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
 
-  const [departments, setDepartments] = useState([])
-  const [courses, setCourses] = useState([])
-  const [years, setYears] = useState([])
+  // Category-free rows used only to derive filter options. The table below
+  // still uses server-side filtering/pagination over the selected values.
+  const [optionRows, setOptionRows] = useState([])
 
   // Categorical search filters are OR sets; empty arrays mean "All".
   const [departmentId, setDepartmentId] = useState([])
@@ -72,29 +76,43 @@ export default function Masterlist() {
   const [error, setError] = useState('')
   const [openMenuId, setOpenMenuId] = useState(null)
 
-  // Filter dropdown data — fetched once.
+  // Fetch the search-matched superset once per search change. Categories are
+  // derived from these rows while ignoring their own selection, which keeps
+  // every option backed by a real student without contradicting other filters.
   useEffect(() => {
-    masterlistApi.listDepartments().then(setDepartments).catch(() => {})
-    masterlistApi.listYears().then(setYears).catch(() => {})
-  }, [])
+    const OPTION_PAGE_SIZE = 1000
+    let cancelled = false
 
-  // Courses cascade off the selected departments. Multiple departments return
-  // the union of their courses; selections no longer offered are dropped so
-  // the two filters can never contradict each other.
-  useEffect(() => {
-    masterlistApi
-      .listCourses(departmentId.length ? departmentId : undefined)
-      .then((rows) => {
-        const list = Array.isArray(rows) ? rows : []
-        setCourses(list)
-        const validIds = new Set(list.map((c) => String(c.course_id)))
-        setCourseId((previous) => {
-          const next = previous.filter((id) => validIds.has(String(id)))
-          return next.length === previous.length ? previous : next
-        })
+    async function loadOptions() {
+      const first = await masterlistApi.listStudents({
+        search: debouncedSearch || undefined,
+        sort_by: 'name',
+        sort_dir: 'asc',
+        page: 1,
+        page_size: OPTION_PAGE_SIZE,
       })
-      .catch(() => {})
-  }, [departmentId])
+      const rows = [...(first?.data || [])]
+      const total = Number(first?.total || 0)
+      for (let pageNumber = 2; pageNumber <= getPageCount(total, OPTION_PAGE_SIZE); pageNumber += 1) {
+        const response = await masterlistApi.listStudents({
+          search: debouncedSearch || undefined,
+          sort_by: 'name',
+          sort_dir: 'asc',
+          page: pageNumber,
+          page_size: OPTION_PAGE_SIZE,
+        })
+        rows.push(...(response?.data || []))
+      }
+      if (!cancelled) setOptionRows(rows)
+    }
+
+    loadOptions().catch(() => {
+      if (!cancelled) setOptionRows([])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedSearch])
 
   useEffect(() => {
     setPage(1)
@@ -153,6 +171,42 @@ export default function Masterlist() {
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, total)
 
+  const filterFields = useMemo(
+    () => ({
+      department: (row) => ({ value: row.department_id, label: row.department_name }),
+      course: (row) => ({ value: row.course_id, label: row.course_name }),
+      year: (row) => row.year_level,
+    }),
+    []
+  )
+  const filterSelections = useMemo(
+    () => ({ department: departmentId, course: courseId, year: yearLevel }),
+    [departmentId, courseId, yearLevel]
+  )
+  const derivedOptions = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: optionRows,
+        fields: filterFields,
+        selections: filterSelections,
+      }),
+    [optionRows, filterFields, filterSelections]
+  )
+  const departmentOptions = derivedOptions.department || []
+  const courseOptions = derivedOptions.course || []
+  const yearOptions = derivedOptions.year || []
+
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: filterSelections,
+      options: derivedOptions,
+    })
+    if (!changed) return
+    if (next.department !== departmentId) setDepartmentId(next.department)
+    if (next.course !== courseId) setCourseId(next.course)
+    if (next.year !== yearLevel) setYearLevel(next.year)
+  }, [derivedOptions, filterSelections, departmentId, courseId, yearLevel])
+
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
@@ -195,7 +249,7 @@ export default function Masterlist() {
             pluralLabel="Departments"
             ariaLabel="Filter by department"
             triggerTestId="masterlist-department-filter"
-            options={departments.map((d) => ({ value: d.department_id, label: d.department_name }))}
+            options={departmentOptions}
           />
           <FilterMultiSelect
             value={courseId}
@@ -204,7 +258,7 @@ export default function Masterlist() {
             pluralLabel="Courses"
             ariaLabel="Filter by course"
             triggerTestId="masterlist-course-filter"
-            options={courses.map((c) => ({ value: c.course_id, label: c.course_name }))}
+            options={courseOptions}
           />
           <FilterMultiSelect
             value={yearLevel}
@@ -213,7 +267,7 @@ export default function Masterlist() {
             pluralLabel="Years"
             ariaLabel="Filter by year level"
             triggerTestId="masterlist-year-filter"
-            options={years.map((y) => ({ value: y, label: y }))}
+            options={yearOptions}
           />
         </div>
 

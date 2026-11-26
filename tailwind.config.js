@@ -80,7 +80,7 @@ export default {
       },
 
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"Geist Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         // Reserved for institutional moments only: page titles, the sidebar
         // lockup, and the printed letterhead / medical certificate. It is not a
         // decorative display face — it's what makes a printed document read as

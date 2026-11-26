@@ -134,9 +134,9 @@ test("Appointments page renders the final filtered blocks and exact empty state"
 })
 
 test("Dashboard Appointment widget renders only real appointment blocks", () => {
-  assert.match(widgetSource, /buildAppointmentDepartmentOptions/)
-  assert.match(widgetSource, /buildAppointmentCourseOptions/)
-  assert.match(widgetSource, /buildAppointmentReasonOptions/)
+  assert.match(widgetSource, /deriveRecordFilterOptions/)
+  assert.match(widgetSource, /reconcileRecordFilterSelections/)
+  assert.doesNotMatch(widgetSource, /buildAppointment(Department|Course|Reason)Options/)
   assert.match(widgetSource, /filterAppointmentSlots/)
   assert.match(
     widgetSource,
@@ -170,6 +170,37 @@ test("Dashboard appointment blocks start collapsed but stay manually toggleable"
   )
   assert.match(
     widgetSource,
+    /className=\{`expand \$\{expanded \? "is-open" : ""\}`\}/
+  )
+})
+
+test("Full-page appointment blocks start collapsed and reset only for view changes", () => {
+  assert.match(
+    panelSource,
+    /const \[expanded, setExpanded\] = useState\(false\);/
+  )
+  assert.doesNotMatch(
+    panelSource,
+    /const \[expanded, setExpanded\] = useState\(slot\.bookings\.length > 0\);/
+  )
+
+  const viewKey = panelSource.match(
+    /const expansionViewKey = JSON\.stringify\(\{[\s\S]*?\}\);/
+  )?.[0] || ""
+  assert.match(viewKey, /date: toYMD\(selectedDate\)/)
+  assert.match(viewKey, /search,/)
+  assert.match(viewKey, /department,/)
+  assert.match(viewKey, /course,/)
+  assert.match(viewKey, /reason: reasonFilter/)
+  assert.doesNotMatch(viewKey, /slots|openEditId|cancelTarget/)
+  assert.match(panelSource, /key=\{`\$\{slot\.id\}:\$\{expansionViewKey\}`\}/)
+
+  assert.match(
+    panelSource,
+    /onClick=\{\(\) => setExpanded\(\(v\) => !v\)\}/
+  )
+  assert.match(
+    panelSource,
     /className=\{`expand \$\{expanded \? "is-open" : ""\}`\}/
   )
 })

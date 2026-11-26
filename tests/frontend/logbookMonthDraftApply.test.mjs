@@ -14,6 +14,7 @@ const read = (path) => readFileSync(path, "utf8")
 const control = read("src/components/admin/LogbookRangePicker.jsx")
 const widget = read("src/components/admin/LogbookPanel.jsx")
 const fullPage = read("src/components/admin/LogbookFullPanel.jsx")
+const calendar = read("src/components/ui/DateRangePicker.jsx")
 const draftLib = read("src/lib/logbookRangeDraft.js")
 
 const NOW = new Date(2026, 0, 1)
@@ -145,6 +146,23 @@ test("non-Month periods keep their existing immediate apply behavior", () => {
   assert.equal(calls.length, 1)
   assert.equal(gate.maybeApply(day), false)
   assert.equal(calls.length, 1, "unchanged ranges must not trigger duplicate fetches")
+})
+
+test("full Logbook keeps its controls mounted during background refreshes", () => {
+  assert.match(fullPage, /const \[hasLoadedOnce, setHasLoadedOnce\] = useState\(false\)/)
+  assert.match(fullPage, /setHasLoadedOnce\(true\)/)
+  assert.match(fullPage, /if \(loading && !hasLoadedOnce\)/)
+  assert.match(fullPage, /if \(error && !hasLoadedOnce\)/)
+  assert.match(fullPage, /aria-busy=\{loading\}/)
+  assert.doesNotMatch(fullPage, /if \(loading\) \{\s*return \(/, "later fetches must not replace the whole panel")
+  assert.doesNotMatch(fullPage, /window\.location|location\.reload/, "no document navigation on filter changes")
+
+  const pickDay = fnSource(control, "handlePickDay")
+  assert.match(pickDay, /setDayRange\(next\)/)
+  assert.doesNotMatch(pickDay, /setOpen/, "start/end day picks must not close the calendar")
+  assert.match(control, /onPick=\{handlePickDay\}/)
+  assert.match(calendar, /getRangePreview\(value, hoverISO\)/)
+  assert.match(calendar, /onMouseEnter=\{\(\) => setHoverISO\(iso\)\}/)
 })
 
 test("both Logbook parents keep one picker instance with no key-driven remount", () => {

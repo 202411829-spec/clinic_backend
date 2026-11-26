@@ -30,7 +30,11 @@ import {
   mergeReportResponses,
   normalizeReportDepartments,
 } from "../../lib/reportAggregation.js";
-import { formatFilterSelectionLabel } from "../../lib/filterMultiSelect.js";
+import {
+  deriveRecordFilterOptions,
+  formatFilterSelectionLabel,
+  reconcileRecordFilterSelections,
+} from "../../lib/filterMultiSelect.js";
 import {
   buildRegularTimeDates,
   formatDailyAverage,
@@ -360,6 +364,7 @@ export default function ReportsFullPanel() {
   // Time-category and period controls remain single-value by design.
   const [department, setDepartment] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [reportDepartmentRows, setReportDepartmentRows] = useState([]);
   const [data, setData] = useState(EMPTY_DATA);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
@@ -540,6 +545,32 @@ export default function ReportsFullPanel() {
     departmentKey,
   ]);
 
+  // Fetch the same selected dates without a department filter so the dropdown
+  // only offers departments that actually contributed records to the report.
+  useEffect(() => {
+    let cancelled = false;
+    const dates = timeCategory === "School-Based Time" ? academicDates : regularDates;
+    if (dates.length === 0) {
+      setReportDepartmentRows([]);
+      return undefined;
+    }
+
+    async function loadDepartmentOptions() {
+      const responses = await fetchReportDates(dates, [], reportsApi.get);
+      const rows = responses
+        .flatMap((response) => response?.department_breakdown || [])
+        .filter((row) => Number(row?.count || 0) > 0 && String(row?.label || "").trim());
+      if (!cancelled) setReportDepartmentRows(rows);
+    }
+
+    loadDepartmentOptions().catch(() => {
+      if (!cancelled) setReportDepartmentRows([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [timeCategory, academicDatesKey, regularDatesKey]);
+
   const academicPeriodLabel = useMemo(
     () => formatAcademicPeriodLabel({ schoolStartYear, semester, monthRange: academicMonthRange }),
     [schoolStartYear, semester, academicMonthRangeKey]
@@ -551,6 +582,37 @@ export default function ReportsFullPanel() {
         ? dayRangeLabel(dayRange) || formatDateLabel(dateKey)
         : formatRegularPeriodLabel(regularPeriodArgs);
   const canOpenPicker = timeCategory === "School-Based Time" || period !== "All Time";
+
+  const reportDepartmentFields = useMemo(
+    () => ({
+      department: (row) => {
+        const target = String(row?.label ?? "").trim().toLowerCase();
+        const match = departments.find(
+          (item) => String(item.name ?? "").trim().toLowerCase() === target
+        );
+        return match ? { value: match.id, label: row.label } : null;
+      },
+    }),
+    [departments]
+  );
+  const reportDepartmentSelections = useMemo(() => ({ department }), [department]);
+  const reportDepartmentOptions = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: reportDepartmentRows,
+        fields: reportDepartmentFields,
+        selections: reportDepartmentSelections,
+      }).department || [],
+    [reportDepartmentRows, reportDepartmentFields, reportDepartmentSelections]
+  );
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: reportDepartmentSelections,
+      options: { department: reportDepartmentOptions },
+    });
+    if (changed && next.department !== department) setDepartment(next.department);
+  }, [reportDepartmentOptions, reportDepartmentSelections, department]);
+
   const departmentLabel = formatFilterSelectionLabel({
     selected: department,
     options: departments.map((d) => ({ value: d.id, label: d.name })),
@@ -1101,7 +1163,7 @@ export default function ReportsFullPanel() {
               <FilterMultiSelect
                 value={department}
                 onChange={setDepartment}
-                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                options={reportDepartmentOptions}
                 allLabel="All Departments"
                 pluralLabel="Departments"
                 ariaLabel="Filter by department"

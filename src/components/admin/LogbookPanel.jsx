@@ -9,13 +9,15 @@ import Letterhead from "./Letterhead.jsx";
 import Pagination from "../ui/Pagination.jsx";
 import WalkInVisitModal from "./WalkInVisitModal.jsx";
 import useWalkInForm from "./useWalkInForm.js";
-import { logbookApi, masterlistApi } from "../../lib/api.js";
+import { logbookApi } from "../../lib/api.js";
 import { getWeekRangeYMD, isoToMDY } from "../../lib/calendar.js";
 import { clampPage, getPageCount } from "../../lib/pagination.js";
 import { buildLogbookQueryParams } from "../../lib/logbookQuery.js";
 import {
+  deriveRecordFilterOptions,
   formatFilterSelectionLabel,
   isFilterSelected,
+  reconcileRecordFilterSelections,
 } from "../../lib/filterMultiSelect.js";
 import { pdfLetterhead } from "../../lib/pdf.js";
 
@@ -82,10 +84,6 @@ export default function LogbookPanel({
   const navigate = useNavigate();
   const [entries, setEntries] = useState([]);
 
-  // Derived for dropdowns
-  const reasons = useMemo(() => reasonRecords.map((r) => r.description), [reasonRecords]);
-  const medicines = useMemo(() => medicineRecords.map((m) => m.medicine_name), [medicineRecords]);
-
   // Walk-in form — shared hook encapsulates all walk-in state + handlers
   const walkIn = useWalkInForm({
     reasonRecords,
@@ -110,35 +108,6 @@ export default function LogbookPanel({
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Reference department/course names from the masterlist so the multi-select
-  // options are complete — the widget only ever holds five rows, which used to
-  // starve the old single-value dropdowns of options.
-  const [referenceDepartments, setReferenceDepartments] = useState([]);
-  const [referenceCourses, setReferenceCourses] = useState([]);
-
-  useEffect(() => {
-    masterlistApi
-      .listDepartments()
-      .then((res) =>
-        setReferenceDepartments(
-          (res?.departments || res || [])
-            .map((d) => d.department_name)
-            .filter((name) => name && name !== "-")
-        )
-      )
-      .catch(() => {});
-    masterlistApi
-      .listCourses()
-      .then((res) =>
-        setReferenceCourses(
-          (res?.courses || res || [])
-            .map((c) => c.course_name)
-            .filter((name) => name && name !== "-")
-        )
-      )
-      .catch(() => {});
-  }, []);
-
   // The widget keeps only the first five rows, but asks the backend for the
   // selected Regular Time range instead of applying a second local date logic.
   useEffect(() => {
@@ -148,24 +117,54 @@ export default function LogbookPanel({
       .catch((err) => console.error("Failed to load logbook:", err));
   }, [dateFrom, dateTo]);
 
-  // Multi-select options: masterlist reference names (complete) unioned with
-  // whatever the five loaded rows happen to show, so a row can never be
-  // unfilterable even if the reference fetch failed.
-  const departments = useMemo(() => {
-    const set = new Set(referenceDepartments);
-    entries.forEach((e) => {
-      if (e.dept && e.dept !== "-") set.add(e.dept);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [referenceDepartments, entries]);
+  // Options come only from logbook rows this widget actually loaded. Each
+  // category ignores its own selection, so dependent filters stay useful.
+  const filterFields = useMemo(
+    () => ({
+      department: (entry) => entry?.dept,
+      course: (entry) => entry?.course,
+      reason: (entry) => entry?.reason,
+    }),
+    []
+  );
+  const filterSelections = useMemo(
+    () => ({ department, course, reason: reasonFilter }),
+    [department, course, reasonFilter]
+  );
+  const options = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: entries,
+        fields: filterFields,
+        selections: filterSelections,
+        matches: (entry) => {
+          const query = search.trim().toLowerCase();
+          if (!query) return true;
+          return [
+            entry?.name,
+            entry?.studentId,
+            entry?.course,
+            entry?.dept,
+            entry?.reason,
+            entry?.complaint,
+            entry?.medicine,
+          ].some((value) => String(value ?? "").toLowerCase().includes(query));
+        },
+      }),
+    [entries, filterFields, filterSelections, search]
+  );
+  const { departments, courses, reasons } = options;
 
-  const courses = useMemo(() => {
-    const set = new Set(referenceCourses);
-    entries.forEach((e) => {
-      if (e.course && e.course !== "-") set.add(e.course);
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: filterSelections,
+      options,
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [referenceCourses, entries]);
+    if (!changed) return;
+    if (next.department !== department) setDepartment(next.department);
+    if (next.course !== course) setCourse(next.course);
+    if (next.reason !== reasonFilter) setReasonFilter(next.reason);
+  }, [options, filterSelections, department, course, reasonFilter]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

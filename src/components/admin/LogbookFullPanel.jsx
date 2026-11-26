@@ -1,8 +1,9 @@
 // src/components/admin/LogbookFullPanel.jsx
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import NavIcon from "../ui/NavIcon.jsx";
 import FilterMultiSelect from "../ui/FilterMultiSelect.jsx";
 import LogbookRangePicker from "./LogbookRangePicker.jsx";
+import LogbookSkeleton from "./LogbookSkeleton.jsx";
 import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import Pagination from "../ui/Pagination.jsx";
@@ -12,7 +13,11 @@ import { logbookApi, referenceApi, masterlistApi } from "../../lib/api.js";
 import { formatMDY, isoToMDY } from "../../lib/calendar.js";
 import { clampPage, getPageCount } from "../../lib/pagination.js";
 import { buildLogbookQueryParams } from "../../lib/logbookQuery.js";
-import { formatFilterSelectionLabel } from "../../lib/filterMultiSelect.js";
+import {
+  deriveRecordFilterOptions,
+  formatFilterSelectionLabel,
+  reconcileRecordFilterSelections,
+} from "../../lib/filterMultiSelect.js";
 import {
   buildLogbookPdfMeta,
   downloadLogbookPdf,
@@ -38,6 +43,9 @@ function mapEntry(r) {
     age: r.age ?? "-",
     dept,
     course,
+    departmentId: r.department_id ?? r.appointments?.students?.department_id ?? r.students?.department_id ?? "",
+    courseId: r.course_id ?? r.appointments?.students?.course_id ?? r.students?.course_id ?? "",
+    reasonId: r.reason_id ?? r.appointments?.reason_id ?? "",
     deptCourse,
     sex: r.sex || "-",
     reason: r.reason || "-",
@@ -49,11 +57,26 @@ function mapEntry(r) {
   };
 }
 
+// Reference rows are only used to turn a record's display name back into the
+// ID the server-side filters expect. They never supply options on their own.
+function findReferenceId(rows, valueKey, labelKey, name) {
+  const target = String(name ?? "").trim().toLowerCase();
+  if (!target || target === "-") return "";
+  const match = (rows || []).find(
+    (row) => String(row?.[labelKey] ?? "").trim().toLowerCase() === target
+  );
+  return match ? String(match?.[valueKey] ?? "") : "";
+}
+
 export default function LogbookFullPanel() {
   const [entries, setEntries] = useState([]);
+  // Unfiltered-by-category rows used only to derive filter options. The table
+  // itself still uses server-side pagination/filtering via `entries`.
+  const [optionEntries, setOptionEntries] = useState([]);
   const [reasonRecords, setReasonRecords] = useState([]);
   const [medicineRecords, setMedicineRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState(null);
 
   // Pagination & filters state — categorical filters are multi-select arrays
@@ -71,7 +94,7 @@ export default function LogbookFullPanel() {
   const totalPages = getPageCount(totalEntries, pageSize);
   const currentPage = clampPage(page, totalPages);
 
-  // Options for the new department/course filters, loaded from the masterlist.
+  // Reference labels/IDs used for PDF labels and record-to-ID resolution.
   const [departments, setDepartments] = useState([]);
   const [courses, setCourses] = useState([]);
 
@@ -112,6 +135,7 @@ export default function LogbookFullPanel() {
       if (isCurrent()) {
         setEntries((logbookRes?.logbook || []).map(mapEntry));
         setTotalEntries(Number(logbookRes?.total || 0));
+        setHasLoadedOnce(true);
         const reasonsList = (reasonsRes?.reasons || []).filter((r) => r.description && r.description !== "-");
         if (reasonsList.length) setReasonRecords(reasonsList);
         const medicinesList = (medicinesRes?.medicines || []).filter((m) => m.medicine_name);
@@ -128,6 +152,26 @@ export default function LogbookFullPanel() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load the category-free superset once per date/search change. Each filter
+  // derives its options from these rows while honoring the other selections,
+  // so a selected category can still offer additional values to add.
+  useEffect(() => {
+    let cancelled = false;
+    fetchAllLogbookRows({
+      list: (params) => logbookApi.list(params),
+      params: buildLogbookQueryParams({ dateFrom, dateTo, search }),
+    })
+      .then(({ rows }) => {
+        if (!cancelled) setOptionEntries(rows.map(mapEntry));
+      })
+      .catch(() => {
+        if (!cancelled) setOptionEntries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo, search]);
 
   // Keep the visible page valid if a filtered result set shrinks underneath us.
   useEffect(() => {
@@ -237,6 +281,62 @@ export default function LogbookFullPanel() {
     value: String(r.reason_id),
     label: r.description,
   }));
+
+  // Filter options are record-backed: reference rows only resolve the IDs.
+  const filterFields = useMemo(
+    () => ({
+      department: (entry) => {
+        const id = entry.departmentId || findReferenceId(departments, "value", "label", entry.dept);
+        return id ? { value: id, label: entry.dept } : null;
+      },
+      course: (entry) => {
+        const id = entry.courseId || findReferenceId(courses, "value", "label", entry.course);
+        return id ? { value: id, label: entry.course } : null;
+      },
+      reason: (entry) => {
+        const id = entry.reasonId || findReferenceId(reasonRecords, "reason_id", "description", entry.reason);
+        return id ? { value: id, label: entry.reason } : null;
+      },
+    }),
+    [departments, courses, reasonRecords]
+  );
+  const filterSelections = useMemo(
+    () => ({ department: departmentFilter, course: courseFilter, reason: reasonFilter }),
+    [departmentFilter, courseFilter, reasonFilter]
+  );
+  const derivedOptions = useMemo(
+    () =>
+      deriveRecordFilterOptions({
+        records: optionEntries,
+        fields: filterFields,
+        selections: filterSelections,
+      }),
+    [optionEntries, filterFields, filterSelections]
+  );
+  const departmentOptions = derivedOptions.department || [];
+  const courseOptions = derivedOptions.course || [];
+  const recordReasonOptions = derivedOptions.reason || [];
+
+  useEffect(() => {
+    const { next, changed } = reconcileRecordFilterSelections({
+      selections: filterSelections,
+      options: derivedOptions,
+    });
+    if (!changed) return;
+    if (next.department !== departmentFilter) {
+      setDepartmentFilter(next.department);
+      setPage(1);
+    }
+    if (next.course !== courseFilter) {
+      setCourseFilter(next.course);
+      setPage(1);
+    }
+    if (next.reason !== reasonFilter) {
+      setReasonFilter(next.reason);
+      setPage(1);
+    }
+  }, [derivedOptions, filterSelections, departmentFilter, courseFilter, reasonFilter]);
+
   const departmentLabel = formatFilterSelectionLabel({
     selected: departmentFilter,
     options: departments,
@@ -306,15 +406,13 @@ export default function LogbookFullPanel() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gc-green-700 font-semibold">Loading logbook…</div>
-      </div>
-    );
+  // Only the first load replaces the panel. Later refreshes stay in React so
+  // filters, focus, and the open date-range calendar survive background fetches.
+  if (loading && !hasLoadedOnce) {
+    return <LogbookSkeleton />;
   }
 
-  if (error) {
+  if (error && !hasLoadedOnce) {
     return (
       <div role="alert" className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">
         <p className="font-semibold">Failed to load logbook</p>
@@ -324,7 +422,7 @@ export default function LogbookFullPanel() {
   }
 
   return (
-    <section ref={panelRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
+    <section ref={panelRef} aria-busy={loading} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-5 print:shadow-none print:border-none print-a4-portrait">
       {error && (
         <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between gap-2 text-sm">
           <span>{error}</span>
@@ -364,7 +462,7 @@ export default function LogbookFullPanel() {
           <FilterMultiSelect
             value={departmentFilter}
             onChange={changeDepartment}
-            options={departments}
+            options={departmentOptions}
             allLabel="All Departments"
             pluralLabel="Departments"
             ariaLabel="Filter by department"
@@ -373,7 +471,7 @@ export default function LogbookFullPanel() {
           <FilterMultiSelect
             value={courseFilter}
             onChange={changeCourse}
-            options={courses}
+            options={courseOptions}
             allLabel="All Course"
             pluralLabel="Courses"
             ariaLabel="Filter by course"
@@ -382,7 +480,7 @@ export default function LogbookFullPanel() {
           <FilterMultiSelect
             value={reasonFilter}
             onChange={changeReason}
-            options={reasonOptions}
+            options={recordReasonOptions}
             allLabel="All Reasons"
             pluralLabel="Reasons"
             ariaLabel="Filter by reason"

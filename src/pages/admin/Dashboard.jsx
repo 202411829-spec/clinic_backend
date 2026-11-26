@@ -43,13 +43,13 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-3 sm:pt-4">
       <PageHeader
-        className="animate-fade-up"
+        className="animate-fade-up [&>div:last-child]:ml-auto [&>div:last-child]:max-w-full"
         title={greeting()}
         subtitle="Overview of today's clinic activity."
         actions={
-          <p className="text-right text-2xs font-semibold uppercase tracking-[0.22em] text-brand-600">
+          <p className="max-w-full break-words text-right text-2xs font-semibold uppercase leading-tight tracking-[0.22em] text-brand-600">
             {todayLabel}
           </p>
         }
@@ -62,7 +62,7 @@ export default function Dashboard() {
         />
       </Reveal>
       <Reveal delay={90}>
-        <AppointmentsPanel reasonRecords={reasonRecords} />
+        <AppointmentsPanel />
       </Reveal>
     </div>
   );

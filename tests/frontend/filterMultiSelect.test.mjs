@@ -3,9 +3,11 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 import {
+  deriveRecordFilterOptions,
   formatFilterSelectionLabel,
   isFilterSelected,
   normalizeFilterValues,
+  reconcileRecordFilterSelections,
   toggleFilterValue,
 } from "../../src/lib/filterMultiSelect.js"
 import { appendRequestParams } from "../../src/lib/requestParams.js"
@@ -67,6 +69,70 @@ test("multi-select labels show one value or a readable count", () => {
     }),
     "2 Departments selected"
   )
+})
+
+test("record-backed filter options exclude empty values and cascade across categories", () => {
+  const records = [
+    {
+      department: { value: "1", label: "CCS" },
+      course: { value: "10", label: "BSIT" },
+      reason: "Consultation",
+    },
+    {
+      department: { value: "1", label: "CCS" },
+      course: { value: "11", label: "BSCS" },
+      reason: "Medical Certificate",
+    },
+    {
+      department: { value: "2", label: "CAHS" },
+      course: { value: "12", label: "BSN" },
+      reason: "Consultation",
+    },
+    {
+      department: "-",
+      course: "",
+      reason: "-",
+    },
+  ]
+  const fields = {
+    department: (record) => record.department,
+    course: (record) => record.course,
+    reason: (record) => record.reason,
+  }
+
+  const options = deriveRecordFilterOptions({
+    records,
+    fields,
+    selections: { department: ["1"], course: [], reason: [] },
+  })
+  // A category ignores its own selection so another value can still be added.
+  assert.deepEqual(options.department, [
+    { value: "2", label: "CAHS" },
+    { value: "1", label: "CCS" },
+  ])
+  assert.deepEqual(options.course, [
+    { value: "11", label: "BSCS" },
+    { value: "10", label: "BSIT" },
+  ])
+  assert.deepEqual(options.reason, [
+    { value: "Consultation", label: "Consultation" },
+    { value: "Medical Certificate", label: "Medical Certificate" },
+  ])
+
+  const narrowed = deriveRecordFilterOptions({
+    records,
+    fields,
+    selections: { department: [], course: ["10"], reason: [] },
+  })
+  assert.deepEqual(narrowed.department, [{ value: "1", label: "CCS" }])
+
+  const reconciled = reconcileRecordFilterSelections({
+    selections: { department: ["9"], course: ["10"], reason: [] },
+    options: narrowed,
+  })
+  assert.deepEqual(reconciled.next.department, [])
+  assert.deepEqual(reconciled.next.course, ["10"])
+  assert.equal(reconciled.changed, true)
 })
 
 test("OR within categories and AND across categories filter appointment slots", () => {
