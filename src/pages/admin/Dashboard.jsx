@@ -46,9 +46,13 @@ export default function Dashboard() {
     <div className="space-y-5">
       <PageHeader
         className="animate-fade-up"
-        eyebrow={todayLabel}
         title={greeting()}
         subtitle="Overview of today's clinic activity."
+        actions={
+          <p className="text-right text-2xs font-semibold uppercase tracking-[0.22em] text-brand-600">
+            {todayLabel}
+          </p>
+        }
       />
 
       <Reveal delay={0}>

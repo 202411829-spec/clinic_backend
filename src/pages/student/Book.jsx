@@ -59,7 +59,7 @@ function SuccessPanel({ rescheduling, onDone }) {
         onClick={onDone}
         className="btn-primary btn-press btn-shine w-full py-2.5"
       >
-        Back to Dashboard
+        Done
       </button>
     </section>
   );

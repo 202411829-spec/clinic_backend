@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import NavIcon from "../ui/NavIcon";
 import { mainNav, managementNav } from "../../data/adminNav";
 import LogoutMenu from "../auth/LogoutMenu";
+import AdminSidebarProfile from "./AdminSidebarProfile";
 
 function NavGroup({ title, items, onNavigate }) {
   return (
@@ -86,12 +87,14 @@ export default function SidebarNav({ onNavigate }) {
 
       <div className="mx-4 border-t border-white/15" />
 
-      <nav className="flex-1 overflow-y-auto px-2 pt-5 space-y-7">
+      <AdminSidebarProfile />
+
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pt-5 space-y-7">
         <NavGroup title="Main" items={mainNav} onNavigate={onNavigate} />
         <NavGroup title="Management" items={managementNav} onNavigate={onNavigate} />
       </nav>
 
-      <div className="px-2 pb-5 pt-3 border-t border-white/15 mx-2 space-y-1">
+      <div className="mt-auto shrink-0 border-t border-white/15 mx-2 space-y-1 px-2 pb-5 pt-3">
         <div className="[&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-xl [&>button]:px-4 [&>button]:py-2.5 [&>button]:text-sm [&>button]:font-medium [&>button]:text-white/85 [&>button]:transition-all [&>button]:duration-200 [&>button:hover]:bg-white/10 [&>button:hover]:text-white/85 [&>button:active]:scale-[0.98] [&_svg]:w-[18px] [&_svg]:h-[18px]">
           <LogoutMenu redirectTo="/admin/login" />
         </div>

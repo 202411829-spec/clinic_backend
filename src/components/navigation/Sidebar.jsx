@@ -10,6 +10,7 @@ import {
   InfoIcon,
 } from '../ui/icons.jsx'
 import LogoutMenu from '../auth/LogoutMenu.jsx'
+import AdminSidebarProfile from './AdminSidebarProfile.jsx'
 
 const MAIN_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -92,7 +93,9 @@ function NavContent() {
         <div className="mt-4 h-px w-full bg-white/15" />
       </div>
 
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4">
+      <AdminSidebarProfile />
+
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto px-3 pb-4 pt-4">
         <div>
           <p className="px-4 pb-2 text-[11px] font-bold tracking-wider text-white/60">MAIN</p>
           <div className="space-y-1 stagger">
@@ -111,13 +114,13 @@ function NavContent() {
         </div>
       </nav>
 
-      <div className="border-t border-white/15 p-3">
+      <div className="mt-auto shrink-0 border-t border-white/15 p-3">
         <div className="[&>button]:btn-press [&>button]:flex [&>button]:w-full [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-control [&>button]:px-3.5 [&>button]:py-2.5 [&>button]:text-[15px] [&>button]:font-semibold [&>button]:text-white/75 [&>button]:transition-colors [&>button]:duration-200 [&>button:hover]:bg-white/10 [&>button:hover]:text-white [&_svg]:h-5 [&_svg]:w-5 [&_svg]:transition-transform [&_svg]:duration-200 [&>button:hover_svg]:scale-110">
           <LogoutMenu redirectTo="/admin/login" />
         </div>
       </div>
 
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="shrink-0 border-t border-white/10 px-3 py-3">
         <button className="btn-press flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-white/5">
           <InfoIcon className="h-5 w-5" />
           About

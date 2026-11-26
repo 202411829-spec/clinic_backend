@@ -5,7 +5,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
-import { ChevronLeftIcon } from "../ui/icons.jsx";
 import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
 import Letterhead from "./Letterhead.jsx";
 import {
@@ -356,14 +355,6 @@ export default function MedicalSummaryPanel({ student, medicalSummary }) {
 
       {/* ---------- title row + actions ---------- */}
       <div className="flex flex-col gap-4 print:hidden">
-        <button
-          onClick={() => navigate(-1)}
-          className="btn-press flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700"
-        >
-          <ChevronLeftIcon className="h-4 w-4" />
-          Back
-        </button>
-
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="w-10 h-10 rounded-lg bg-gc-green/10 text-gc-green flex items-center justify-center shrink-0">

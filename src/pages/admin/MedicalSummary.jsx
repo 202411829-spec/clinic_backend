@@ -1,6 +1,6 @@
 // src/pages/admin/MedicalSummary.jsx
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import MedicalSummaryPanel from "../../components/admin/MedicalSummaryPanel.jsx";
 import { masterlistApi, recordsApi } from "../../lib/api.js";
 import { adaptStudentProfile } from "../../lib/studentAdapter.js";
@@ -41,10 +41,7 @@ export default function MedicalSummary() {
     return (
       <div className="pt-2">
         <section className="bg-white rounded-2xl shadow-sm border border-gray-300 p-8 text-center">
-          <p className="text-sm text-gray-500 mb-3">{error}</p>
-          <Link to="/admin/masterlist" className="text-sm font-semibold text-gc-green hover:opacity-75">
-            ← Back to Masterlist
-          </Link>
+          <p className="text-sm text-gray-500">{error}</p>
         </section>
       </div>
     );

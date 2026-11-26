@@ -7,11 +7,9 @@
 // sheet (per the clinic's paper trail — one for the student, one for the
 // department, one for the clinic's own file).
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import NavIcon from "../ui/NavIcon.jsx";
 import AnimatedCheckbox from "../ui/AnimatedCheckbox.jsx";
 import { DownloadPdfButton, PrintButton } from "../ui/PrintDownloadButtons.jsx";
-import { ChevronLeftIcon } from "../ui/icons.jsx";
 import { computeAge } from "../../data/studentRecordSample.js";
 import { formatMDY } from "../../lib/calendar.js";
 import { getCertificateDefaults } from "../../lib/certificateSync.js";
@@ -139,7 +137,6 @@ function CertificateCopy({ student, age, normalFindings, diagnosis, finalRemark,
 }
 
 export default function MedicalCertificatePanel({ student, certificate = null, yearLabel = null }) {
-  const navigate = useNavigate();
   // Pre-fill from whatever was last saved on the Diagnosis and Final Remark
   // section of this student's Student Record for the selected Year I–IV — the
   // nurse can still edit any of these here, this just saves re-typing them.
@@ -262,15 +259,6 @@ export default function MedicalCertificatePanel({ student, certificate = null, y
           <button type="button" onClick={() => setError(null)} className="shrink-0 font-semibold underline underline-offset-2" aria-label="Dismiss error">Dismiss</button>
         </div>
       )}
-      {/* ---------- back ---------- */}
-      <button
-        onClick={() => navigate(-1)}
-        className="btn-press flex items-center gap-1 self-start text-sm font-semibold text-gc-green-700 print:hidden"
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-        Back
-      </button>
-
       {/* ---------- action row ---------- */}
       <div className="grid grid-cols-3 md:flex md:items-center md:justify-end gap-2 print:hidden">
         <button

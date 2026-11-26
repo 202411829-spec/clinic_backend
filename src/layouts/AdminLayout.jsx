@@ -1,7 +1,6 @@
 import { useState, useEffect, Suspense } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from '../components/navigation/Sidebar.jsx'
-import TopBar from '../components/navigation/TopBar.jsx'
 import MobileSidebarOverlay from '../components/navigation/MobileSidebarOverlay.jsx'
 import MobileMenuHandle from '../components/navigation/MobileMenuHandle.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -14,7 +13,7 @@ import { agentApi } from '../lib/agentApi.js'
 import { ContentLoader } from '../components/ui/PageLoader.jsx'
 
 // Medical Certificate / Medical Summary are printable official documents —
-// TopBar already hides itself there, so the mobile nav handle should too.
+// the mobile nav handle should hide there too.
 const HIDE_ON_PATTERNS = [/\/medical-certificate$/, /\/medical-summary$/]
 
 export default function AdminLayout() {
@@ -155,12 +154,11 @@ export default function AdminLayout() {
         )}
 
         <div className="app-main flex flex-1 flex-col overflow-y-auto lg:my-3 lg:mr-3 lg:rounded-shell print:m-0 print:overflow-visible print:rounded-none">
-          <TopBar />
           <main id="main-content" tabIndex={-1} className="px-4 pb-4 lg:px-10 lg:pb-6 print:px-0 print:pb-0">
             {checkingPending ? (
-              // Only this content area shows the loading state — Sidebar and
-              // TopBar above are already mounted and visible, so switching
-              // admins/reloading never blanks out the whole screen anymore.
+              // Only this content area shows the loading state — the Sidebar
+              // is already mounted and visible, so switching admins/reloading
+              // never blanks out the whole screen anymore.
               <div className="flex min-h-[60vh] items-center justify-center animate-fade-in">
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-gc-green-100 border-t-gc-green-700" />

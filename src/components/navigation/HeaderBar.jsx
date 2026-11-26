@@ -1,5 +1,4 @@
 // src/components/admin/Topbar.jsx
-import NavIcon from "../ui/NavIcon";
 import LogoutMenu from "../auth/LogoutMenu";
 
 function initials(name = "") {
@@ -13,24 +12,11 @@ function initials(name = "") {
 
 /**
  * user: { name: string, role: string }
- * onBack: optional handler for the "Back" link (defaults to browser back)
  * onMenuClick: opens the mobile sidebar overlay
  */
-export default function Topbar({ user, onBack, onMenuClick, logoutRedirect = "/admin/login", showLogout = true }) {
-  const handleBack = onBack ?? (() => window.history.back());
-
+export default function Topbar({ user, onMenuClick, logoutRedirect = "/admin/login", showLogout = true }) {
   return (
-    <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-6 print:hidden">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1.5 text-gc-green font-semibold text-sm hover:opacity-75"
-        >
-          <NavIcon name="back" className="w-4 h-4" />
-          Back
-        </button>
-      </div>
-
+    <header className="flex items-center justify-end px-4 md:px-8 py-4 md:py-6 print:hidden">
       {/* desktop: avatar + name/role, matches the mockup */}
       <div className="hidden md:flex items-center gap-3">
         <div className="text-right leading-tight">

@@ -29,12 +29,15 @@ test("Reports uses the shared PageHeader with its existing icon and actions", ()
   assert.match(header, /handleDownloadPdf/)
 })
 
-test("Dashboard keeps its date, greeting, and subtitle in the shared header", () => {
+test("Dashboard keeps its greeting left and date right in the shared header", () => {
   assert.match(dashboard, /import \{ PageHeader \} from "\.\.\/\.\.\/components\/ui\/primitives\.jsx"/)
   const header = dashboard.match(/<PageHeader[\s\S]*?\n\s+\/>/)?.[0] ?? ""
-  assert.match(header, /eyebrow=\{todayLabel\}/)
   assert.match(header, /title=\{greeting\(\)\}/)
   assert.match(header, /subtitle="Overview of today's clinic activity\."/)
+  assert.match(header, /actions=\{/)
+  assert.match(header, /\{todayLabel\}/)
+  assert.match(header, /text-right/)
+  assert.doesNotMatch(header, /eyebrow=\{todayLabel\}/)
   assert.match(header, /className="animate-fade-up"/)
   assert.doesNotMatch(dashboard, /font-serif text-3xl font-semibold/)
 })
