@@ -1,45 +1,60 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { shouldPrefixApi } from '../../src/lib/api.js'
-
-const apiSource = readFileSync('src/lib/api.js', 'utf8')
+import {
+  resolveApiBaseUrl,
+  shouldPrefixApi,
+  toApiUrl,
+} from '../../src/lib/api.js'
 
 test('separate production backend URLs are not given the Vercel /api prefix', () => {
+  const origin = 'https://gccas.vercel.app'
+  const baseUrl = 'https://gc-rfb-backend-production.up.railway.app'
+
+  assert.equal(shouldPrefixApi(baseUrl, origin), false)
   assert.equal(
-    shouldPrefixApi(
-      'https://gc-rfb-backend-production.up.railway.app',
-      'https://gc-rfb-frontend.vercel.app'
-    ),
-    false
+    toApiUrl('/logbook', { origin, baseUrl }),
+    'https://gc-rfb-backend-production.up.railway.app/logbook'
   )
 })
 
 test('same-origin Vercel Flask mount still receives the /api prefix', () => {
+  const origin = 'https://gccas.vercel.app'
+
+  assert.equal(shouldPrefixApi('/', origin), true)
+  assert.equal(shouldPrefixApi(origin, origin), true)
   assert.equal(
-    shouldPrefixApi('/', 'https://gc-rfb-frontend.vercel.app'),
-    true
-  )
-  assert.equal(
-    shouldPrefixApi(
-      'https://gc-rfb-frontend.vercel.app',
-      'https://gc-rfb-frontend.vercel.app'
-    ),
-    true
+    toApiUrl('/logbook', { origin, baseUrl: origin }),
+    'https://gccas.vercel.app/api/logbook'
   )
 })
 
-test('local dev backend keeps root-relative paths', () => {
+test('relative VITE_API_URL resolves against the current origin before URL construction', () => {
+  const origin = 'https://gccas.vercel.app'
+
+  assert.equal(resolveApiBaseUrl('/', origin), `${origin}/`)
   assert.equal(
-    shouldPrefixApi('http://127.0.0.1:5000', 'http://localhost:5173'),
+    toApiUrl('/logbook', { origin, baseUrl: '/' }),
+    'https://gccas.vercel.app/api/logbook'
+  )
+  assert.equal(
+    toApiUrl('/reasons', { origin, baseUrl: '/' }),
+    'https://gccas.vercel.app/api/reasons'
+  )
+  assert.equal(
+    toApiUrl('/api/masterlist/departments', { origin, baseUrl: '/' }),
+    'https://gccas.vercel.app/api/masterlist/departments'
+  )
+})
+
+test('local dev backend keeps root-relative paths without a /api prefix', () => {
+  const baseUrl = 'http://127.0.0.1:5000'
+
+  assert.equal(
+    shouldPrefixApi(baseUrl, 'http://localhost:5173'),
     false
   )
-})
-
-test('toApiUrl applies the helper and never double-prefixes /api paths', () => {
-  assert.match(
-    apiSource,
-    /if \(!alreadyPrefixed && shouldPrefixApi\(API_BASE_URL, origin\)\)/
+  assert.equal(
+    toApiUrl('/logbook', { origin: 'http://localhost:5173', baseUrl }),
+    'http://127.0.0.1:5000/logbook'
   )
-  assert.match(apiSource, /url\.pathname = `\/api\$\{url\.pathname\}`/)
 })

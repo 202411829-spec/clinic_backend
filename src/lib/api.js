@@ -1,7 +1,25 @@
 import { supabase } from './supabaseClient.js'
 import { appendRequestParams } from './requestParams.js'
 
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:5000'
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5000'
+const API_BASE_URL = import.meta.env?.VITE_API_URL || DEFAULT_API_BASE_URL
+
+function currentOrigin() {
+  return typeof window === 'undefined' ? null : window.location?.origin || null
+}
+
+// A relative VITE_API_URL (e.g. `/` on Vercel) is not a valid base for `new
+// URL()`. Resolve it against the current browser origin first so the same
+// source works locally (absolute Flask host by default) and on Vercel
+// (same-origin Flask mount).
+export function resolveApiBaseUrl(baseUrl = API_BASE_URL, origin = currentOrigin()) {
+  const value = typeof baseUrl === 'string' && baseUrl.trim() ? baseUrl.trim() : DEFAULT_API_BASE_URL
+  try {
+    return new URL(value, origin || undefined).toString()
+  } catch {
+    return value
+  }
+}
 
 // ---- Backend URL normalizer (two modes, one place) ----
 // Same-origin backend (local Flask proxy or Flask mounted in a Vercel
@@ -20,11 +38,11 @@ export function shouldPrefixApi(baseUrl, origin) {
   }
 }
 
-export function toApiUrl(path) {
-  const url = new URL(path, API_BASE_URL)
+export function toApiUrl(path, { origin = currentOrigin(), baseUrl = API_BASE_URL } = {}) {
+  const resolvedBaseUrl = resolveApiBaseUrl(baseUrl, origin)
+  const url = new URL(path, resolvedBaseUrl)
   const alreadyPrefixed = url.pathname === '/api' || url.pathname.startsWith('/api/')
-  const origin = typeof window === 'undefined' ? null : window.location.origin
-  if (!alreadyPrefixed && shouldPrefixApi(API_BASE_URL, origin)) {
+  if (!alreadyPrefixed && shouldPrefixApi(resolvedBaseUrl, origin)) {
     url.pathname = `/api${url.pathname}`
   }
   return url.toString()
